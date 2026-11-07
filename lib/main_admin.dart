@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'services/cloud_backend_service.dart';
+import 'services/language_service.dart';
 import 'screens/admin/admin_dashboard_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final backend = CloudBackendService();
   await backend.init();
+  await LanguageService().init();
 
   runApp(const MsixaAdminApp());
 }

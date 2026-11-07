@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../services/cloud_backend_service.dart';
+import '../../services/language_service.dart';
 import '../../models/song.dart';
 import '../../models/user_profile.dart';
 
@@ -17,6 +18,7 @@ class AdminDashboardScreen extends StatefulWidget {
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> with SingleTickerProviderStateMixin {
   final _backend = CloudBackendService();
+  final _lang = LanguageService();
   final _player = AudioPlayer();
   late TabController _tabController;
 
@@ -28,7 +30,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-    _backend.addListener(_onBackendUpdate);
+    _backend.addListener(_onUpdate);
+    _lang.addListener(_onUpdate);
 
     _player.playerStateStream.listen((state) {
       if (mounted) {
@@ -39,14 +42,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
     });
   }
 
-  void _onBackendUpdate() {
+  void _onUpdate() {
     if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
     _tabController.dispose();
-    _backend.removeListener(_onBackendUpdate);
+    _backend.removeListener(_onUpdate);
+    _lang.removeListener(_onUpdate);
     _player.dispose();
     super.dispose();
   }
@@ -71,7 +75,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('ऑडियो पूर्वावलोकन चलाने में समस्या: $e')),
+        SnackBar(content: Text('Audio Preview Error: $e')),
       );
     }
   }
@@ -91,6 +95,203 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
   Future<void> _launchMail(String email) async {
     final uri = Uri.parse('mailto:$email?subject=Msixa%20Player%20Support');
     if (await canLaunchUrl(uri)) await launchUrl(uri);
+  }
+
+  void _showAddSongDialog() {
+    final titleCtrl = TextEditingController();
+    final artistCtrl = TextEditingController();
+    final albumCtrl = TextEditingController(text: 'Msixa Originals');
+    final audioCtrl = TextEditingController();
+    final coverCtrl = TextEditingController();
+    String selectedGenre = 'Bhakti';
+    final genres = ['Bhakti', 'Punjabi', 'Sufi', 'Bollywood', 'Spiritual', 'Desi Lo-Fi', 'Ghazal', 'Indie Pop'];
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: const Color(0xFF131A2A),
+          title: Row(
+            children: [
+              const Icon(Icons.add_circle_outline_rounded, color: Color(0xFFFFB300)),
+              const SizedBox(width: 8),
+              Text(
+                _lang.t('add_song_admin'),
+                style: GoogleFonts.syne(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildAdminTextField(titleCtrl, _lang.t('song_title'), 'उदा. Shree Ram Dhun'),
+                const SizedBox(height: 10),
+                _buildAdminTextField(artistCtrl, _lang.t('artist_name'), 'उदा. Hariharan'),
+                const SizedBox(height: 10),
+                _buildAdminTextField(albumCtrl, _lang.t('album_name'), 'Msixa Originals'),
+                const SizedBox(height: 10),
+                _buildAdminTextField(audioCtrl, 'ऑडियो लिंक या पाथ (Audio Stream URL)', 'assets/audio/... or https://...'),
+                const SizedBox(height: 10),
+                _buildAdminTextField(coverCtrl, _lang.t('cover_url'), 'https://.../cover.jpg'),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<String>(
+                  value: selectedGenre,
+                  dropdownColor: const Color(0xFF1E293B),
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                  decoration: InputDecoration(
+                    labelText: _lang.t('genre_label'),
+                    labelStyle: const TextStyle(color: Colors.grey, fontSize: 12),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Colors.white24)),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFFFB300))),
+                  ),
+                  items: genres.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
+                  onChanged: (val) {
+                    if (val != null) setDialogState(() => selectedGenre = val);
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(_lang.t('cancel'), style: const TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFFB300), foregroundColor: Colors.black),
+              onPressed: () async {
+                if (titleCtrl.text.trim().isEmpty || artistCtrl.text.trim().isEmpty) return;
+                await _backend.addAdminSong(
+                  title: titleCtrl.text,
+                  artist: artistCtrl.text,
+                  album: albumCtrl.text,
+                  genre: selectedGenre,
+                  audioPath: audioCtrl.text.trim().isNotEmpty ? audioCtrl.text.trim() : 'assets/audio/sankat_mochan_hanuman_ashtak.mp3',
+                  coverUrl: coverCtrl.text.trim().isNotEmpty ? coverCtrl.text.trim() : null,
+                );
+                if (mounted) {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('🎉 "${titleCtrl.text}" ${_lang.isHindi ? "सफलतापूर्वक लाइव कर दिया गया!" : "successfully published live!"}')),
+                  );
+                }
+              },
+              child: Text(_lang.isHindi ? 'गाना लाइव करें' : 'Publish Live', style: const TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showEditSongDialog(Song song) {
+    final titleCtrl = TextEditingController(text: song.title);
+    final artistCtrl = TextEditingController(text: song.artist);
+    final albumCtrl = TextEditingController(text: song.album);
+    final audioCtrl = TextEditingController(text: song.streamUrl);
+    final coverCtrl = TextEditingController(text: song.coverUrl);
+    String selectedGenre = song.genre;
+    final genres = ['Bhakti', 'Punjabi', 'Sufi', 'Bollywood', 'Spiritual', 'Desi Lo-Fi', 'Ghazal', 'Indie Pop'];
+    if (!genres.contains(selectedGenre)) genres.add(selectedGenre);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: const Color(0xFF131A2A),
+          title: Row(
+            children: [
+              const Icon(Icons.edit_note_rounded, color: Color(0xFF00E5FF)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '${_lang.t('edit_btn')}: ${song.title}',
+                  style: GoogleFonts.syne(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildAdminTextField(titleCtrl, _lang.t('song_title'), ''),
+                const SizedBox(height: 10),
+                _buildAdminTextField(artistCtrl, _lang.t('artist_name'), ''),
+                const SizedBox(height: 10),
+                _buildAdminTextField(albumCtrl, _lang.t('album_name'), ''),
+                const SizedBox(height: 10),
+                _buildAdminTextField(audioCtrl, 'ऑडियो लिंक या पाथ (Audio Stream URL)', ''),
+                const SizedBox(height: 10),
+                _buildAdminTextField(coverCtrl, _lang.t('cover_url'), ''),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<String>(
+                  value: selectedGenre,
+                  dropdownColor: const Color(0xFF1E293B),
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                  decoration: InputDecoration(
+                    labelText: _lang.t('genre_label'),
+                    labelStyle: const TextStyle(color: Colors.grey, fontSize: 12),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Colors.white24)),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF00E5FF))),
+                  ),
+                  items: genres.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
+                  onChanged: (val) {
+                    if (val != null) setDialogState(() => selectedGenre = val);
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(_lang.t('cancel'), style: const TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00E5FF), foregroundColor: Colors.black),
+              onPressed: () async {
+                await _backend.editSong(
+                  songId: song.id,
+                  title: titleCtrl.text,
+                  artist: artistCtrl.text,
+                  album: albumCtrl.text,
+                  genre: selectedGenre,
+                  streamUrl: audioCtrl.text,
+                  coverUrl: coverCtrl.text,
+                );
+                if (mounted) {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('✅ "${titleCtrl.text}" ${_lang.t('save_changes')}')),
+                  );
+                }
+              },
+              child: Text(_lang.t('save_changes'), style: const TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAdminTextField(TextEditingController ctrl, String label, String hint) {
+    return TextField(
+      controller: ctrl,
+      style: const TextStyle(color: Colors.white, fontSize: 13),
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        labelStyle: const TextStyle(color: Colors.grey, fontSize: 12),
+        hintStyle: const TextStyle(color: Colors.white30, fontSize: 11),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Colors.white24)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFFFB300))),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      ),
+    );
   }
 
   @override
@@ -125,22 +326,50 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                 style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.black),
               ),
             ),
-            const SizedBox(width: 10),
-            Text(
-              'Msixa Admin Control',
-              style: GoogleFonts.syne(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.white),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                _lang.t('admin_title'),
+                style: GoogleFonts.syne(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ],
         ),
         actions: [
+          // Language Switcher Toggle Button
+          InkWell(
+            onTap: () => _lang.toggleLanguage(),
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              margin: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E293B),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFFFB300).withOpacity(0.4)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.language_rounded, color: Color(0xFFFFB300), size: 14),
+                  const SizedBox(width: 4),
+                  Text(
+                    _lang.displayLabel,
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
+                ],
+              ),
+            ),
+          ),
           IconButton(
-            tooltip: 'Refresh Data',
-            icon: const Icon(Icons.refresh_rounded, color: Colors.white70),
+            tooltip: 'Refresh',
+            icon: const Icon(Icons.refresh_rounded, color: Colors.white70, size: 20),
             onPressed: () => setState(() {}),
           ),
           IconButton(
-            tooltip: 'Sign Out',
-            icon: const Icon(Icons.logout_rounded, color: Colors.redAccent),
+            tooltip: _lang.t('sign_out'),
+            icon: const Icon(Icons.logout_rounded, color: Colors.redAccent, size: 20),
             onPressed: widget.onSignOut,
           ),
         ],
@@ -152,9 +381,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
           unselectedLabelColor: Colors.grey.shade400,
           labelStyle: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold),
           tabs: [
-            Tab(text: 'लंबित गाने (${pending.length})'),
-            Tab(text: 'यूज़र्स डेटा (${users.length})'),
-            Tab(text: 'लाइव गाने (${approved.length})'),
+            Tab(text: '${_lang.t('tab_pending')} (${pending.length})'),
+            Tab(text: '${_lang.t('tab_users')} (${users.length})'),
+            Tab(text: '${_lang.t('tab_live')} (${approved.length})'),
           ],
         ),
       ),
@@ -171,25 +400,25 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 _buildMetricCard(
-                  title: 'कुल यूज़र्स',
+                  title: _lang.t('metric_total_users'),
                   value: '${_backend.totalUsersCount}',
                   icon: Icons.people_alt_rounded,
                   color: Colors.cyanAccent,
                 ),
                 _buildMetricCard(
-                  title: 'सक्रिय (Active)',
+                  title: _lang.t('metric_active_users'),
                   value: '${_backend.activeUsersCount}',
                   icon: Icons.wifi_tethering_rounded,
                   color: Colors.greenAccent,
                 ),
                 _buildMetricCard(
-                  title: 'लंबित अप्रूवल',
+                  title: _lang.t('metric_pending'),
                   value: '${pending.length}',
                   icon: Icons.pending_actions_rounded,
                   color: Colors.amberAccent,
                 ),
                 _buildMetricCard(
-                  title: 'लाइव गाने',
+                  title: _lang.t('metric_live'),
                   value: '${approved.length}',
                   icon: Icons.library_music_rounded,
                   color: Colors.indigoAccent,
@@ -209,7 +438,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                 // TAB 2: Users Directory
                 _buildUsersDirectoryTab(filteredUsers),
 
-                // TAB 3: Live Songs Catalog
+                // TAB 3: Live Songs Catalog (with Add, Edit, Delete)
                 _buildLiveSongsTab(approved),
               ],
             ),
@@ -253,9 +482,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
           children: [
             Icon(Icons.check_circle_outline_rounded, color: Colors.greenAccent.withOpacity(0.5), size: 54),
             const SizedBox(height: 12),
-            Text('कोई लंबित गाना नहीं है!', style: GoogleFonts.syne(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold)),
+            Text(_lang.t('no_pending_songs'), style: GoogleFonts.syne(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
-            const Text('सभी गाने अप्रूव हो चुके हैं।', style: TextStyle(color: Colors.grey, fontSize: 12)),
+            Text(_lang.t('all_songs_approved'), style: const TextStyle(color: Colors.grey, fontSize: 12)),
           ],
         ),
       );
@@ -310,7 +539,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          'गायक: ${song.artist} • ${song.genre}',
+                          '${song.artist} • ${song.genre}',
                           style: TextStyle(color: Colors.grey.shade300, fontSize: 12),
                         ),
                         const SizedBox(height: 4),
@@ -319,13 +548,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                             const Icon(Icons.account_circle_outlined, size: 12, color: Colors.cyanAccent),
                             const SizedBox(width: 4),
                             Text(
-                              'अपलोडर: ${song.uploaderName ?? "Unknown"} (${song.uploaderPhone ?? ""})',
+                              '${song.uploaderName ?? "User"} (${song.uploaderPhone ?? ""})',
                               style: const TextStyle(color: Colors.cyanAccent, fontSize: 11),
                             ),
                           ],
                         ),
                       ],
                     ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.edit_note_rounded, color: Color(0xFF00E5FF), size: 22),
+                    tooltip: _lang.t('edit_btn'),
+                    onPressed: () => _showEditSongDialog(song),
                   ),
                 ],
               ),
@@ -347,7 +581,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                     ),
                     icon: Icon(isThisPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded, size: 18),
                     label: Text(
-                      isThisPlaying ? 'रुकें (Playing)' : 'सुनें (Preview)',
+                      isThisPlaying ? _lang.t('preview_stop') : _lang.t('preview_play'),
                       style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
                     ),
                   ),
@@ -360,14 +594,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                         context: context,
                         builder: (ctx) => AlertDialog(
                           backgroundColor: const Color(0xFF131A2A),
-                          title: const Text('गाना रिजेक्ट करें?', style: TextStyle(color: Colors.white)),
-                          content: Text('क्या आप "${song.title}" को हटाना चाहते हैं?', style: const TextStyle(color: Colors.white70)),
+                          title: Text(_lang.t('confirm_delete_title'), style: const TextStyle(color: Colors.white)),
+                          content: Text('${_lang.t('confirm_delete_msg')} ("${song.title}")', style: const TextStyle(color: Colors.white70)),
                           actions: [
-                            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('रद्द करें')),
+                            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(_lang.t('cancel'))),
                             ElevatedButton(
                               style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
                               onPressed: () => Navigator.pop(ctx, true),
-                              child: const Text('हाँ, हटाएँ'),
+                              child: Text(_lang.t('confirm_yes')),
                             ),
                           ],
                         ),
@@ -377,13 +611,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                         await _backend.rejectOrDeleteSong(song.id);
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('गाना हटा दिया गया।')),
+                            SnackBar(content: Text('"${song.title}" removed.')),
                           );
                         }
                       }
                     },
                     icon: const Icon(Icons.close_rounded, color: Colors.redAccent, size: 16),
-                    label: const Text('हटाएँ (Reject)', style: TextStyle(color: Colors.redAccent, fontSize: 11)),
+                    label: Text(_lang.t('reject_btn'), style: const TextStyle(color: Colors.redAccent, fontSize: 11)),
                   ),
                   const SizedBox(width: 8),
 
@@ -393,7 +627,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                       await _backend.approveSong(song.id);
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('🎉 "${song.title}" को सभी के लिए लाइव कर दिया गया!')),
+                          SnackBar(content: Text('🎉 "${song.title}" live!')),
                         );
                       }
                     },
@@ -404,7 +638,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                       visualDensity: VisualDensity.compact,
                     ),
                     icon: const Icon(Icons.check_rounded, size: 16),
-                    label: const Text('स्वीकार करें (Approve)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    label: Text(_lang.t('approve_btn'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                   ),
                 ],
               ),
@@ -431,12 +665,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
             child: TextField(
               onChanged: (val) => setState(() => _userSearchQuery = val),
               style: const TextStyle(color: Colors.white, fontSize: 13),
-              decoration: const InputDecoration(
-                hintText: 'यूज़र का नाम, फ़ोन या ईमेल खोजें...',
-                hintStyle: TextStyle(color: Colors.grey, fontSize: 12),
-                prefixIcon: Icon(Icons.search_rounded, color: Color(0xFFFFB300), size: 20),
+              decoration: InputDecoration(
+                hintText: _lang.t('search_users'),
+                hintStyle: const TextStyle(color: Colors.grey, fontSize: 12),
+                prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFFFFB300), size: 20),
                 border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(vertical: 12),
+                contentPadding: const EdgeInsets.symmetric(vertical: 12),
               ),
             ),
           ),
@@ -445,7 +679,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
         // Users List
         Expanded(
           child: users.isEmpty
-              ? const Center(child: Text('कोई यूज़र नहीं मिला', style: TextStyle(color: Colors.grey)))
+              ? Center(child: Text(_lang.t('no_users_found'), style: const TextStyle(color: Colors.grey)))
               : ListView.separated(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
                   itemCount: users.length,
@@ -463,7 +697,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                       ),
                       child: Row(
                         children: [
-                          // Avatar with Online dot
                           Stack(
                             children: [
                               CircleAvatar(
@@ -546,23 +779,23 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                             ),
                           ),
 
-                          // Quick Action Buttons (Call, WhatsApp, Email)
+                          // Quick Action Buttons
                           if (u.phoneNumber.isNotEmpty) ...[
                             IconButton(
                               icon: const Icon(Icons.phone_outlined, color: Colors.greenAccent, size: 18),
                               onPressed: () => _launchCall(u.phoneNumber),
-                              tooltip: 'कॉल करें',
+                              tooltip: _lang.t('call_tooltip'),
                             ),
                             IconButton(
                               icon: const Icon(Icons.chat_bubble_outline_rounded, color: Colors.tealAccent, size: 18),
                               onPressed: () => _launchWhatsApp(u.phoneNumber),
-                              tooltip: 'WhatsApp मैसेज',
+                              tooltip: _lang.t('whatsapp_tooltip'),
                             ),
                           ],
                           IconButton(
                             icon: const Icon(Icons.mail_outline_rounded, color: Colors.cyanAccent, size: 18),
                             onPressed: () => _launchMail(u.email),
-                            tooltip: 'ईमेल भेजें',
+                            tooltip: _lang.t('email_tooltip'),
                           ),
                         ],
                       ),
@@ -574,64 +807,136 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
     );
   }
 
-  // TAB 3: All Live Songs
+  // TAB 3: All Live Songs (with Add, Edit, and Delete)
   Widget _buildLiveSongsTab(List<Song> songs) {
-    if (songs.isEmpty) {
-      return const Center(child: Text('कोई लाइव गाना नहीं है', style: TextStyle(color: Colors.grey)));
-    }
-
-    return ListView.separated(
-      padding: const EdgeInsets.all(14),
-      itemCount: songs.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 10),
-      itemBuilder: (context, index) {
-        final s = songs[index];
-        return Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: const Color(0xFF131B2C),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white10),
-          ),
+    return Column(
+      children: [
+        // Add Song Header Button Bar
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          color: const Color(0xFF0F1728),
           child: Row(
             children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.network(
-                  s.coverUrl,
-                  width: 44,
-                  height: 44,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(width: 44, height: 44, color: Colors.grey.shade800),
-                ),
+              Text(
+                '${_lang.t('tab_live')} (${songs.length})',
+                style: GoogleFonts.syne(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(s.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13), maxLines: 1),
-                    Text('${s.artist} • ${s.genre}', style: const TextStyle(color: Colors.white60, fontSize: 11), maxLines: 1),
-                  ],
+              const Spacer(),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFFB300),
+                  foregroundColor: Colors.black,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20),
-                onPressed: () async {
-                  await _backend.rejectOrDeleteSong(s.id);
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('"${s.title}" को हटा दिया गया।')),
-                    );
-                  }
-                },
-                tooltip: 'गाना हटाएँ',
+                icon: const Icon(Icons.add_rounded, size: 18),
+                label: Text(
+                  _lang.t('add_song_admin'),
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                ),
+                onPressed: _showAddSongDialog,
               ),
             ],
           ),
-        );
-      },
+        ),
+
+        Expanded(
+          child: songs.isEmpty
+              ? Center(child: Text(_lang.t('no_pending_songs'), style: const TextStyle(color: Colors.grey)))
+              : ListView.separated(
+                  padding: const EdgeInsets.all(14),
+                  itemCount: songs.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  itemBuilder: (context, index) {
+                    final s = songs[index];
+                    final isThisPlaying = _currentlyPlayingSongId == s.id && _isPlaying;
+
+                    return Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF131B2C),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isThisPlaying ? const Color(0xFFFFB300) : Colors.white10,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.network(
+                              s.coverUrl,
+                              width: 44,
+                              height: 44,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(width: 44, height: 44, color: Colors.grey.shade800),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(s.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13), maxLines: 1),
+                                Text('${s.artist} • ${s.genre}', style: const TextStyle(color: Colors.white60, fontSize: 11), maxLines: 1),
+                              ],
+                            ),
+                          ),
+                          // Preview Button
+                          IconButton(
+                            icon: Icon(
+                              isThisPlaying ? Icons.pause_circle_filled_rounded : Icons.play_circle_fill_rounded,
+                              color: isThisPlaying ? const Color(0xFFFFB300) : Colors.white70,
+                              size: 26,
+                            ),
+                            tooltip: _lang.t('preview_play'),
+                            onPressed: () => _playSongPreview(s),
+                          ),
+                          // Edit Button
+                          IconButton(
+                            icon: const Icon(Icons.edit_note_rounded, color: Color(0xFF00E5FF), size: 22),
+                            tooltip: _lang.t('edit_btn'),
+                            onPressed: () => _showEditSongDialog(s),
+                          ),
+                          // Delete Button
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20),
+                            tooltip: _lang.t('delete_btn'),
+                            onPressed: () async {
+                              final confirm = await showDialog<bool>(
+                                context: context,
+                                builder: (ctx) => AlertDialog(
+                                  backgroundColor: const Color(0xFF131A2A),
+                                  title: Text(_lang.t('confirm_delete_title'), style: const TextStyle(color: Colors.white)),
+                                  content: Text('${_lang.t('confirm_delete_msg')} ("${s.title}")', style: const TextStyle(color: Colors.white70)),
+                                  actions: [
+                                    TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(_lang.t('cancel'))),
+                                    ElevatedButton(
+                                      style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+                                      onPressed: () => Navigator.pop(ctx, true),
+                                      child: Text(_lang.t('confirm_yes')),
+                                    ),
+                                  ],
+                                ),
+                              );
+
+                              if (confirm == true) {
+                                await _backend.rejectOrDeleteSong(s.id);
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('"${s.title}" removed.')),
+                                  );
+                                }
+                              }
+                            },
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ],
     );
   }
 }
-

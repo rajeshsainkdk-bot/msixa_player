@@ -162,3 +162,4 @@ While Version 2.0 bundles local master tracks and local state synchronization, t
 1. **Audio Storage Backend:** Cloudflare R2 object storage (S3-compatible, zero egress bandwidth costs) for hosting user-submitted audio files beyond device memory.
 2. **Database & Auth:** Supabase / PostgreSQL or Firebase Firestore for cloud-wide synchronized real-time user directories and community catalog broadcasts.
 3. **SMS Gateway:** Fast2SMS / Twilio SMS API for live commercial telecom OTP delivery.
+

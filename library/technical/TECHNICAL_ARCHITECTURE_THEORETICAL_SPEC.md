@@ -225,3 +225,4 @@ The GitHub Actions workflow (`.github/workflows/build_apk.yml`) compiles both pr
    flutter build apk --release --target=lib/main_admin.dart --no-tree-shake-icons
    cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/msixa-admin-release.apk
    ```
+

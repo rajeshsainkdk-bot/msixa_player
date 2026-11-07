@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../services/cloud_backend_service.dart';
+import '../../services/language_service.dart';
 
 class AuthScreen extends StatefulWidget {
   final VoidCallback onAuthenticated;
@@ -13,43 +14,52 @@ class AuthScreen extends StatefulWidget {
 
 class _AuthScreenState extends State<AuthScreen> {
   final _backend = CloudBackendService();
-  int _step = 1; // 1: Info, 2: Phone OTP, 3: Email Code
+  final _lang = LanguageService();
+  int _step = 1; // 1: Info, 2: Phone OTP (Email step removed)
 
   final _nameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
   final _otpCtrl = TextEditingController();
-  final _emailCodeCtrl = TextEditingController();
 
   bool _isLoading = false;
   String? _errorMessage;
-  String? _hintCode;
+
+  @override
+  void initState() {
+    super.initState();
+    _lang.addListener(_onLangUpdate);
+  }
+
+  void _onLangUpdate() {
+    if (mounted) setState(() {});
+  }
 
   @override
   void dispose() {
+    _lang.removeListener(_onLangUpdate);
     _nameCtrl.dispose();
     _emailCtrl.dispose();
     _phoneCtrl.dispose();
     _otpCtrl.dispose();
-    _emailCodeCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _handleSendOtp() async {
     final name = _nameCtrl.text.trim();
-    final email = _emailCtrl.text.trim();
     final phone = _phoneCtrl.text.trim();
+    final email = _emailCtrl.text.trim();
 
     if (name.isEmpty || name.length < 2) {
-      setState(() => _errorMessage = 'कृपया अपना पूरा नाम दर्ज करें (Enter full name)');
-      return;
-    }
-    if (!email.contains('@') || !email.contains('.')) {
-      setState(() => _errorMessage = 'कृपया सही ईमेल पता दर्ज करें (Enter valid email)');
+      setState(() => _errorMessage = _lang.isHindi
+          ? 'कृपया अपना पूरा नाम दर्ज करें'
+          : 'Please enter your full name');
       return;
     }
     if (phone.length < 10) {
-      setState(() => _errorMessage = 'कृपया 10 अंकों का मोबाइल नंबर दर्ज करें (Enter 10-digit mobile number)');
+      setState(() => _errorMessage = _lang.isHindi
+          ? 'कृपया 10 अंकों का मोबाइल नंबर दर्ज करें'
+          : 'Please enter 10-digit mobile number');
       return;
     }
 
@@ -61,17 +71,22 @@ class _AuthScreenState extends State<AuthScreen> {
     final formattedPhone = phone.startsWith('+91') ? phone : '+91 $phone';
     final success = await _backend.sendPhoneOtp(
       fullName: name,
-      email: email,
       phoneNumber: formattedPhone,
+      email: email.isNotEmpty ? email : null,
     );
 
     setState(() {
       _isLoading = false;
       if (success) {
         _step = 2;
-        _hintCode = 'सुरक्षा कोड (SMS OTP sent)';
+        // Auto-fill prompt
+        if (_backend.lastGeneratedOtp != null) {
+          _otpCtrl.text = _backend.lastGeneratedOtp!;
+        }
       } else {
-        _errorMessage = 'OTP भेजने में समस्या हुई। कृपया दोबारा प्रयास करें।';
+        _errorMessage = _lang.isHindi
+            ? 'OTP भेजने में समस्या हुई। कृपया दोबारा प्रयास करें।'
+            : 'Failed to send OTP. Please try again.';
       }
     });
   }
@@ -79,7 +94,9 @@ class _AuthScreenState extends State<AuthScreen> {
   Future<void> _handleVerifyPhoneOtp() async {
     final otp = _otpCtrl.text.trim();
     if (otp.length < 6) {
-      setState(() => _errorMessage = 'कृपया 6 अंकों का SMS OTP दर्ज करें');
+      setState(() => _errorMessage = _lang.isHindi
+          ? 'कृपया 6 अंकों का SMS OTP दर्ज करें'
+          : 'Please enter 6-digit SMS OTP');
       return;
     }
 
@@ -90,274 +107,325 @@ class _AuthScreenState extends State<AuthScreen> {
 
     final verified = await _backend.verifyPhoneOtp(otp);
 
-    setState(() {
-      _isLoading = false;
-      if (verified) {
-        _step = 3;
-        _hintCode = 'ईमेल कोड (Email code sent to ${_emailCtrl.text})';
-      } else {
-        _errorMessage = 'अमान्य OTP कोड। कृपया सही कोड दर्ज करें।';
-      }
-    });
-  }
-
-  Future<void> _handleVerifyEmailCode() async {
-    final code = _emailCodeCtrl.text.trim();
-    if (code.length < 4) {
-      setState(() => _errorMessage = 'कृपया 4 अंकों का ईमेल वेरिफिकेशन कोड दर्ज करें');
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    final user = await _backend.completeVerification(code);
-
     setState(() => _isLoading = false);
 
-    if (user != null) {
+    if (verified) {
       widget.onAuthenticated();
     } else {
-      setState(() => _errorMessage = 'अमान्य ईमेल कोड। कृपया दोबारा जाँचें।');
+      setState(() => _errorMessage = _lang.isHindi
+          ? 'अमान्य OTP कोड। कृपया सही कोड दर्ज करें (या 123456 का उपयोग करें)।'
+          : 'Invalid OTP. Please enter the correct code (or use 123456).');
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final otpCode = _backend.lastGeneratedOtp ?? '123456';
+
     return Scaffold(
       backgroundColor: const Color(0xFF0B0F19),
       body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // App Logo / Shield
-                Container(
-                  width: 72,
-                  height: 72,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF00E5FF), Color(0xFF4F46E5)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF00E5FF).withOpacity(0.35),
-                        blurRadius: 24,
-                        spreadRadius: 2,
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.music_note_rounded,
-                    color: Colors.white,
-                    size: 38,
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // App Title
-                Text(
-                  'Msixa Player',
-                  style: GoogleFonts.syne(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'सुरक्षित श्रोता पंजीकरण (Verified Registration)',
-                  style: GoogleFonts.outfit(
-                    fontSize: 13,
-                    color: Colors.cyanAccent.withOpacity(0.9),
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 28),
-
-                // Stepper Indicator
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _buildStepDot(1, 'विवरण (Info)'),
-                    _buildStepLine(1),
-                    _buildStepDot(2, 'मोबाइल OTP'),
-                    _buildStepLine(2),
-                    _buildStepDot(3, 'ईमेल कोड'),
-                  ],
-                ),
-                const SizedBox(height: 28),
-
-                // Form Container
-                Container(
-                  padding: const EdgeInsets.all(22),
+        child: Stack(
+          children: [
+            // Language Switcher Top Bar
+            Positioned(
+              top: 14,
+              right: 18,
+              child: InkWell(
+                onTap: () => _lang.toggleLanguage(),
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: const Color(0xFF131A2A),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: Colors.white.withOpacity(0.08),
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.4),
-                        blurRadius: 20,
-                        offset: const Offset(0, 10),
+                    border: Border.all(color: const Color(0xFF00E5FF).withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.language_rounded, size: 15, color: Color(0xFF00E5FF)),
+                      const SizedBox(width: 6),
+                      Text(
+                        _lang.displayLabel,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ],
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (_errorMessage != null) ...[
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: Colors.redAccent.withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.redAccent.withOpacity(0.3)),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 18),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  _errorMessage!,
-                                  style: const TextStyle(color: Colors.redAccent, fontSize: 12),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                      ],
-
-                      // STEP 1: Registration Form
-                      if (_step == 1) ...[
-                        _buildInputField(
-                          controller: _nameCtrl,
-                          label: 'पूरा नाम (Full Name)',
-                          hint: 'उदा. Rajesh Kumar',
-                          icon: Icons.person_outline_rounded,
-                        ),
-                        const SizedBox(height: 14),
-                        _buildInputField(
-                          controller: _emailCtrl,
-                          label: 'ईमेल आईडी (Email Address)',
-                          hint: 'name@example.com',
-                          icon: Icons.mail_outline_rounded,
-                          keyboardType: TextInputType.emailAddress,
-                        ),
-                        const SizedBox(height: 14),
-                        _buildInputField(
-                          controller: _phoneCtrl,
-                          label: 'मोबाइल नंबर (10-Digit Mobile)',
-                          hint: '9876543210',
-                          icon: Icons.phone_android_rounded,
-                          keyboardType: TextInputType.phone,
-                          prefixText: '+91 ',
-                        ),
-                        const SizedBox(height: 22),
-                        _buildSubmitButton(
-                          title: 'SMS OTP प्राप्त करें (Send OTP)',
-                          icon: Icons.arrow_forward_rounded,
-                          onPressed: _isLoading ? null : _handleSendOtp,
-                        ),
-                      ],
-
-                      // STEP 2: Phone SMS OTP
-                      if (_step == 2) ...[
-                        Text(
-                          'मोबाइल नंबर पर 6 अंकों का SMS भेजा गया है:',
-                          style: TextStyle(color: Colors.grey.shade300, fontSize: 13),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          _phoneCtrl.text,
-                          style: const TextStyle(
-                            color: Color(0xFF00E5FF),
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
-                          ),
-                        ),
-                        const SizedBox(height: 18),
-                        _buildInputField(
-                          controller: _otpCtrl,
-                          label: '6-अंकीय SMS OTP दर्ज करें',
-                          hint: '123456',
-                          icon: Icons.lock_outline_rounded,
-                          keyboardType: TextInputType.number,
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 22),
-                        _buildSubmitButton(
-                          title: 'मोबाइल नंबर सत्यापित करें (Verify Phone)',
-                          icon: Icons.check_circle_outline_rounded,
-                          onPressed: _isLoading ? null : _handleVerifyPhoneOtp,
-                        ),
-                        const SizedBox(height: 12),
-                        TextButton(
-                          onPressed: () => setState(() => _step = 1),
-                          child: const Text('नंबर बदलें (Change Phone Number)', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                        ),
-                      ],
-
-                      // STEP 3: Email Verification Code
-                      if (_step == 3) ...[
-                        Text(
-                          'आपके ईमेल पर 4 अंकों का वेरिफिकेशन कोड भेजा गया है:',
-                          style: TextStyle(color: Colors.grey.shade300, fontSize: 13),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          _emailCtrl.text,
-                          style: const TextStyle(
-                            color: Color(0xFF00E5FF),
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
-                          ),
-                        ),
-                        const SizedBox(height: 18),
-                        _buildInputField(
-                          controller: _emailCodeCtrl,
-                          label: '4-अंकीय ईमेल कोड दर्ज करें',
-                          hint: '1234',
-                          icon: Icons.mark_email_read_outlined,
-                          keyboardType: TextInputType.number,
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 22),
-                        _buildSubmitButton(
-                          title: 'ईमेल सत्यापित करें व शुरू करें (Complete)',
-                          icon: Icons.login_rounded,
-                          onPressed: _isLoading ? null : _handleVerifyEmailCode,
-                        ),
-                        const SizedBox(height: 12),
-                        TextButton(
-                          onPressed: () => setState(() => _step = 2),
-                          child: const Text('पीछे जाएँ (Back)', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                        ),
-                      ],
-                    ],
-                  ),
                 ),
-
-                const SizedBox(height: 20),
-                Text(
-                  '100% मुफ़्त एवं सुरक्षित • कोई पासवर्ड याद रखने की ज़रूरत नहीं',
-                  style: TextStyle(color: Colors.grey.shade500, fontSize: 11),
-                ),
-              ],
+              ),
             ),
-          ),
+
+            Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // App Logo / Shield
+                    Container(
+                      width: 72,
+                      height: 72,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF00E5FF), Color(0xFF4F46E5)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF00E5FF).withOpacity(0.35),
+                            blurRadius: 24,
+                            spreadRadius: 2,
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.music_note_rounded,
+                        color: Colors.white,
+                        size: 38,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // App Title
+                    Text(
+                      _lang.t('auth_title'),
+                      style: GoogleFonts.syne(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      _lang.t('auth_subtitle'),
+                      style: GoogleFonts.outfit(
+                        fontSize: 13,
+                        color: Colors.cyanAccent.withOpacity(0.9),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Stepper Indicator (2 Steps: Info -> Mobile OTP)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _buildStepDot(1, _lang.t('step_info')),
+                        _buildStepLine(1),
+                        _buildStepDot(2, _lang.t('step_otp')),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Form Container
+                    Container(
+                      padding: const EdgeInsets.all(22),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF131A2A),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.08),
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.4),
+                            blurRadius: 20,
+                            offset: const Offset(0, 10),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (_errorMessage != null) ...[
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.redAccent.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.redAccent.withOpacity(0.3)),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 18),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      _errorMessage!,
+                                      style: const TextStyle(color: Colors.redAccent, fontSize: 12),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                          ],
+
+                          // STEP 1: Registration Form
+                          if (_step == 1) ...[
+                            _buildInputField(
+                              controller: _nameCtrl,
+                              label: _lang.t('full_name'),
+                              hint: _lang.t('full_name_hint'),
+                              icon: Icons.person_outline_rounded,
+                            ),
+                            const SizedBox(height: 14),
+                            _buildInputField(
+                              controller: _phoneCtrl,
+                              label: _lang.t('phone_number'),
+                              hint: _lang.t('phone_number_hint'),
+                              icon: Icons.phone_android_rounded,
+                              keyboardType: TextInputType.phone,
+                              prefixText: '+91 ',
+                            ),
+                            const SizedBox(height: 14),
+                            _buildInputField(
+                              controller: _emailCtrl,
+                              label: _lang.t('email_optional'),
+                              hint: _lang.t('email_hint'),
+                              icon: Icons.mail_outline_rounded,
+                              keyboardType: TextInputType.emailAddress,
+                            ),
+                            const SizedBox(height: 22),
+                            _buildSubmitButton(
+                              title: _lang.t('send_otp'),
+                              icon: Icons.arrow_forward_rounded,
+                              onPressed: _isLoading ? null : _handleSendOtp,
+                            ),
+                          ],
+
+                          // STEP 2: Phone SMS OTP
+                          if (_step == 2) ...[
+                            // Prominent On-Screen OTP Notification Card
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    const Color(0xFF00E5FF).withOpacity(0.15),
+                                    const Color(0xFF10B981).withOpacity(0.15),
+                                  ],
+                                ),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: const Color(0xFF10B981).withOpacity(0.4)),
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF10B981).withOpacity(0.2),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(Icons.mark_chat_unread_rounded, color: Colors.greenAccent, size: 20),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          _lang.t('otp_banner_title'),
+                                          style: const TextStyle(color: Colors.white70, fontSize: 11),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          otpCode,
+                                          style: const TextStyle(
+                                            color: Colors.greenAccent,
+                                            fontSize: 20,
+                                            fontWeight: FontWeight.bold,
+                                            letterSpacing: 3,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.greenAccent,
+                                      foregroundColor: Colors.black,
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                      minimumSize: Size.zero,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    ),
+                                    onPressed: () {
+                                      setState(() {
+                                        _otpCtrl.text = otpCode;
+                                      });
+                                    },
+                                    child: Text(
+                                      _lang.t('autofill_otp'),
+                                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+
+                            Text(
+                              _lang.t('otp_sent_to'),
+                              style: TextStyle(color: Colors.grey.shade300, fontSize: 12),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              _phoneCtrl.text.startsWith('+91') ? _phoneCtrl.text : '+91 ${_phoneCtrl.text}',
+                              style: const TextStyle(
+                                color: Color(0xFF00E5FF),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+
+                            _buildInputField(
+                              controller: _otpCtrl,
+                              label: _lang.t('enter_otp'),
+                              hint: '123456',
+                              icon: Icons.lock_outline_rounded,
+                              keyboardType: TextInputType.number,
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 22),
+
+                            _buildSubmitButton(
+                              title: _lang.t('verify_and_start'),
+                              icon: Icons.check_circle_outline_rounded,
+                              onPressed: _isLoading ? null : _handleVerifyPhoneOtp,
+                            ),
+                            const SizedBox(height: 12),
+                            TextButton(
+                              onPressed: () => setState(() => _step = 1),
+                              child: Text(
+                                _lang.t('change_phone'),
+                                style: const TextStyle(color: Colors.grey, fontSize: 12),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 20),
+                    Text(
+                      _lang.t('auth_tagline'),
+                      style: TextStyle(color: Colors.grey.shade500, fontSize: 11),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -407,7 +475,7 @@ class _AuthScreenState extends State<AuthScreen> {
   Widget _buildStepLine(int afterStep) {
     final isPassed = _step > afterStep;
     return Container(
-      width: 36,
+      width: 50,
       height: 2,
       margin: const EdgeInsets.only(bottom: 16),
       color: isPassed ? const Color(0xFF00E5FF) : Colors.grey.shade800,
@@ -495,4 +563,3 @@ class _AuthScreenState extends State<AuthScreen> {
     );
   }
 }
-

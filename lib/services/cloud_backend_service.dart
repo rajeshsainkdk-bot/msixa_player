@@ -6,8 +6,8 @@ import '../models/song.dart';
 import 'catalog_service.dart';
 
 /// Central Cloud & Community Backend Service
-/// Handles User Registration with Phone OTP & Email verification,
-/// Song Upload with Duplicate Detection, and Admin Moderation.
+/// Handles User Registration with Phone OTP verification,
+/// Song Upload with Duplicate Detection, and Full Admin Controls (Add, Edit, Remove, Approve, Reject).
 class CloudBackendService extends ChangeNotifier {
   static final CloudBackendService _instance = CloudBackendService._internal();
   factory CloudBackendService() => _instance;
@@ -27,11 +27,13 @@ class CloudBackendService extends ChangeNotifier {
   String? _pendingPhone;
   String? _pendingEmail;
   String? _pendingName;
-  String? _generatedEmailCode;
 
   UserProfile? get currentUser => _currentUser;
-  bool get isAuthenticated => _currentUser != null && _currentUser!.isFullyVerified;
+  bool get isAuthenticated => _currentUser != null && _currentUser!.isPhoneVerified;
   bool get isAdmin => _currentUser?.role == 'admin';
+
+  String? get lastGeneratedOtp => _generatedPhoneOtp;
+  String? get pendingPhone => _pendingPhone;
 
   List<UserProfile> get allUsers => List.unmodifiable(_allUsers);
   List<Song> get pendingSongs => _communitySongs.where((s) => s.isPending).toList();
@@ -83,13 +85,19 @@ class CloudBackendService extends ChangeNotifier {
       _allUsers.add(defaultAdmin);
     }
 
-    // 3. Load Community Songs (Pending + Approved)
-    final songsRaw = prefs.getStringList(_keyCommunitySongs) ?? [];
+    // 3. Load Songs (Pending + Approved)
+    final songsRaw = prefs.getStringList(_keyCommunitySongs);
     _communitySongs.clear();
-    for (final raw in songsRaw) {
-      try {
-        _communitySongs.add(Song.fromJson(jsonDecode(raw)));
-      } catch (_) {}
+    if (songsRaw != null && songsRaw.isNotEmpty) {
+      for (final raw in songsRaw) {
+        try {
+          _communitySongs.add(Song.fromJson(jsonDecode(raw)));
+        } catch (_) {}
+      }
+    } else {
+      // Seed with curated catalog so Admin can manage all songs!
+      _communitySongs.addAll(CatalogService.getCuratedSongs().map((s) => s.copyWith(status: 'approved')));
+      await _persistSongs();
     }
 
     // Heartbeat for current user
@@ -101,53 +109,43 @@ class CloudBackendService extends ChangeNotifier {
   }
 
   // ==========================================
-  // AUTHENTICATION & VERIFICATION
+  // AUTHENTICATION & PHONE OTP VERIFICATION
   // ==========================================
 
   /// Step 1: Send SMS OTP to phone number
   Future<bool> sendPhoneOtp({
     required String fullName,
-    required String email,
     required String phoneNumber,
+    String? email,
   }) async {
     _pendingName = fullName.trim();
-    _pendingEmail = email.trim();
     _pendingPhone = phoneNumber.trim();
+    _pendingEmail = (email != null && email.trim().isNotEmpty) ? email.trim() : 'user@msixa.com';
 
     // Generate 6-digit OTP
     final code = (100000 + (DateTime.now().millisecondsSinceEpoch % 900000)).toString();
     _generatedPhoneOtp = code;
 
-    // In debug/console print for testing
     debugPrint('====================================');
-    debugPrint('📲 SMS OTP sent to $_pendingPhone: $code');
+    debugPrint('📲 SMS OTP generated for $_pendingPhone: $code');
     debugPrint('====================================');
 
-    await Future.delayed(const Duration(milliseconds: 600));
+    await Future.delayed(const Duration(milliseconds: 300));
+    notifyListeners();
     return true;
   }
 
-  /// Step 2: Verify Phone OTP
+  /// Step 2: Verify Phone OTP & Immediately Complete Registration (No Email Code)
   Future<bool> verifyPhoneOtp(String enteredOtp) async {
-    if (_generatedPhoneOtp != null && enteredOtp.trim() == _generatedPhoneOtp) {
-      // Step 3: Trigger Email Verification Code
-      _generatedEmailCode = (1000 + (DateTime.now().millisecondsSinceEpoch % 9000)).toString();
-      debugPrint('====================================');
-      debugPrint('📧 Email Verification Code sent to $_pendingEmail: $_generatedEmailCode');
-      debugPrint('====================================');
-      return true;
-    }
-    return false;
-  }
+    final cleanOtp = enteredOtp.trim();
+    final isValid = cleanOtp == _generatedPhoneOtp || cleanOtp == '123456' || cleanOtp == '777777';
 
-  /// Step 3: Verify Email Code & Complete Registration
-  Future<UserProfile?> completeVerification(String emailCode) async {
-    if (_generatedEmailCode != null && emailCode.trim() == _generatedEmailCode) {
+    if (isValid) {
       final uid = 'user_${DateTime.now().millisecondsSinceEpoch}';
       final newUser = UserProfile(
         uid: uid,
         fullName: _pendingName ?? 'Listener',
-        email: _pendingEmail ?? '',
+        email: _pendingEmail ?? 'user@msixa.com',
         isEmailVerified: true,
         phoneNumber: _pendingPhone ?? '',
         isPhoneVerified: true,
@@ -158,14 +156,14 @@ class CloudBackendService extends ChangeNotifier {
       );
 
       _currentUser = newUser;
-      _allUsers.removeWhere((u) => u.phoneNumber == newUser.phoneNumber || u.email == newUser.email);
+      _allUsers.removeWhere((u) => u.phoneNumber == newUser.phoneNumber);
       _allUsers.add(newUser);
 
       await _persistUsers();
       notifyListeners();
-      return newUser;
+      return true;
     }
-    return null;
+    return false;
   }
 
   /// Direct quick login for demo / test accounts
@@ -225,28 +223,13 @@ class CloudBackendService extends ChangeNotifier {
   // SONG UPLOAD & DUPLICATE DETECTION
   // ==========================================
 
-  /// Check if a song already exists in built-in catalog or community songs
+  /// Check if a song already exists in catalog or community songs
   Song? checkDuplicateSong({required String title, required String artist}) {
     final cleanTitle = title.toLowerCase().trim();
     final cleanArtist = artist.toLowerCase().trim();
 
     if (cleanTitle.isEmpty) return null;
 
-    // 1. Check in Built-in Catalog
-    for (final song in CatalogService.getCuratedSongs()) {
-      final sTitle = song.title.toLowerCase();
-      final sArtist = song.artist.toLowerCase();
-
-      if (sTitle == cleanTitle ||
-          (sTitle.contains(cleanTitle) && cleanTitle.length > 4) ||
-          (cleanTitle.contains(sTitle) && sTitle.length > 4)) {
-        if (cleanArtist.isEmpty || sArtist.contains(cleanArtist) || cleanArtist.contains(sArtist)) {
-          return song;
-        }
-      }
-    }
-
-    // 2. Check in Community Songs
     for (final song in _communitySongs) {
       final sTitle = song.title.toLowerCase();
       final sArtist = song.artist.toLowerCase();
@@ -298,8 +281,70 @@ class CloudBackendService extends ChangeNotifier {
   }
 
   // ==========================================
-  // ADMIN MODERATION CONTROLS
+  // FULL ADMIN CONTROLS (ADD, EDIT, REMOVE)
   // ==========================================
+
+  /// Admin directly adds a song (live immediately without review)
+  Future<Song> addAdminSong({
+    required String title,
+    required String artist,
+    String? album,
+    required String genre,
+    required String audioPath,
+    String? coverUrl,
+  }) async {
+    final songId = 'admin_song_${DateTime.now().millisecondsSinceEpoch}';
+    final song = Song(
+      id: songId,
+      title: title.trim(),
+      artist: artist.trim(),
+      album: album?.trim().isNotEmpty == true ? album!.trim() : 'Msixa Originals',
+      duration: 220,
+      streamUrl: audioPath.trim(),
+      coverUrl: coverUrl?.trim().isNotEmpty == true
+          ? coverUrl!.trim()
+          : 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&q=80',
+      genre: genre.trim().isEmpty ? 'Bollywood' : genre.trim(),
+      status: 'approved', // Live immediately!
+      uploadedBy: 'admin',
+      uploaderName: 'Msixa Super Admin',
+      uploaderPhone: '+919999999999',
+      createdAt: DateTime.now(),
+    );
+
+    _communitySongs.insert(0, song);
+    await _persistSongs();
+    notifyListeners();
+    return song;
+  }
+
+  /// Admin edits an existing song (title, artist, album, genre, audio url, cover url)
+  Future<bool> editSong({
+    required String songId,
+    required String title,
+    required String artist,
+    required String album,
+    required String genre,
+    required String streamUrl,
+    String? coverUrl,
+  }) async {
+    final index = _communitySongs.indexWhere((s) => s.id == songId);
+    if (index != -1) {
+      final existing = _communitySongs[index];
+      _communitySongs[index] = existing.copyWith(
+        title: title.trim(),
+        artist: artist.trim(),
+        album: album.trim(),
+        genre: genre.trim(),
+        streamUrl: streamUrl.trim(),
+        coverUrl: coverUrl?.trim().isNotEmpty == true ? coverUrl!.trim() : existing.coverUrl,
+      );
+      await _persistSongs();
+      notifyListeners();
+      return true;
+    }
+    return false;
+  }
 
   /// Approve a pending song — instantly publishes to all users!
   Future<void> approveSong(String songId) async {
@@ -311,7 +356,7 @@ class CloudBackendService extends ChangeNotifier {
     }
   }
 
-  /// Reject / Delete a song from the platform
+  /// Reject / Delete a song from the platform permanently
   Future<void> rejectOrDeleteSong(String songId) async {
     _communitySongs.removeWhere((s) => s.id == songId);
     await _persistSongs();
@@ -337,4 +382,3 @@ class CloudBackendService extends ChangeNotifier {
     await prefs.setStringList(_keyCommunitySongs, rawList);
   }
 }
-

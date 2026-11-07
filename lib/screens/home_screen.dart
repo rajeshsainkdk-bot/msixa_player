@@ -8,6 +8,7 @@ import '../services/cloud_backend_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/genre_card.dart';
 import '../widgets/song_list_tile.dart';
+import '../services/language_service.dart';
 import 'upload_song_screen.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -58,102 +59,134 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<PlayerProvider>(
-      builder: (context, provider, child) {
-        final trending = provider.trendingSongs;
-        final heroSong = trending.isNotEmpty ? trending.first : null;
+    return ListenableBuilder(
+      listenable: LanguageService(),
+      builder: (context, _) {
+        final lang = LanguageService();
+        return Consumer<PlayerProvider>(
+          builder: (context, provider, child) {
+            final trending = provider.trendingSongs;
+            final heroSong = trending.isNotEmpty ? trending.first : null;
 
-        return RefreshIndicator(
-          color: AppColors.accentCyan,
-          backgroundColor: AppColors.surface,
-          onRefresh: () => provider.refreshCatalog(),
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.only(bottom: 120),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Top App Header with Share APK Button
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+            return RefreshIndicator(
+              color: AppColors.accentCyan,
+              backgroundColor: AppColors.surface,
+              onRefresh: () => provider.refreshCatalog(),
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.only(bottom: 120),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Top App Header with Language Switcher & Upload Song Button
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Row(
-                            children: const [
-                              Icon(Icons.graphic_eq_rounded, color: AppColors.accentCyan, size: 28),
-                              SizedBox(width: 8),
-                              Text(
-                                'Msixa Player',
-                                style: TextStyle(
-                                  color: AppColors.textPrimary,
-                                  fontSize: 26,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: -0.5,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          const Text(
-                            '100% Free Indian & Offline Music Player',
-                            style: TextStyle(
-                              color: AppColors.textSecondary,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                      Row(
-                        children: [
-                          // Upload Song Button
-                          GestureDetector(
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(builder: (_) => const UploadSongScreen()),
-                              );
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                              decoration: BoxDecoration(
-                                gradient: const LinearGradient(
-                                  colors: [Color(0xFF00E5FF), Color(0xFF4F46E5)],
-                                ),
-                                borderRadius: BorderRadius.circular(14),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: const Color(0xFF00E5FF).withOpacity(0.3),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 3),
-                                  ),
-                                ],
-                              ),
-                              child: Row(
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
                                 children: const [
-                                  Icon(Icons.cloud_upload_rounded, color: Colors.black, size: 17),
-                                  SizedBox(width: 6),
+                                  Icon(Icons.graphic_eq_rounded, color: AppColors.accentCyan, size: 28),
+                                  SizedBox(width: 8),
                                   Text(
-                                    '+ Upload Song',
+                                    'Msixa Player',
                                     style: TextStyle(
-                                      color: Colors.black,
-                                      fontSize: 12,
+                                      color: AppColors.textPrimary,
+                                      fontSize: 26,
                                       fontWeight: FontWeight.bold,
+                                      letterSpacing: -0.5,
                                     ),
                                   ),
                                 ],
                               ),
-                            ),
+                              const SizedBox(height: 4),
+                              const Text(
+                                '100% Free Indian & Offline Music Player',
+                                style: TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                          Row(
+                            children: [
+                              // Language Switcher Toggle Pill
+                              InkWell(
+                                onTap: () => lang.toggleLanguage(),
+                                borderRadius: BorderRadius.circular(14),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                                  margin: const EdgeInsets.only(right: 8),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF131A2A),
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(color: const Color(0xFF00E5FF).withOpacity(0.35)),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.language_rounded, color: Color(0xFF00E5FF), size: 14),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        lang.displayLabel,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              // Upload Song Button
+                              GestureDetector(
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (_) => const UploadSongScreen()),
+                                  );
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    gradient: const LinearGradient(
+                                      colors: [Color(0xFF00E5FF), Color(0xFF4F46E5)],
+                                    ),
+                                    borderRadius: BorderRadius.circular(14),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: const Color(0xFF00E5FF).withOpacity(0.3),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 3),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.cloud_upload_rounded, color: Colors.black, size: 16),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        lang.t('upload_song'),
+                                        style: const TextStyle(
+                                          color: Colors.black,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                    ],
-                  ),
-                ),
+                    ),
 
                 // Featured Hero Banner
                 if (heroSong != null)
@@ -316,19 +349,19 @@ class HomeScreen extends StatelessWidget {
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
-                            children: const [
+                            children: [
                               Text(
-                                'Share App APK with Friends',
-                                style: TextStyle(
+                                lang.t('share_apk_title'),
+                                style: const TextStyle(
                                   color: AppColors.textPrimary,
                                   fontSize: 14,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
-                              SizedBox(height: 2),
+                              const SizedBox(height: 2),
                               Text(
-                                'Send directly via WhatsApp, Bluetooth & Nearby Share',
-                                style: TextStyle(
+                                lang.t('share_apk_desc'),
+                                style: const TextStyle(
                                   color: AppColors.textSecondary,
                                   fontSize: 11,
                                 ),
@@ -347,9 +380,9 @@ class HomeScreen extends StatelessWidget {
                             ),
                           ),
                           icon: const Icon(Icons.share_rounded, size: 14),
-                          label: const Text(
-                            'Share APK',
-                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                          label: Text(
+                            lang.t('share_apk_btn'),
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
                           ),
                           onPressed: () => AppShareService.shareAppApk(),
                         ),
@@ -387,9 +420,9 @@ class HomeScreen extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
-                                'Device Offline Audio',
-                                style: TextStyle(
+                              Text(
+                                lang.t('offline_audio_title'),
+                                style: const TextStyle(
                                   color: AppColors.textPrimary,
                                   fontSize: 14,
                                   fontWeight: FontWeight.bold,
@@ -398,8 +431,8 @@ class HomeScreen extends StatelessWidget {
                               const SizedBox(height: 2),
                               Text(
                                 provider.deviceSongs.isEmpty
-                                    ? 'Scan phone folders (Downloads, Music)'
-                                    : '${provider.deviceSongs.length} offline songs ready',
+                                    ? lang.t('offline_audio_scan')
+                                    : '${provider.deviceSongs.length} ${lang.t('offline_ready')}',
                                 style: const TextStyle(
                                   color: AppColors.textSecondary,
                                   fontSize: 11,
@@ -424,7 +457,7 @@ class HomeScreen extends StatelessWidget {
                           ),
                           onPressed: () => provider.scanDeviceSongs(),
                           child: Text(
-                            provider.deviceSongs.isEmpty ? 'Scan' : 'Rescan',
+                            provider.deviceSongs.isEmpty ? lang.t('scan_btn') : lang.t('rescan_btn'),
                             style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
                           ),
                         ),
@@ -594,6 +627,8 @@ class HomeScreen extends StatelessWidget {
             ),
           ),
         );
+      },
+    );
       },
     );
   }
@@ -771,6 +806,7 @@ class HomeScreen extends StatelessWidget {
   Widget _buildCommunitySection(BuildContext context, PlayerProvider provider) {
     final backend = CloudBackendService();
     final approved = backend.approvedSongs;
+    final lang = LanguageService();
 
     if (approved.isEmpty) return const SizedBox.shrink();
 
@@ -793,9 +829,9 @@ class HomeScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  const Text(
-                    '🔥 Newly Added by Community',
-                    style: TextStyle(
+                  Text(
+                    lang.t('community_shelf_title'),
+                    style: const TextStyle(
                       color: AppColors.textPrimary,
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -811,7 +847,7 @@ class HomeScreen extends StatelessWidget {
                   border: Border.all(color: const Color(0xFF00E5FF).withOpacity(0.4)),
                 ),
                 child: Text(
-                  '${approved.length} Live',
+                  '${approved.length} ${lang.t('live_badge')}',
                   style: const TextStyle(
                     color: Color(0xFF00E5FF),
                     fontSize: 10,

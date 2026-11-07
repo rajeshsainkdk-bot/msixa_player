@@ -5,6 +5,7 @@ import 'package:just_audio_background/just_audio_background.dart';
 import 'theme/app_theme.dart';
 import 'providers/player_provider.dart';
 import 'services/cloud_backend_service.dart';
+import 'services/language_service.dart';
 import 'screens/main_navigation_screen.dart';
 import 'screens/auth/auth_screen.dart';
 
@@ -25,6 +26,7 @@ Future<void> main() async {
   // Initialize Cloud & Authentication Backend
   final backend = CloudBackendService();
   await backend.init();
+  await LanguageService().init();
 
   // Set system UI to immersive dark styling
   SystemChrome.setSystemUIOverlayStyle(
