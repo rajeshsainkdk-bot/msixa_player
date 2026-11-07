@@ -4,7 +4,9 @@ import 'package:provider/provider.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 import 'theme/app_theme.dart';
 import 'providers/player_provider.dart';
+import 'services/cloud_backend_service.dart';
 import 'screens/main_navigation_screen.dart';
+import 'screens/auth/auth_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,6 +21,10 @@ Future<void> main() async {
       androidNotificationIcon: 'mipmap/ic_launcher',
     );
   } catch (_) {}
+
+  // Initialize Cloud & Authentication Backend
+  final backend = CloudBackendService();
+  await backend.init();
 
   // Set system UI to immersive dark styling
   SystemChrome.setSystemUIOverlayStyle(
@@ -43,13 +49,41 @@ class MsixaPlayerApp extends StatelessWidget {
         ChangeNotifierProvider<PlayerProvider>(
           create: (_) => PlayerProvider(),
         ),
+        ChangeNotifierProvider<CloudBackendService>.value(
+          value: CloudBackendService(),
+        ),
       ],
       child: MaterialApp(
         title: 'Msixa Player',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.darkTheme,
-        home: const MainNavigationScreen(),
+        home: const UserAppRootView(),
       ),
     );
+  }
+}
+
+class UserAppRootView extends StatefulWidget {
+  const UserAppRootView({Key? key}) : super(key: key);
+
+  @override
+  State<UserAppRootView> createState() => _UserAppRootViewState();
+}
+
+class _UserAppRootViewState extends State<UserAppRootView> {
+  @override
+  Widget build(BuildContext context) {
+    final backend = context.watch<CloudBackendService>();
+
+    // Mandatory Verification Check: User must be registered with verified Phone OTP & Email
+    if (!backend.isAuthenticated) {
+      return AuthScreen(
+        onAuthenticated: () {
+          setState(() {});
+        },
+      );
+    }
+
+    return const MainNavigationScreen();
   }
 }

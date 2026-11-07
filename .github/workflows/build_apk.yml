@@ -165,11 +165,24 @@ jobs:
       - name: Get Dependencies
         run: flutter pub get
 
-      - name: Build APK (Release)
-        run: flutter build apk --release --no-tree-shake-icons
+      - name: Build User APK (Release)
+        run: |
+          flutter build apk --release --no-tree-shake-icons
+          cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/msixa-player-release.apk
 
-      - name: Upload APK Artifact
+      - name: Build Admin Control APK (Release)
+        run: |
+          flutter build apk --release --target=lib/main_admin.dart --no-tree-shake-icons
+          cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/msixa-admin-release.apk
+
+      - name: Upload User APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Msixa-Player-APK
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: build/app/outputs/flutter-apk/msixa-player-release.apk
+
+      - name: Upload Admin APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Msixa-Admin-APK
+          path: build/app/outputs/flutter-apk/msixa-admin-release.apk

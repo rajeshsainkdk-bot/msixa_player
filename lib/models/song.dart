@@ -12,6 +12,13 @@ class Song {
   final String source;
   bool isFavorite;
 
+  // Community Upload & Moderation
+  final String status; // 'approved' | 'pending' | 'rejected'
+  final String? uploadedBy;
+  final String? uploaderName;
+  final String? uploaderPhone;
+  final DateTime? createdAt;
+
   Song({
     required this.id,
     required this.title,
@@ -25,6 +32,11 @@ class Song {
     this.licenseUrl = 'https://creativecommons.org/licenses/',
     this.source = 'Jamendo Free Catalog',
     this.isFavorite = false,
+    this.status = 'approved',
+    this.uploadedBy,
+    this.uploaderName,
+    this.uploaderPhone,
+    this.createdAt,
   });
 
   String get formattedDuration {
@@ -41,6 +53,9 @@ class Song {
       id.startsWith('device_') ||
       genre == 'Offline';
 
+  bool get isPending => status == 'pending';
+  bool get isApproved => status == 'approved';
+
   Song copyWith({
     String? id,
     String? title,
@@ -54,6 +69,11 @@ class Song {
     String? licenseUrl,
     String? source,
     bool? isFavorite,
+    String? status,
+    String? uploadedBy,
+    String? uploaderName,
+    String? uploaderPhone,
+    DateTime? createdAt,
   }) {
     return Song(
       id: id ?? this.id,
@@ -68,6 +88,11 @@ class Song {
       licenseUrl: licenseUrl ?? this.licenseUrl,
       source: source ?? this.source,
       isFavorite: isFavorite ?? this.isFavorite,
+      status: status ?? this.status,
+      uploadedBy: uploadedBy ?? this.uploadedBy,
+      uploaderName: uploaderName ?? this.uploaderName,
+      uploaderPhone: uploaderPhone ?? this.uploaderPhone,
+      createdAt: createdAt ?? this.createdAt,
     );
   }
 
@@ -85,6 +110,11 @@ class Song {
       'licenseUrl': licenseUrl,
       'source': source,
       'isFavorite': isFavorite,
+      'status': status,
+      'uploadedBy': uploadedBy,
+      'uploaderName': uploaderName,
+      'uploaderPhone': uploaderPhone,
+      'createdAt': createdAt?.toIso8601String(),
     };
   }
 
@@ -102,6 +132,11 @@ class Song {
       licenseUrl: json['licenseUrl'] as String? ?? 'https://creativecommons.org/',
       source: json['source'] as String? ?? 'Legal Free Music',
       isFavorite: json['isFavorite'] as bool? ?? false,
+      status: json['status'] as String? ?? 'approved',
+      uploadedBy: json['uploadedBy'] as String?,
+      uploaderName: json['uploaderName'] as String?,
+      uploaderPhone: json['uploaderPhone'] as String?,
+      createdAt: json['createdAt'] != null ? DateTime.tryParse(json['createdAt'] as String) : null,
     );
   }
 

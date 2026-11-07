@@ -4,9 +4,11 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../models/song.dart';
 import '../providers/player_provider.dart';
 import '../services/app_share_service.dart';
+import '../services/cloud_backend_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/genre_card.dart';
 import '../widgets/song_list_tile.dart';
+import 'upload_song_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -108,6 +110,40 @@ class HomeScreen extends StatelessWidget {
                       ),
                       Row(
                         children: [
+                          // Upload Song Button
+                          GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => const UploadSongScreen()),
+                              );
+                            },
+                            child: Container(
+                              margin: const EdgeInsets.only(right: 8),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [Color(0xFF00E5FF), Color(0xFF4F46E5)],
+                                ),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: Row(
+                                children: const [
+                                  Icon(Icons.cloud_upload_rounded, color: Colors.black, size: 16),
+                                  SizedBox(width: 5),
+                                  Text(
+                                    '+ Upload',
+                                    style: TextStyle(
+                                      color: Colors.black,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+
                           // Share Application APK File Button
                           GestureDetector(
                             onTap: () => AppShareService.shareAppApk(),
@@ -417,6 +453,11 @@ class HomeScreen extends StatelessWidget {
                     ),
                   ),
                 ),
+
+                // ==========================================
+                // 🔥 NEWLY ADDED BY COMMUNITY (Approved User Songs)
+                // ==========================================
+                _buildCommunitySection(context, provider),
 
                 // ==========================================
                 // SECTION 1: DIVINE BHAKTI & HANUMAN CHANTS
@@ -745,6 +786,77 @@ class HomeScreen extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildCommunitySection(BuildContext context, PlayerProvider provider) {
+    final backend = CloudBackendService();
+    final approved = backend.approvedSongs;
+
+    if (approved.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 4,
+                    height: 18,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF00E5FF),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    '🔥 Newly Added by Community',
+                    style: TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF00E5FF).withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFF00E5FF).withOpacity(0.4)),
+                ),
+                child: Text(
+                  '${approved.length} Live',
+                  style: const TextStyle(
+                    color: Color(0xFF00E5FF),
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: 190,
+          child: ListView.separated(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            scrollDirection: Axis.horizontal,
+            itemCount: approved.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 14),
+            itemBuilder: (context, index) {
+              final song = approved[index];
+              return _buildSongCard(context, song, provider, approved);
+            },
+          ),
+        ),
+      ],
     );
   }
 }
