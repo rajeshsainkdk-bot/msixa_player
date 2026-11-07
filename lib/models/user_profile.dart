@@ -9,6 +9,7 @@ class UserProfile {
   final DateTime createdAt;
   final DateTime lastActiveAt;
   final bool isOnline;
+  final String password;
 
   UserProfile({
     required this.uid,
@@ -21,6 +22,7 @@ class UserProfile {
     required this.createdAt,
     required this.lastActiveAt,
     this.isOnline = true,
+    this.password = '',
   });
 
   bool get isFullyVerified => isEmailVerified && isPhoneVerified;
@@ -37,6 +39,7 @@ class UserProfile {
       'createdAt': createdAt.toIso8601String(),
       'lastActiveAt': lastActiveAt.toIso8601String(),
       'isOnline': isOnline,
+      'password': password,
     };
   }
 
@@ -56,6 +59,7 @@ class UserProfile {
           ? DateTime.tryParse(json['lastActiveAt'] as String) ?? DateTime.now()
           : DateTime.now(),
       isOnline: json['isOnline'] as bool? ?? false,
+      password: json['password'] as String? ?? '',
     );
   }
 
@@ -70,6 +74,7 @@ class UserProfile {
     DateTime? createdAt,
     DateTime? lastActiveAt,
     bool? isOnline,
+    String? password,
   }) {
     return UserProfile(
       uid: uid ?? this.uid,
@@ -82,6 +87,7 @@ class UserProfile {
       createdAt: createdAt ?? this.createdAt,
       lastActiveAt: lastActiveAt ?? this.lastActiveAt,
       isOnline: isOnline ?? this.isOnline,
+      password: password ?? this.password,
     );
   }
 }

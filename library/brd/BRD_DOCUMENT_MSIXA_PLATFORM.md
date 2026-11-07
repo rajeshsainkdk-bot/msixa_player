@@ -91,16 +91,17 @@ graph TD
   5. *Lo-Fi & Ghazal:* Bajrang Baan Lo-Fi (11 Baar Non-Stop), Kagaz Ki Kashti (Jagjit Singh).
 - **Acceptance Criteria:** Songs must play instantly with zero network buffering when the user is offline.
 
-### FR-02: Instant User Registration with Mandatory Details & Auto-Playlist Recovery (Zero OTP)
-- **Description:** User creates or logs into their account via a streamlined, single-screen onboarding flow without any OTP wait or SMS gateway delays.
-- **Mandatory Fields:**
-  1. *Full Name:* Strictly required (minimum 2 characters).
-  2. *10-Digit Mobile Number:* Strictly required (Indian 10-digit format).
-  3. *Email Address:* Strictly required with RFC regex validation (`name@domain.com`).
-- **Account & State Recovery Behavior:**
-  - If a user inputs an existing mobile number, the system automatically matches the record, preserves the original `uid` and creation date, updates last active timestamp, and instantly reloads all previously saved playlists, favorite songs, and recently played tracks.
-  - Zero OTP verification codes required; prevents onboarding drop-offs and eliminates telecom SMS failures.
-- **Acceptance Criteria:** Account creation and login are blocked until all 3 fields are validly filled. Returning users instantly access their previous playlists upon entering the same mobile number.
+### FR-02: Password-Based Authentication with Mobile Number as User ID (Zero OTP)
+- **Description:** User authentication is entirely decoupled from telecom SMS OTPs and replaced with a robust User ID (Mobile Number) + User-Created Password mechanism.
+- **User Roles & Flow Paths:**
+  1. *New User Registration:*
+     - Mandatory inputs: Full Name (min 2 chars), 10-Digit Mobile Number (serves as User ID), Email Address, and Password (min 4 chars).
+     - If the mobile number already exists in the registered users directory, registration is blocked with notification: *"यह नंबर पहले से रजिस्टर्ड है! कृपया सीधे पासवर्ड डालकर लॉगिन करें"*, automatically switching the user to Login mode with their phone pre-filled.
+  2. *Returning User Login:*
+     - Mandatory inputs: 10-Digit Mobile Number (User ID) and Password.
+     - If the mobile number is NOT found in the user list, login is rejected with clear guidance: *"यह मोबाइल नंबर रजिस्टर्ड नहीं है! कृपया पहले नया रजिस्ट्रेशन करें"*, preventing unauthorized access and offering an immediate 1-tap transition to Register mode.
+     - On successful password verification: Session is established, user heartbeat is recorded, and all previously created playlists, liked songs, and playback history are immediately loaded into the player.
+- **Acceptance Criteria:** Direct login is impossible without prior registration. Attempting duplicate registration redirects to login. Returning users recover all personal playlists upon entering their registered number and password.
 
 ### FR-03: Real-Time Active User Heartbeat & Analytics
 - **Description:** The client sends periodic timestamp heartbeats upon app foregrounding and song playback.

@@ -23,50 +23,53 @@
 
 ## 2. Test Suite 1: User Onboarding & Authentication (TS-01)
 
-### TC-AUTH-001: First-Time User Registration Wizard Launch
+### TC-AUTH-001: First-Time User Auth Screen Launch
 - **Precondition:** Fresh installation of `Msixa-Player-APK`, app data cleared.
 - **Test Steps:**
   1. Launch Msixa Player.
   2. Observe the initial screen displayed.
-- **Expected Result:** `AuthScreen` is rendered immediately. The main music player is completely inaccessible until mandatory details are submitted.
+- **Expected Result:** `AuthScreen` is rendered immediately with `[Login]` and `[Register]` tabs. The main player is completely inaccessible until authentication.
 - **Status:** PASS
 
-### TC-AUTH-002: Form Validation on Empty & Incomplete Mandatory Inputs
-- **Precondition:** On `AuthScreen`.
+### TC-AUTH-002: Direct Login Attempt with Unregistered Mobile Number
+- **Precondition:** On `AuthScreen` Login tab. Mobile number `9123456780` is NOT in the user directory.
 - **Test Steps:**
-  1. Leave "Full Name" blank and tap `[Start Listening]`.
-     - *Expected:* "कृपया अपना पूरा नाम दर्ज करें (कम से कम 2 अक्षर)" error.
-  2. Fill Name (`Rajesh`), enter 8-digit phone (`98765432`) and tap `[Start Listening]`.
-     - *Expected:* "कृपया 10 अंकों का वैध मोबाइल नंबर दर्ज करें" error.
-  3. Fill 10-digit phone (`9876543210`), leave Email blank or enter invalid format (`rajesh@`) and tap `[Start Listening]`.
-     - *Expected:* "कृपया एक वैध ईमेल आईडी दर्ज करें (उदा. user@mail.com)" error.
-- **Expected Result:** Account creation is strictly blocked until all 3 mandatory fields pass validation.
+  1. Enter mobile number `9123456780` and any password.
+  2. Tap `[🔑 लॉगिन करें व संगीत सुनें (Login)]`.
+- **Expected Result:** Login is blocked. Clear notification appears: *"⚠️ यह मोबाइल नंबर रजिस्टर्ड नहीं है! कृपया पहले नया रजिस्ट्रेशन करें।"* A 1-tap `[👉 अभी नया खाता बनाएं (Register)]` button is shown and pre-fills the number on Register tab.
 - **Status:** PASS
 
-### TC-AUTH-003: Zero-OTP Direct Account Creation (New User)
-- **Precondition:** Valid inputs (Name: `Aman Verma`, Phone: `9812345678`, Email: `aman@example.com`).
+### TC-AUTH-003: Duplicate Registration Attempt with Existing Mobile Number
+- **Precondition:** User `9876543210` already exists in `_allUsers`.
 - **Test Steps:**
-  1. Tap `[🎧 शुरू करें (Start Listening)]`.
-- **Expected Result:** Account is instantly created without any OTP prompt. Welcome toast appears. User is immediately transitioned to `MainNavigationScreen`.
+  1. Switch to `Register` tab.
+  2. Enter Full Name, already registered phone `9876543210`, email, and password.
+  3. Tap `[✨ खाता बनाएं व शुरू करें (Register)]`.
+- **Expected Result:** Registration is halted. Notification appears: *"ℹ️ यह नंबर पहले से रजिस्टर्ड है! कृपया सीधे पासवर्ड डालकर लॉगिन करें।"* UI automatically toggles to `Login` tab with `9876543210` pre-filled.
 - **Status:** PASS
 
-### TC-AUTH-004: Returning User Account & Playlist Recovery
-- **Precondition:** User `Aman Verma` previously saved favorite songs and created a custom playlist "My Devotional Hits".
+### TC-AUTH-004: First-Time Registration with Name, Mobile, Email & Password
+- **Precondition:** Unique inputs: Name: `Rajesh Sain`, Phone: `9876500001`, Email: `rajesh@example.com`, Password: `mySecretPass123`.
 - **Test Steps:**
-  1. Sign out or re-enter the same 10-digit number (`9812345678`).
-  2. Tap `[🎧 शुरू करें (Start Listening)]`.
-- **Expected Result:**
-  - Existing user profile matched and restored.
-  - Success banner: "वापसी पर स्वागत है! आपकी प्लेलिस्ट व गाने रीस्टोर हो गए हैं।"
-  - In Library tab, "My Devotional Hits" playlist and all previous favorites are fully restored and playable.
+  1. Fill all 4 mandatory fields on Register tab.
+  2. Tap `[✨ खाता बनाएं व शुरू करें]`.
+- **Expected Result:** Account is instantly created. User profile is saved to persistent directory with User ID `+91 9876500001`. Toast *"स्वागत है! आपका Msixa खाता सफलतापूर्वक बन गया है।"* appears. User enters `MainNavigationScreen`.
 - **Status:** PASS
 
-### TC-AUTH-005: Correct SMS OTP Entry & Instant Completion
-- **Precondition:** On Stage 2 (Phone OTP).
+### TC-AUTH-005: Incorrect Password Entry during Login (Negative Test)
+- **Precondition:** Registered user `9876500001` exists with password `mySecretPass123`.
 - **Test Steps:**
-  1. Enter generated 6-digit OTP or tap `[Auto-fill Code]` (or enter `123456`).
-  2. Tap `[Verify & Start Listening]`.
-- **Expected Result:** Registration completes instantly. User profile is persisted to `SharedPreferences`. User is taken straight to `MainNavigationScreen` (Home) with full music access.
+  1. On Login tab, enter `9876500001` and wrong password `wrongPass999`.
+  2. Tap `[🔑 लॉगिन करें]`.
+- **Expected Result:** Authentication fails. Warning displays: *"❌ गलत पासवर्ड! कृपया सही पासवर्ड दर्ज करें।"* Session is not created.
+- **Status:** PASS
+
+### TC-AUTH-006: Successful Login & Instant Playlist/Favorites Recovery
+- **Precondition:** User `9876500001` created playlists and liked tracks in an earlier session.
+- **Test Steps:**
+  1. On Login tab, enter `9876500001` and correct password `mySecretPass123`.
+  2. Tap `[🔑 लॉगिन करें]`.
+- **Expected Result:** Login succeeds immediately. Toast *"वापसी पर स्वागत है! आपकी प्लेलिस्ट व गाने लोड हो गए हैं।"* appears. In Library tab, all previous custom playlists, favorites, and history are fully restored and playable.
 - **Status:** PASS
 
 ### TC-AUTH-006: Language Switcher Toggle on Auth Screen

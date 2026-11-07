@@ -109,16 +109,133 @@ class CloudBackendService extends ChangeNotifier {
   }
 
   // ==========================================
-  // AUTHENTICATION & DIRECT REGISTRATION / LOGIN (ZERO OTP)
+  // AUTHENTICATION: PHONE USER ID & PASSWORD SYSTEM
   // ==========================================
 
-  /// Direct Registration / Login without OTP
-  /// All 3 fields (Full Name, 10-digit Phone, Email) are strictly mandatory.
-  /// If phone number already exists, restores the existing account & its playlists/songs!
+  /// Check if a phone number (User ID) is already registered
+  bool isPhoneRegistered(String phoneNumber) {
+    final digitsOnly = phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
+    final last10Digits = digitsOnly.length >= 10
+        ? digitsOnly.substring(digitsOnly.length - 10)
+        : digitsOnly;
+    return _allUsers.any((u) {
+      final uDigits = u.phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
+      return uDigits.endsWith(last10Digits);
+    });
+  }
+
+  /// Get user profile by phone number (if exists)
+  UserProfile? getUserByPhone(String phoneNumber) {
+    final digitsOnly = phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
+    final last10Digits = digitsOnly.length >= 10
+        ? digitsOnly.substring(digitsOnly.length - 10)
+        : digitsOnly;
+    try {
+      return _allUsers.firstWhere((u) {
+        final uDigits = u.phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
+        return uDigits.endsWith(last10Digits);
+      });
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Register New User (Name, Phone Number [User ID], Email, Password)
+  /// If phone already exists, throws 'ALREADY_REGISTERED' so UI prompts direct login
+  Future<UserProfile> registerUser({
+    required String fullName,
+    required String phoneNumber,
+    required String email,
+    required String password,
+  }) async {
+    final cleanName = fullName.trim();
+    final cleanEmail = email.trim().toLowerCase();
+    final digitsOnly = phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
+    final last10Digits = digitsOnly.length >= 10
+        ? digitsOnly.substring(digitsOnly.length - 10)
+        : digitsOnly;
+    final formattedPhone = '+91 $last10Digits';
+
+    final existingIndex = _allUsers.indexWhere((u) {
+      final uDigits = u.phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
+      return uDigits.endsWith(last10Digits);
+    });
+
+    if (existingIndex != -1) {
+      throw 'ALREADY_REGISTERED';
+    }
+
+    final uid = 'user_${DateTime.now().millisecondsSinceEpoch}';
+    final user = UserProfile(
+      uid: uid,
+      fullName: cleanName,
+      email: cleanEmail,
+      isEmailVerified: true,
+      phoneNumber: formattedPhone,
+      isPhoneVerified: true,
+      role: 'user',
+      createdAt: DateTime.now(),
+      lastActiveAt: DateTime.now(),
+      isOnline: true,
+      password: password.trim(),
+    );
+
+    _allUsers.add(user);
+    _currentUser = user;
+    await _persistUsers();
+    notifyListeners();
+    return user;
+  }
+
+  /// Login Existing User with Phone Number (User ID) and Password
+  /// - If phone is not in user list -> throws 'NOT_REGISTERED'
+  /// - If password mismatch -> throws 'WRONG_PASSWORD'
+  /// - If successful -> restores session, updates heartbeat, recovers playlists
+  Future<UserProfile> loginUser({
+    required String phoneNumber,
+    required String password,
+  }) async {
+    final digitsOnly = phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
+    final last10Digits = digitsOnly.length >= 10
+        ? digitsOnly.substring(digitsOnly.length - 10)
+        : digitsOnly;
+
+    final existingIndex = _allUsers.indexWhere((u) {
+      final uDigits = u.phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
+      return uDigits.endsWith(last10Digits);
+    });
+
+    if (existingIndex == -1) {
+      throw 'NOT_REGISTERED';
+    }
+
+    var user = _allUsers[existingIndex];
+    final cleanPass = password.trim();
+
+    // If account was created prior to password field, set it now, otherwise verify
+    if (user.password.isNotEmpty && user.password != cleanPass) {
+      throw 'WRONG_PASSWORD';
+    }
+
+    user = user.copyWith(
+      lastActiveAt: DateTime.now(),
+      isOnline: true,
+      password: user.password.isEmpty ? cleanPass : user.password,
+    );
+    _allUsers[existingIndex] = user;
+    _currentUser = user;
+
+    await _persistUsers();
+    notifyListeners();
+    return user;
+  }
+
+  /// Direct Registration / Login without OTP (legacy / unified helper)
   Future<UserProfile> registerOrLogin({
     required String fullName,
     required String phoneNumber,
     required String email,
+    String? password,
   }) async {
     final cleanName = fullName.trim();
     final cleanEmail = email.trim().toLowerCase();
@@ -138,7 +255,6 @@ class CloudBackendService extends ChangeNotifier {
 
     UserProfile user;
     if (existingIndex != -1) {
-      // Existing User: Restore existing UID & registration date, update name/email
       final existingUser = _allUsers[existingIndex];
       user = existingUser.copyWith(
         fullName: cleanName.isNotEmpty ? cleanName : existingUser.fullName,
@@ -148,10 +264,12 @@ class CloudBackendService extends ChangeNotifier {
         isEmailVerified: true,
         lastActiveAt: DateTime.now(),
         isOnline: true,
+        password: (password != null && password.trim().isNotEmpty)
+            ? password.trim()
+            : existingUser.password,
       );
       _allUsers[existingIndex] = user;
     } else {
-      // New User: Create new profile
       final uid = 'user_${DateTime.now().millisecondsSinceEpoch}';
       user = UserProfile(
         uid: uid,
@@ -164,6 +282,7 @@ class CloudBackendService extends ChangeNotifier {
         createdAt: DateTime.now(),
         lastActiveAt: DateTime.now(),
         isOnline: true,
+        password: password?.trim() ?? '',
       );
       _allUsers.add(user);
     }

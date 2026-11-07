@@ -55,24 +55,49 @@ class LanguageService extends ChangeNotifier {
   static const Map<String, Map<String, String>> _localizedValues = {
     // Auth & Onboarding
     'auth_title': {'hi': 'Msixa Player', 'en': 'Msixa Player'},
-    'auth_subtitle': {'hi': 'श्रोता खाता बनाएं या लॉगिन करें', 'en': 'Create Listener Account or Login'},
+    'auth_subtitle': {'hi': 'मोबाइल नंबर (User ID) व पासवर्ड आधारित सुरक्षित एक्सेस', 'en': 'Secure Mobile Number & Password Access'},
+    'tab_login': {'hi': 'लॉगिन (Login)', 'en': 'Login'},
+    'tab_register': {'hi': 'नया रजिस्ट्रेशन (Register)', 'en': 'Register'},
+    'user_id_label': {'hi': 'यूज़र आईडी (10-Digit Mobile Number) *', 'en': 'User ID (10-Digit Mobile Number) *'},
+    'user_id_hint': {'hi': '9876543210', 'en': '9876543210'},
     'full_name': {'hi': 'पूरा नाम (Full Name) *', 'en': 'Full Name *'},
     'full_name_hint': {'hi': 'उदा. Rajesh Kumar', 'en': 'e.g. Rajesh Kumar'},
-    'phone_number': {'hi': 'मोबाइल नंबर (10-Digit Mobile) *', 'en': 'Mobile Number (10 Digits) *'},
+    'phone_number': {'hi': 'मोबाइल नंबर (User ID) *', 'en': 'Mobile Number (User ID) *'},
     'phone_number_hint': {'hi': '9876543210', 'en': '9876543210'},
     'email_mandatory': {'hi': 'ईमेल आईडी (Email ID) *', 'en': 'Email ID *'},
     'email_hint': {'hi': 'rajesh@example.com', 'en': 'rajesh@example.com'},
-    'start_listening': {'hi': '🎧 शुरू करें (Start Listening)', 'en': '🎧 Start Listening'},
-    'auth_tagline': {'hi': '100% मुफ़्त एवं सुरक्षित • OTP की कोई आवश्यकता नहीं', 'en': '100% Free & Secure • No OTP Required'},
+    'password_label': {'hi': 'पासवर्ड (Password) *', 'en': 'Password *'},
+    'password_hint': {'hi': 'अपना पासवर्ड दर्ज करें', 'en': 'Enter your password'},
+    'create_password_label': {'hi': 'पासवर्ड बनाएं (Create Password) *', 'en': 'Create Password *'},
+    'create_password_hint': {'hi': 'नया पासवर्ड दर्ज करें (कम से कम 4 अक्षर)', 'en': 'Create password (min 4 characters)'},
+    'btn_login': {'hi': '🔑 लॉगिन करें व संगीत सुनें', 'en': '🔑 Login & Listen'},
+    'btn_register': {'hi': '✨ खाता बनाएं व शुरू करें', 'en': '✨ Create Account & Start'},
+    'switch_to_register_prompt': {'hi': 'नया यूज़र हैं? नया खाता बनाएं', 'en': 'New user? Create an account'},
+    'switch_to_login_prompt': {'hi': 'पहले से अकाउंट है? सीधे लॉगिन करें', 'en': 'Already registered? Login here'},
+    'auth_tagline': {'hi': '100% मुफ़्त एवं सुरक्षित • OTP का कोई झंझट नहीं', 'en': '100% Free & Secure • No OTP Hassle'},
     'account_recovery_banner': {
-      'hi': '⚡ पुराना मोबाइल नंबर डालने पर आपका पिछला अकाउंट, प्लेलिस्ट व पसंदीदा गाने स्वतः रीस्टोर हो जाएंगे!',
-      'en': '⚡ Entering your previous number will instantly restore your account, playlists & favorite songs!'
+      'hi': '⚡ रजिस्टर्ड नंबर व पासवर्ड से लॉगिन करने पर आपकी सभी प्लेलिस्ट व गाने तुरंत लोड होंगे!',
+      'en': '⚡ Login with your registered number & password to restore all your playlists & songs!'
     },
     'err_name_required': {'hi': 'कृपया अपना पूरा नाम दर्ज करें (कम से कम 2 अक्षर)', 'en': 'Please enter your full name (at least 2 characters)'},
     'err_phone_required': {'hi': 'कृपया 10 अंकों का वैध मोबाइल नंबर दर्ज करें', 'en': 'Please enter a valid 10-digit mobile number'},
     'err_email_required': {'hi': 'कृपया एक वैध ईमेल आईडी दर्ज करें (उदा. user@mail.com)', 'en': 'Please enter a valid email address (e.g. user@mail.com)'},
-    'welcome_back': {'hi': 'वापसी पर स्वागत है! आपकी प्लेलिस्ट व गाने रीस्टोर हो गए हैं।', 'en': 'Welcome back! Your playlists & songs have been restored.'},
-    'welcome_new': {'hi': 'Msixa Player में आपका स्वागत है!', 'en': 'Welcome to Msixa Player!'},
+    'err_password_required': {'hi': 'कृपया पासवर्ड दर्ज करें', 'en': 'Please enter your password'},
+    'err_password_short': {'hi': 'पासवर्ड कम से कम 4 अक्षरों का होना चाहिए', 'en': 'Password must be at least 4 characters'},
+    'err_not_registered': {
+      'hi': '⚠️ यह मोबाइल नंबर रजिस्टर्ड नहीं है! कृपया पहले नया रजिस्ट्रेशन करें।',
+      'en': '⚠️ This mobile number is not registered! Please register first.'
+    },
+    'err_already_registered': {
+      'hi': 'ℹ️ यह नंबर पहले से रजिस्टर्ड है! कृपया सीधे पासवर्ड डालकर लॉगिन करें।',
+      'en': 'ℹ️ Already registered! Please login directly with your password.'
+    },
+    'err_wrong_password': {
+      'hi': '❌ गलत पासवर्ड! कृपया सही पासवर्ड दर्ज करें।',
+      'en': '❌ Incorrect password! Please enter the correct password.'
+    },
+    'welcome_back': {'hi': 'वापसी पर स्वागत है! आपकी प्लेलिस्ट व गाने लोड हो गए हैं।', 'en': 'Welcome back! Your playlists & songs have been loaded.'},
+    'welcome_new': {'hi': 'स्वागत है! आपका Msixa खाता सफलतापूर्वक बन गया है।', 'en': 'Welcome! Your Msixa account has been created successfully.'},
     'create_playlist': {'hi': '+ नई प्लेलिस्ट बनाएं', 'en': '+ Create Playlist'},
     'my_playlist_badge': {'hi': 'मेरी प्लेलिस्ट', 'en': 'My Playlist'},
     'playlist_name': {'hi': 'प्लेलिस्ट का नाम', 'en': 'Playlist Name'},

@@ -81,20 +81,39 @@ graph TB
   - `msixa_all_registered_users`: Full user directory array.
   - `msixa_community_songs`: All submitted, pending, and approved tracks.
 
-### 3.2 User Registration & Account Recovery State Machine (Zero OTP)
+### 3.2 User Authentication State Machine (User ID: Phone, Password-Based)
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Unregistered: User launches User App
-    Unregistered --> AuthScreen: Intercepted by UserAppRootView
-    AuthScreen --> MandatoryValidation: Full Name, 10-Digit Mobile, Email
-    MandatoryValidation --> AuthScreen: Any field invalid / incomplete
-    MandatoryValidation --> AccountLookup: All 3 fields verified
-    AccountLookup --> RestoreAccount: Mobile number matches existing record
-    AccountLookup --> CreateAccount: New mobile number
-    RestoreAccount --> LoadScopedData: Restore UID, playlists & favorites
-    CreateAccount --> LoadScopedData: New UID, initial state
-    LoadScopedData --> MainNavigationScreen: Session Persisted, Heartbeat Active
+    [*] --> Unauthenticated: User launches User App
+    Unauthenticated --> AuthScreen: Intercepted by UserAppRootView
+    
+    state AuthScreen {
+        [*] --> LoginMode
+        LoginMode --> RegisterMode: Tap 'Create Account' / Unregistered Number
+        RegisterMode --> LoginMode: Tap 'Login' / Number Already Registered
+        
+        state LoginMode {
+            [*] --> ValidateLoginInputs
+            ValidateLoginInputs --> CheckUserList: Phone (User ID) + Password entered
+            CheckUserList --> UnregisteredReject: Phone NOT in _allUsers
+            UnregisteredReject --> RegisterMode: Prompt & Pre-fill Phone
+            CheckUserList --> PasswordCheck: Phone exists in _allUsers
+            PasswordCheck --> WrongPasswordError: Password mismatch
+            PasswordCheck --> LoginSuccess: Password matched
+        }
+        
+        state RegisterMode {
+            [*] --> ValidateRegInputs
+            ValidateRegInputs --> CheckDuplicates: Name, Phone, Email, Password entered
+            CheckDuplicates --> DuplicateReject: Phone ALREADY exists in _allUsers
+            DuplicateReject --> LoginMode: Prompt "Already registered, please login"
+            CheckDuplicates --> RegSuccess: Unique Phone
+        }
+    }
+
+    LoginSuccess --> MainNavigationScreen: Load scoped playlists, favorites & history
+    RegSuccess --> MainNavigationScreen: Initialize fresh profile & session
 ```
 
 ---
