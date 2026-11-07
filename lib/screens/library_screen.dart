@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/player_provider.dart';
+import '../services/app_share_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/song_list_tile.dart';
 
@@ -35,6 +36,13 @@ class _LibraryScreenState extends State<LibraryScreen>
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Your Library'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.share_rounded, color: AppColors.accentCyan),
+            tooltip: 'Share APK with Friends',
+            onPressed: () => AppShareService.shareAppApk(),
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: AppColors.accentCyan,

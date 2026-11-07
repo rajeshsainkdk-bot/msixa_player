@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../models/song.dart';
 import '../providers/player_provider.dart';
+import '../services/app_share_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/genre_card.dart';
 import '../widgets/song_list_tile.dart';
@@ -12,49 +13,39 @@ class HomeScreen extends StatelessWidget {
 
   static const List<Map<String, dynamic>> _genres = [
     {
-      'title': 'Indian',
+      'title': 'All Indian',
       'icon': Icons.music_note_rounded,
       'gradient': LinearGradient(colors: [Color(0xFFFF9933), Color(0xFF138808)]),
     },
     {
+      'title': 'Bollywood',
+      'icon': Icons.movie_filter_rounded,
+      'gradient': LinearGradient(colors: [Color(0xFFE11D48), Color(0xFF9333EA)]),
+    },
+    {
+      'title': 'Rajasthani',
+      'icon': Icons.terrain_rounded,
+      'gradient': LinearGradient(colors: [Color(0xFFF59E0B), Color(0xFFD97706)]),
+    },
+    {
+      'title': 'DJ Songs',
+      'icon': Icons.speaker_group_rounded,
+      'gradient': LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFFEC4899)]),
+    },
+    {
       'title': 'Desi Lo-Fi',
       'icon': Icons.nightlife_rounded,
-      'gradient': LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFFEC4899)]),
+      'gradient': LinearGradient(colors: [Color(0xFF3B82F6), Color(0xFF06B6D4)]),
+    },
+    {
+      'title': 'Sufi',
+      'icon': Icons.temple_hindu_rounded,
+      'gradient': LinearGradient(colors: [Color(0xFF10B981), Color(0xFF06B6D4)]),
     },
     {
       'title': 'Classical',
       'icon': Icons.waves_rounded,
-      'gradient': LinearGradient(colors: [Color(0xFFD97706), Color(0xFFF59E0B)]),
-    },
-    {
-      'title': 'Synthwave',
-      'icon': Icons.bolt_rounded,
-      'gradient': LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFFEC4899)]),
-    },
-    {
-      'title': 'Lo-Fi',
-      'icon': Icons.nightlight_round,
-      'gradient': LinearGradient(colors: [Color(0xFF3B82F6), Color(0xFF06B6D4)]),
-    },
-    {
-      'title': 'Electronic',
-      'icon': Icons.album_rounded,
-      'gradient': LinearGradient(colors: [Color(0xFF10B981), Color(0xFF06B6D4)]),
-    },
-    {
-      'title': 'Ambient',
-      'icon': Icons.waves_rounded,
       'gradient': LinearGradient(colors: [Color(0xFF6366F1), Color(0xFF3B82F6)]),
-    },
-    {
-      'title': 'Chillhop',
-      'icon': Icons.coffee_rounded,
-      'gradient': LinearGradient(colors: [Color(0xFFF59E0B), Color(0xFFEF4444)]),
-    },
-    {
-      'title': 'Acoustic',
-      'icon': Icons.music_note_rounded,
-      'gradient': LinearGradient(colors: [Color(0xFF14B8A6), Color(0xFF6366F1)]),
     },
   ];
 
@@ -75,7 +66,7 @@ class HomeScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Top App Header
+                // Top App Header with Share APK Button
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
                   child: Row(
@@ -101,7 +92,7 @@ class HomeScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: 4),
                           const Text(
-                            'Legal Free Online Audio Streaming',
+                            '100% Free Indian & Offline Music Player',
                             style: TextStyle(
                               color: AppColors.textSecondary,
                               fontSize: 12,
@@ -110,18 +101,35 @@ class HomeScreen extends StatelessWidget {
                           ),
                         ],
                       ),
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: AppColors.card,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white.withOpacity(0.08)),
-                        ),
-                        child: const Icon(
-                          Icons.verified_rounded,
-                          color: AppColors.accentCyan,
-                          size: 20,
-                        ),
+                      Row(
+                        children: [
+                          // Share Application APK File Button
+                          GestureDetector(
+                            onTap: () => AppShareService.shareAppApk(),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                              decoration: BoxDecoration(
+                                color: AppColors.accentCyan.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: AppColors.accentCyan.withOpacity(0.4)),
+                              ),
+                              child: Row(
+                                children: const [
+                                  Icon(Icons.share_rounded, color: AppColors.accentCyan, size: 16),
+                                  SizedBox(width: 5),
+                                  Text(
+                                    'Share APK',
+                                    style: TextStyle(
+                                      color: AppColors.accentCyan,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -153,12 +161,14 @@ class HomeScreen extends StatelessWidget {
                             Positioned.fill(
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(24),
-                                child: CachedNetworkImage(
-                                  imageUrl: heroSong.coverUrl,
-                                  fit: BoxFit.cover,
-                                  color: Colors.black.withOpacity(0.6),
-                                  colorBlendMode: BlendMode.darken,
-                                ),
+                                child: heroSong.coverUrl.startsWith('http')
+                                    ? CachedNetworkImage(
+                                        imageUrl: heroSong.coverUrl,
+                                        fit: BoxFit.cover,
+                                        color: Colors.black.withOpacity(0.6),
+                                        colorBlendMode: BlendMode.darken,
+                                      )
+                                    : Container(color: AppColors.card),
                               ),
                             ),
 
@@ -178,7 +188,7 @@ class HomeScreen extends StatelessWidget {
                                           borderRadius: BorderRadius.circular(12),
                                         ),
                                         child: const Text(
-                                          'FEATURED STREAM',
+                                          '🇮🇳 100% FREE • NO PAYMENT',
                                           style: TextStyle(
                                             color: Colors.white,
                                             fontSize: 10,
@@ -226,7 +236,7 @@ class HomeScreen extends StatelessWidget {
                                                 Icon(Icons.play_arrow_rounded, color: Colors.white, size: 18),
                                                 SizedBox(width: 4),
                                                 Text(
-                                                  'Stream Now',
+                                                  'Listen Free',
                                                   style: TextStyle(
                                                     color: Colors.white,
                                                     fontWeight: FontWeight.bold,
@@ -237,11 +247,12 @@ class HomeScreen extends StatelessWidget {
                                             ),
                                           ),
                                           const SizedBox(width: 10),
-                                          Text(
-                                            heroSong.license.split(' ').take(3).join(' '),
-                                            style: const TextStyle(
-                                              color: AppColors.textMuted,
+                                          const Text(
+                                            'Free Forever',
+                                            style: TextStyle(
+                                              color: AppColors.accentGreen,
                                               fontSize: 11,
+                                              fontWeight: FontWeight.w600,
                                             ),
                                           ),
                                         ],
@@ -257,9 +268,79 @@ class HomeScreen extends StatelessWidget {
                     ),
                   ),
 
-                // Device Storage Quick Access Banner
+                // Share APK File Quick Card
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: AppColors.card,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppColors.accentCyan.withOpacity(0.2)),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: AppColors.accentCyan.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.send_to_mobile_rounded,
+                            color: AppColors.accentCyan,
+                            size: 22,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: const [
+                              Text(
+                                'Share App APK with Friends',
+                                style: TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              SizedBox(height: 2),
+                              Text(
+                                'Send directly via WhatsApp, Bluetooth & Nearby Share',
+                                style: TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.accentCyan,
+                            foregroundColor: Colors.black,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            minimumSize: Size.zero,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          icon: const Icon(Icons.share_rounded, size: 14),
+                          label: const Text(
+                            'Share APK',
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                          ),
+                          onPressed: () => AppShareService.shareAppApk(),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                // Device Storage Quick Access Banner
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     decoration: BoxDecoration(
@@ -272,13 +353,13 @@ class HomeScreen extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: AppColors.accentCyan.withOpacity(0.12),
+                            color: AppColors.accentGreen.withOpacity(0.12),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: const Icon(
-                            Icons.phone_android_rounded,
-                            color: AppColors.accentCyan,
-                            size: 24,
+                            Icons.sd_storage_rounded,
+                            color: AppColors.accentGreen,
+                            size: 22,
                           ),
                         ),
                         const SizedBox(width: 14),
@@ -298,10 +379,10 @@ class HomeScreen extends StatelessWidget {
                               Text(
                                 provider.deviceSongs.isEmpty
                                     ? 'Scan phone folders (Downloads, Music)'
-                                    : '${provider.deviceSongs.length} local offline songs detected',
+                                    : '${provider.deviceSongs.length} offline songs ready',
                                 style: const TextStyle(
                                   color: AppColors.textSecondary,
-                                  fontSize: 12,
+                                  fontSize: 11,
                                 ),
                               ),
                             ],
@@ -310,11 +391,11 @@ class HomeScreen extends StatelessWidget {
                         ElevatedButton(
                           style: ElevatedButton.styleFrom(
                             backgroundColor: provider.deviceSongs.isEmpty
-                                ? AppColors.accentCyan
+                                ? AppColors.accentGreen
                                 : AppColors.surface,
                             foregroundColor: provider.deviceSongs.isEmpty
                                 ? Colors.black
-                                : AppColors.accentCyan,
+                                : AppColors.accentGreen,
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                             minimumSize: Size.zero,
                             shape: RoundedRectangleBorder(
@@ -324,7 +405,7 @@ class HomeScreen extends StatelessWidget {
                           onPressed: () => provider.scanDeviceSongs(),
                           child: Text(
                             provider.deviceSongs.isEmpty ? 'Scan' : 'Rescan',
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
                           ),
                         ),
                       ],
@@ -332,61 +413,51 @@ class HomeScreen extends StatelessWidget {
                   ),
                 ),
 
-                // Indian Songs & Ragas Section
-                Builder(
-                  builder: (context) {
-                    final indianList = trending.where((s) => s.id.startsWith('msixa_ind')).toList();
-                    if (indianList.isEmpty) return const SizedBox.shrink();
-
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Row(
-                                children: const [
-                                  Text('🇮🇳 ', style: TextStyle(fontSize: 16)),
-                                  Text(
-                                    'Indian Songs & Ragas',
-                                    style: TextStyle(
-                                      color: AppColors.textPrimary,
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              GestureDetector(
-                                onTap: () => provider.selectGenre('Indian'),
-                                child: const Text(
-                                  'See All',
-                                  style: TextStyle(color: AppColors.accentCyan, fontSize: 13),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        SizedBox(
-                          height: 200,
-                          child: ListView.builder(
-                            scrollDirection: Axis.horizontal,
-                            padding: const EdgeInsets.symmetric(horizontal: 20),
-                            itemCount: indianList.length,
-                            itemBuilder: (context, index) {
-                              final song = indianList[index];
-                              return _buildIndianSongCard(context, song, provider, indianList);
-                            },
-                          ),
-                        ),
-                      ],
-                    );
-                  },
+                // ==========================================
+                // SECTION 1: BOLLYWOOD HITS & ACOUSTIC MELODIES
+                // ==========================================
+                _buildCategorySection(
+                  context,
+                  title: '🎬 Bollywood Hits & Acoustic Melodies',
+                  genreKey: 'Bollywood',
+                  provider: provider,
+                  songs: trending.where((s) => s.genre == 'Bollywood').toList(),
                 ),
 
-                const SizedBox(height: 24),
+                // ==========================================
+                // SECTION 2: RAJASTHANI FOLK & GHOOMAR BEATS
+                // ==========================================
+                _buildCategorySection(
+                  context,
+                  title: '🐪 Rajasthani Folk & Ghoomar DJ',
+                  genreKey: 'Rajasthani',
+                  provider: provider,
+                  songs: trending.where((s) => s.genre == 'Rajasthani').toList(),
+                ),
+
+                // ==========================================
+                // SECTION 3: DJ SONGS & DESI PARTY BASS
+                // ==========================================
+                _buildCategorySection(
+                  context,
+                  title: '🎧 DJ Songs & Desi Party Bass',
+                  genreKey: 'DJ Songs',
+                  provider: provider,
+                  songs: trending.where((s) => s.genre == 'DJ Songs').toList(),
+                ),
+
+                // ==========================================
+                // SECTION 4: DESI LO-FI CHAI BEATS
+                // ==========================================
+                _buildCategorySection(
+                  context,
+                  title: '☕ Desi Lo-Fi Chai Beats',
+                  genreKey: 'Desi Lo-Fi',
+                  provider: provider,
+                  songs: trending.where((s) => s.genre == 'Desi Lo-Fi').toList(),
+                ),
+
+                const SizedBox(height: 20),
 
                 // Genres / Moods Carousel
                 Padding(
@@ -395,7 +466,7 @@ class HomeScreen extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text(
-                        'Explore Genres & Moods',
+                        'Browse by Category',
                         style: TextStyle(
                           color: AppColors.textPrimary,
                           fontSize: 18,
@@ -437,7 +508,7 @@ class HomeScreen extends StatelessWidget {
                   ),
                 ),
 
-                const SizedBox(height: 28),
+                const SizedBox(height: 24),
 
                 // Trending Catalog Songs
                 Padding(
@@ -446,24 +517,23 @@ class HomeScreen extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        provider.selectedGenre == 'All'
-                            ? 'Trending Legal MP3s'
-                            : '${provider.selectedGenre} Top Tracks',
+                        provider.selectedGenre == 'All' || provider.selectedGenre == 'All Indian'
+                            ? 'All Free Indian Tracks'
+                            : '${provider.selectedGenre} Tracks',
                         style: const TextStyle(
                           color: AppColors.textPrimary,
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      if (provider.isLoadingTrending)
-                        const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: AppColors.accentCyan,
-                          ),
+                      const Text(
+                        '100% Free Forever',
+                        style: TextStyle(
+                          color: AppColors.accentGreen,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
                         ),
+                      ),
                     ],
                   ),
                 ),
@@ -492,12 +562,68 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildIndianSongCard(BuildContext context, Song song, PlayerProvider provider, List<Song> queue) {
+  Widget _buildCategorySection(
+    BuildContext context, {
+    required String title,
+    required String genreKey,
+    required PlayerProvider provider,
+    required List<Song> songs,
+  }) {
+    if (songs.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              GestureDetector(
+                onTap: () => provider.selectGenre(genreKey),
+                child: const Text(
+                  'See All',
+                  style: TextStyle(color: AppColors.accentCyan, fontSize: 13),
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: 195,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            itemCount: songs.length,
+            itemBuilder: (context, index) {
+              final song = songs[index];
+              return _buildIndianSongCard(context, song, provider, songs);
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildIndianSongCard(
+    BuildContext context,
+    Song song,
+    PlayerProvider provider,
+    List<Song> queue,
+  ) {
     final isCurrent = provider.currentSong?.id == song.id;
     return GestureDetector(
       onTap: () => provider.playSong(song, queueContext: queue),
       child: Container(
-        width: 140,
+        width: 135,
         margin: const EdgeInsets.only(right: 14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -506,24 +632,31 @@ class HomeScreen extends StatelessWidget {
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(16),
-                  child: CachedNetworkImage(
-                    imageUrl: song.coverUrl,
-                    width: 140,
-                    height: 140,
-                    fit: BoxFit.cover,
-                    placeholder: (context, url) => Container(
-                      width: 140,
-                      height: 140,
-                      color: AppColors.card,
-                      child: const Icon(Icons.music_note_rounded, color: AppColors.textMuted),
-                    ),
-                    errorWidget: (context, url, error) => Container(
-                      width: 140,
-                      height: 140,
-                      color: AppColors.card,
-                      child: const Icon(Icons.music_note_rounded, color: AppColors.textMuted),
-                    ),
-                  ),
+                  child: song.coverUrl.startsWith('http')
+                      ? CachedNetworkImage(
+                          imageUrl: song.coverUrl,
+                          width: 135,
+                          height: 135,
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) => Container(
+                            width: 135,
+                            height: 135,
+                            color: AppColors.card,
+                            child: const Icon(Icons.music_note_rounded, color: AppColors.textMuted),
+                          ),
+                          errorWidget: (context, url, error) => Container(
+                            width: 135,
+                            height: 135,
+                            color: AppColors.card,
+                            child: const Icon(Icons.music_note_rounded, color: AppColors.textMuted),
+                          ),
+                        )
+                      : Container(
+                          width: 135,
+                          height: 135,
+                          color: AppColors.card,
+                          child: const Icon(Icons.music_note_rounded, color: AppColors.accentCyan),
+                        ),
                 ),
                 Positioned(
                   bottom: 8,
@@ -532,7 +665,9 @@ class HomeScreen extends StatelessWidget {
                     padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      gradient: isCurrent && provider.isPlaying ? AppColors.accentGradient : AppColors.primaryGradient,
+                      gradient: isCurrent && provider.isPlaying
+                          ? AppColors.accentGradient
+                          : AppColors.primaryGradient,
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withOpacity(0.5),
@@ -541,7 +676,9 @@ class HomeScreen extends StatelessWidget {
                       ],
                     ),
                     child: Icon(
-                      isCurrent && provider.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                      isCurrent && provider.isPlaying
+                          ? Icons.pause_rounded
+                          : Icons.play_arrow_rounded,
                       color: Colors.white,
                       size: 20,
                     ),
@@ -557,8 +694,12 @@ class HomeScreen extends StatelessWidget {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Text(
-                      '🇮🇳 FREE',
-                      style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                      'FREE',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
