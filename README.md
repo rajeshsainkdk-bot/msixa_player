@@ -1,127 +1,127 @@
-# Msixa Player - Dark Premium Flutter Online MP3 Streaming Player
+# 🎵 Msixa Platform - Indian Music Streaming & Community Ecosystem
 
-Msixa Player is a state-of-the-art Android music player application engineered in **Flutter**, built for streaming legal Creative Commons & Public Domain MP3 audio catalogs. Designed with an ultra-luxurious dark obsidian and neon aura theme, Msixa Player provides an immersive music listening experience.
-
----
-
-## 🌟 Key Features
-
-- **100% Legal Online MP3 Streaming**: Powered by the **Jamendo Free Music API** and a built-in curated catalog of Creative Commons (CC-BY, CC-BY-SA, CC0) and Public Domain audio streams. Strictly zero unauthorized YouTube-to-MP3 ripping or copyright violations.
-- **Dark Premium Aesthetics**:
-  - Obsidian & deep space background with neon cyan, radiant violet, and amber glow accents.
-  - Frosted glassmorphism surfaces (`BackdropFilter`) with subtle border glows.
-  - Interactive vinyl turntable disc with realistic vinyl grooves, spinning playback physics, and ambient backlight auras.
-  - Dynamic equalizer bars visualizer with rhythm animations.
-- **Audio Playback Engine**:
-  - Gapless online MP3 streaming with buffered cache indicators.
-  - Full playback controls: Play/Pause, Next/Previous, Shuffle, Repeat (Off, All, One).
-  - Playback speed adjustment (`0.75x`, `1.0x`, `1.25x`, `1.5x`, `2.0x`).
-  - Sleep timer with 15m, 30m, 45m, 60m countdown and auto-pause.
-- **Sound FX & Equalizer**:
-  - 5-Band Studio Graphic Equalizer (`60Hz`, `230Hz`, `910Hz`, `3.6kHz`, `14kHz`).
-  - Presets: Flat, Bass Boost, Vocal Clarity, Electronic / EDM, Rock & Metal, Cyber Chill, Acoustic.
-- **Persistent Mini-Player**:
-  - Docked floating glassmorphism mini-player above the navigation bar with active track progress strip, album art, and instant controls.
-- **Library & Search**:
-  - Instant live search with genre filter chips.
-  - Favorites with local persistence via `SharedPreferences`.
-  - Recently played history.
+Msixa is a state-of-the-art Android music streaming, offline audio, and community distribution ecosystem engineered in **Flutter** with a native Android Kotlin integration layer. It features a dual-APK architecture designed to empower listeners, creators, and platform administrators.
 
 ---
 
-## 📁 Project Architecture
+## 🌟 Dual-Application Ecosystem
+
+| Application | Entry Point | Target Artifact | Primary Functions |
+| :--- | :--- | :--- | :--- |
+| **🎵 Msixa Player (User APK)** | `lib/main.dart` | `Msixa-Player-APK` | 17 bundled Indian tracks, 2-Step OTP onboarding, community upload screen, duplicate detection, and direct native APK sharing. |
+| **🛡️ Msixa Admin (Admin APK)** | `lib/main_admin.dart` | `Msixa-Admin-APK` | Master PIN (`7777`) access, executive KPI cards, in-app audio preview moderation, and user directory CRM (Call, WhatsApp, Email). |
+
+---
+
+## 📚 Engineering & Architectural Library
+
+The repository includes a dedicated documentation and QA library inside the [`library/`](library/) directory:
+
+- 📄 **[Business Requirements Document (BRD)](library/brd/BRD_DOCUMENT_MSIXA_PLATFORM.md)**: Product vision, user personas, functional requirements (FR-01 to FR-15), NFRs, and cloud roadmap.
+- 🛠️ **[Technical Architecture & Theoretical Spec](library/technical/TECHNICAL_ARCHITECTURE_THEORETICAL_SPEC.md)**: Module architecture, duplicate detection math, FileProvider native implementation, state machines, and CI/CD pipelines.
+- 🧪 **[QA Test Suite & Manual Checklist](library/testing/TEST_CASES_AND_QA_CHECKLIST.md)**: 40+ comprehensive test cases for functional, security, offline resilience, and edge case testing.
+- 🧭 **[Library Master Index & Update Runbook](library/README.md)**: Developer runbook for updating songs, UI, or backend connectivity.
+
+---
+
+## 🚀 Key Features
+
+### 1. 🇮🇳 100% Free Authentic Indian Master Library (17 Tracks)
+- All tracks bundled directly in the application asset package for guaranteed offline listening without internet data:
+  - **Bhakti & Mantras:** *Hanuman Chalisa (Sai Charan), Sankat Mochan Hanuman Ashtak (Hariharan), Ye Chamak Ye Damak, Ram Siya Ram, Radhe Tere Charno Ki Dhool.*
+  - **Sufi & Punjabi:** *Guzarish, Udaarian, Sajjan Raazi, Tere Bina Na Guzara, Satinder Sartaaj Jukebox.*
+  - **Bollywood & Indie:** *Jaiye Sajana, Intezaar Reh Gya.*
+  - **Aghori & Spiritual:** *Alakh Niranjan Aghori Trance, Aadesh Hanuman, Siddh Shabar Mantra.*
+  - **Lo-Fi & Ghazal:** *Bajrang Baan Lo-Fi (11 Baar Non-Stop), Kagaz Ki Kashti (Jagjit Singh).*
+
+### 2. 🔐 Mandatory 2-Factor User Registration
+- Built-in onboarding wizard requiring **Full Name**, **Mobile Phone SMS OTP (6 digits)**, and **Email Verification Code (4 digits)**.
+- Unverified users are gated by the `AuthScreen` barrier.
+- User profile, verification timestamps, and active status persist locally via `SharedPreferences`.
+
+### 3. 🔍 Real-Time Duplicate Song Detection
+- Community upload form checks submitted track titles and artists in real-time against all curated and existing songs.
+- If duplicate is found: displays an immediate alert dialog and provides a one-tap `[Play Song Now]` button that jumps directly into playback.
+- If unique: submits to Admin review queue (`status: 'pending'`).
+
+### 4. 📤 Direct Native APK File Sharing (No Links)
+- Tap the `Share APK` card to share the actual `.apk` file directly via Android's native sharesheet (`application/vnd.android.package-archive`).
+- Powered by `com.msixa.player/app_share` MethodChannel and `androidx.core.content.FileProvider`.
+- Shares the real installer file directly to WhatsApp, Bluetooth, Nearby Share, or Telegram without any web links or text invites.
+
+### 5. 🛡️ Executive Admin Dashboard & CRM
+- Protected by Master PIN: **`7777`**.
+- Executive metrics: *Total Registered Users, Currently Active/Online Users, Pending Songs, Live Songs*.
+- **Moderation Center:** Listen to audio previews inside the app before choosing `[Approve]` or `[Reject]`.
+- **User Directory:** Searchable directory with live online dots and instant action buttons:
+  - `[📞 Call]`: Opens native dialer.
+  - `[💬 WhatsApp]`: Starts WhatsApp chat with user.
+  - `[✉️ Email]`: Launches email client.
+
+---
+
+## 📁 Repository Directory Structure
 
 ```
 msixa_player/
-├── pubspec.yaml                       # Dependencies & Flutter asset definitions
-├── README.md                          # Documentation and setup instructions
+├── .github/workflows/
+│   └── build_apk.yml                 # Dual-APK CI/CD automated build workflow
 ├── android/
-│   └── app/
-│       ├── build.gradle               # Android Gradle config (minSdkVersion 21)
-│       └── src/main/
-│           └── AndroidManifest.xml    # Permissions for audio streaming & foreground service
-└── lib/
-    ├── main.dart                      # App entry point with dark overlay config
-    ├── models/
-    │   ├── song.dart                  # Song model with CC attribution metadata
-    │   ├── playlist.dart              # Playlist model
-    │   └── equalizer_preset.dart      # 5-band sound curves & presets
-    ├── services/
-    │   ├── audio_player_service.dart  # Low-level audio engine (just_audio)
-    │   ├── catalog_service.dart       # Jamendo REST API client & CC fallback catalog
-    │   └── storage_service.dart       # Local persistence (favorites, recent, EQ)
-    ├── providers/
-    │   └── player_provider.dart       # ChangeNotifier state controller
-    ├── theme/
-    │   ├── app_colors.dart            # Obsidian & Neon dark theme palette
-    │   └── app_theme.dart             # Outfit typography & dark Material 3 theme
-    ├── widgets/
-    │   ├── album_art_disc.dart        # Vinyl turntable disc with ambient glow
-    │   ├── glowing_play_button.dart   # Dual-gradient glowing FAB
-    │   ├── visualizer_bars.dart       # Animated frequency bar visualizer
-    │   ├── song_list_tile.dart        # Track list row with CC license details
-    │   ├── mini_player.dart           # Floating frosted glass mini player
-    │   ├── genre_card.dart            # Gradient mood & genre cards
-    │   └── sleep_timer_dialog.dart    # Modal sleep timer selector
-    └── screens/
-        ├── main_navigation_screen.dart # Root tab scaffold with persistent mini player
-        ├── home_screen.dart           # Featured stream, genre carousel, trending tracks
-        ├── search_screen.dart         # Live search bar with instant filter chips
-        ├── library_screen.dart        # Favorites, Recently Played, and Playlists
-        ├── now_playing_screen.dart    # Full-screen immersive player
-        └── equalizer_screen.dart      # 5-band graphic equalizer & sound FX
+│   ├── app/
+│   │   ├── build.gradle              # Gradle dependencies & Kotlin stdlib version locks
+│   │   └── src/main/
+│   │       ├── AndroidManifest.xml   # FileProvider, MediaBrowserService & permissions
+│   │       ├── kotlin/.../MainActivity.kt  # MethodChannel for APK file sharing
+│   │       └── res/xml/file_paths.xml      # FileProvider cache paths
+│   ├── build.gradle                  # Root Gradle build script
+│   └── settings.gradle               # Plugin management & Kotlin 1.9/1.8 resolution
+├── assets/
+│   ├── audio/                        # 17 Bundled Indian master MP3 recordings
+│   └── images/                       # App icons & branding
+├── library/                          # 📚 Comprehensive Platform Library & Docs
+│   ├── README.md                     # Library index & developer runbook
+│   ├── brd/
+│   │   └── BRD_DOCUMENT_MSIXA_PLATFORM.md
+│   ├── technical/
+│   │   └── TECHNICAL_ARCHITECTURE_THEORETICAL_SPEC.md
+│   └── testing/
+│       └── TEST_CASES_AND_QA_CHECKLIST.md
+├── lib/
+│   ├── main.dart                     # User App entry point
+│   ├── main_admin.dart               # Admin App entry point (PIN 7777)
+│   ├── models/                       # Song, UserProfile, Playlist, EqualizerPreset
+│   ├── services/
+│   │   ├── cloud_backend_service.dart # Central singleton for Auth, OTP & Moderation
+│   │   ├── audio_player_service.dart  # Low-level just_audio & audio_service engine
+│   │   ├── catalog_service.dart       # 17 Indian master tracks catalog
+│   │   ├── app_share_service.dart     # Native MethodChannel APK sharing
+│   │   ├── device_audio_service.dart  # Offline storage scanner
+│   │   └── storage_service.dart       # Local persistence
+│   ├── providers/
+│   │   └── player_provider.dart       # Audio playback state controller
+│   ├── screens/
+│   │   ├── auth/auth_screen.dart      # 3-step registration & OTP wizard
+│   │   ├── admin/admin_dashboard_screen.dart # Admin KPI, moderation & directory
+│   │   ├── home_screen.dart           # Home screen with community songs shelf
+│   │   ├── upload_song_screen.dart    # Song upload with duplicate check
+│   │   ├── now_playing_screen.dart    # Full-screen vinyl turntable player
+│   │   └── equalizer_screen.dart      # 5-band studio graphic equalizer
+│   └── theme/
+│       ├── app_colors.dart            # Obsidian dark theme & neon glow palette
+│       └── app_theme.dart             # Typography & Material 3 config
+└── pubspec.yaml                      # Project dependencies & asset declarations
 ```
 
 ---
 
-## 🚀 Setup & Run Instructions
+## 🛠️ Building & Releasing
 
-### 1. Prerequisites
-- **Flutter SDK** (`>= 3.0.0`): Ensure Flutter is installed and added to your system `PATH`.
-- **Android SDK & Emulator / Physical Device**: Android API level 21 or higher.
-
-### 2. Install Dependencies
-Open a terminal in the project directory:
+Release builds are automatically compiled via GitHub Actions:
 ```bash
-cd C:\Users\rajes\.gemini\antigravity-ide\scratch\msixa_player
-flutter pub get
+# User App (Release APK)
+flutter build apk --release --no-tree-shake-icons
+
+# Admin App (Release APK)
+flutter build apk --release --target=lib/main_admin.dart --no-tree-shake-icons
 ```
-
-### 3. Verify Android Permissions
-The `AndroidManifest.xml` already includes the necessary permissions:
-- `android.permission.INTERNET`
-- `android.permission.ACCESS_NETWORK_STATE`
-- `android.permission.WAKE_LOCK`
-- `android.permission.FOREGROUND_SERVICE`
-- `android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK`
-- `android:usesCleartextTraffic="true"` (for HTTP audio CDN streams)
-
-### 4. Build Android APK (.apk)
-
-#### Option A: Cloud Build via GitHub Actions (Recommended - No local SDK setup needed)
-A ready-to-run GitHub Actions workflow has been configured at [build_apk.yml](file:///c:/Users/rajes/.gemini/antigravity-ide/scratch/msixa_player/.github/workflows/build_apk.yml):
-1. Push this folder to a GitHub repository.
-2. In GitHub, go to the **Actions** tab. The build workflow will trigger automatically.
-3. Once completed, download the **Msixa-Player-APK** artifact (`app-release.apk`) directly to your phone.
-
-#### Option B: Build Locally on your PC
-To build the `.apk` on your PC, you need Flutter SDK and Android SDK installed:
-```bash
-# 1. Fetch dependencies
-flutter pub get
-
-# 2. Build release APK
-flutter build apk --release
-```
-Your compiled APK file will be located at:
-```
-build/app/outputs/flutter-apk/app-release.apk
-```
-Copy this file to your Android device and tap to install.
-
----
-
-## ⚖️ Legal & Licensing Notice
-
-All streaming tracks provided in Msixa Player are distributed under **Creative Commons Licenses** (CC-BY 4.0, CC-BY-SA, CC0 1.0) and public domain catalogs. Msixa Player does not download, scrape, or convert media from YouTube or any other unauthorized DRM-protected service.
-
+Artifacts are automatically published to GitHub Actions and downloaded to your local `Downloads` directory.
