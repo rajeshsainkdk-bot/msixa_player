@@ -54,18 +54,23 @@ class SongListTile extends StatelessWidget {
                       child: SizedBox(
                         width: 52,
                         height: 52,
-                        child: CachedNetworkImage(
-                          imageUrl: song.coverUrl,
-                          fit: BoxFit.cover,
-                          placeholder: (context, url) => Container(
-                            color: AppColors.surface,
-                            child: const Icon(Icons.music_note, color: AppColors.textMuted),
-                          ),
-                          errorWidget: (context, url, error) => Container(
-                            color: AppColors.surface,
-                            child: const Icon(Icons.music_note, color: AppColors.textMuted),
-                          ),
-                        ),
+                        child: song.coverUrl.startsWith('http')
+                            ? CachedNetworkImage(
+                                imageUrl: song.coverUrl,
+                                fit: BoxFit.cover,
+                                placeholder: (context, url) => Container(
+                                  color: AppColors.surface,
+                                  child: const Icon(Icons.music_note, color: AppColors.textMuted),
+                                ),
+                                errorWidget: (context, url, error) => Container(
+                                  color: AppColors.surface,
+                                  child: const Icon(Icons.music_note, color: AppColors.textMuted),
+                                ),
+                              )
+                            : Container(
+                                color: AppColors.card,
+                                child: const Icon(Icons.music_note_rounded, color: AppColors.accentCyan),
+                              ),
                       ),
                     ),
                     if (isCurrent)

@@ -1,5 +1,5 @@
 name: msixa_player
-description: "Msixa Player - Dark Premium Online MP3 Music Player for Android powered by Free Legal Creative Commons Streaming Catalogs."
+description: "Msixa Player - Dark Premium Online & Offline MP3 Music Player for Android with Indian Songs & Local Device Storage Scanner."
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -12,6 +12,10 @@ dependencies:
   
   # Audio Playback Engine
   just_audio: ^0.9.36
+  
+  # Device Audio Scanner & Permissions
+  on_audio_query: ^2.9.0
+  permission_handler: ^11.3.1
   
   # State Management
   provider: ^6.1.2

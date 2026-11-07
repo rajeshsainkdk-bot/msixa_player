@@ -96,9 +96,9 @@ class NowPlayingScreen extends StatelessWidget {
                           Column(
                             children: [
                               Text(
-                                'PLAYING FROM CATALOG',
+                                currentSong.isOffline ? 'OFFLINE DEVICE AUDIO' : 'PLAYING FROM STREAM',
                                 style: TextStyle(
-                                  color: AppColors.accentCyan.withOpacity(0.9),
+                                  color: currentSong.isOffline ? AppColors.accentGreen : AppColors.accentCyan.withOpacity(0.9),
                                   fontSize: 10,
                                   fontWeight: FontWeight.bold,
                                   letterSpacing: 1.5,

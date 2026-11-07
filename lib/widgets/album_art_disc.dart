@@ -134,23 +134,28 @@ class _AlbumArtDiscState extends State<AlbumArtDisc>
                     child: SizedBox(
                       width: widget.size * 0.58,
                       height: widget.size * 0.58,
-                      child: CachedNetworkImage(
-                        imageUrl: widget.imageUrl,
-                        fit: BoxFit.cover,
-                        placeholder: (context, url) => Container(
-                          color: AppColors.card,
-                          child: const Center(
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: AppColors.accentCyan,
+                      child: widget.imageUrl.startsWith('http')
+                          ? CachedNetworkImage(
+                              imageUrl: widget.imageUrl,
+                              fit: BoxFit.cover,
+                              placeholder: (context, url) => Container(
+                                color: AppColors.card,
+                                child: const Center(
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: AppColors.accentCyan,
+                                  ),
+                                ),
+                              ),
+                              errorWidget: (context, url, error) => Container(
+                                color: AppColors.card,
+                                child: const Icon(Icons.music_note, color: AppColors.accentCyan, size: 40),
+                              ),
+                            )
+                          : Container(
+                              color: AppColors.card,
+                              child: const Icon(Icons.music_note, color: AppColors.accentCyan, size: 40),
                             ),
-                          ),
-                        ),
-                        errorWidget: (context, url, error) => Container(
-                          color: AppColors.card,
-                          child: const Icon(Icons.music_note, color: AppColors.accentCyan, size: 40),
-                        ),
-                      ),
                     ),
                   ),
 

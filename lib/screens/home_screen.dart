@@ -12,6 +12,21 @@ class HomeScreen extends StatelessWidget {
 
   static const List<Map<String, dynamic>> _genres = [
     {
+      'title': 'Indian',
+      'icon': Icons.music_note_rounded,
+      'gradient': LinearGradient(colors: [Color(0xFFFF9933), Color(0xFF138808)]),
+    },
+    {
+      'title': 'Desi Lo-Fi',
+      'icon': Icons.nightlife_rounded,
+      'gradient': LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFFEC4899)]),
+    },
+    {
+      'title': 'Classical',
+      'icon': Icons.waves_rounded,
+      'gradient': LinearGradient(colors: [Color(0xFFD97706), Color(0xFFF59E0B)]),
+    },
+    {
       'title': 'Synthwave',
       'icon': Icons.bolt_rounded,
       'gradient': LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFFEC4899)]),
@@ -242,6 +257,135 @@ class HomeScreen extends StatelessWidget {
                     ),
                   ),
 
+                // Device Storage Quick Access Banner
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: AppColors.card,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.white.withOpacity(0.06)),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: AppColors.accentCyan.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.phone_android_rounded,
+                            color: AppColors.accentCyan,
+                            size: 24,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Device Offline Audio',
+                                style: TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                provider.deviceSongs.isEmpty
+                                    ? 'Scan phone folders (Downloads, Music)'
+                                    : '${provider.deviceSongs.length} local offline songs detected',
+                                style: const TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: provider.deviceSongs.isEmpty
+                                ? AppColors.accentCyan
+                                : AppColors.surface,
+                            foregroundColor: provider.deviceSongs.isEmpty
+                                ? Colors.black
+                                : AppColors.accentCyan,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            minimumSize: Size.zero,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          onPressed: () => provider.scanDeviceSongs(),
+                          child: Text(
+                            provider.deviceSongs.isEmpty ? 'Scan' : 'Rescan',
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                // Indian Songs & Ragas Section
+                Builder(
+                  builder: (context) {
+                    final indianList = trending.where((s) => s.id.startsWith('msixa_ind')).toList();
+                    if (indianList.isEmpty) return const SizedBox.shrink();
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: const [
+                                  Text('🇮🇳 ', style: TextStyle(fontSize: 16)),
+                                  Text(
+                                    'Indian Songs & Ragas',
+                                    style: TextStyle(
+                                      color: AppColors.textPrimary,
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              GestureDetector(
+                                onTap: () => provider.selectGenre('Indian'),
+                                child: const Text(
+                                  'See All',
+                                  style: TextStyle(color: AppColors.accentCyan, fontSize: 13),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        SizedBox(
+                          height: 200,
+                          child: ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            itemCount: indianList.length,
+                            itemBuilder: (context, index) {
+                              final song = indianList[index];
+                              return _buildIndianSongCard(context, song, provider, indianList);
+                            },
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+
                 const SizedBox(height: 24),
 
                 // Genres / Moods Carousel
@@ -345,6 +489,105 @@ class HomeScreen extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildIndianSongCard(BuildContext context, Song song, PlayerProvider provider, List<Song> queue) {
+    final isCurrent = provider.currentSong?.id == song.id;
+    return GestureDetector(
+      onTap: () => provider.playSong(song, queueContext: queue),
+      child: Container(
+        width: 140,
+        margin: const EdgeInsets.only(right: 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: CachedNetworkImage(
+                    imageUrl: song.coverUrl,
+                    width: 140,
+                    height: 140,
+                    fit: BoxFit.cover,
+                    placeholder: (context, url) => Container(
+                      width: 140,
+                      height: 140,
+                      color: AppColors.card,
+                      child: const Icon(Icons.music_note_rounded, color: AppColors.textMuted),
+                    ),
+                    errorWidget: (context, url, error) => Container(
+                      width: 140,
+                      height: 140,
+                      color: AppColors.card,
+                      child: const Icon(Icons.music_note_rounded, color: AppColors.textMuted),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  bottom: 8,
+                  right: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: isCurrent && provider.isPlaying ? AppColors.accentGradient : AppColors.primaryGradient,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.5),
+                          blurRadius: 8,
+                        ),
+                      ],
+                    ),
+                    child: Icon(
+                      isCurrent && provider.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: 8,
+                  left: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.7),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Text(
+                      '🇮🇳 FREE',
+                      style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              song.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: isCurrent ? AppColors.accentCyan : AppColors.textPrimary,
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              song.artist,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 11,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

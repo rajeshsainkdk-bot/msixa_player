@@ -7,11 +7,13 @@ import '../models/equalizer_preset.dart';
 import '../services/audio_player_service.dart';
 import '../services/catalog_service.dart';
 import '../services/storage_service.dart';
+import '../services/device_audio_service.dart';
 
 class PlayerProvider extends ChangeNotifier {
   final AudioPlayerService _audioService = AudioPlayerService();
   final CatalogService _catalogService = CatalogService();
   final StorageService _storageService = StorageService();
+  final DeviceAudioService _deviceAudioService = DeviceAudioService();
 
   // State collections
   List<Song> _trendingSongs = [];
@@ -20,9 +22,12 @@ class PlayerProvider extends ChangeNotifier {
   List<Song> _favorites = [];
   List<Song> _recentlyPlayed = [];
   List<Playlist> _customPlaylists = [];
+  List<Song> _deviceSongs = [];
 
   bool _isLoadingTrending = false;
   bool _isSearching = false;
+  bool _isScanningDevice = false;
+  bool _hasDevicePermission = false;
   String _selectedGenre = 'All';
 
   // Playback state
@@ -60,9 +65,12 @@ class PlayerProvider extends ChangeNotifier {
   List<Song> get favorites => _favorites;
   List<Song> get recentlyPlayed => _recentlyPlayed;
   List<Playlist> get customPlaylists => _customPlaylists;
+  List<Song> get deviceSongs => _deviceSongs;
 
   bool get isLoadingTrending => _isLoadingTrending;
   bool get isSearching => _isSearching;
+  bool get isScanningDevice => _isScanningDevice;
+  bool get hasDevicePermission => _hasDevicePermission;
   String get selectedGenre => _selectedGenre;
   int get sleepMinutesRemaining => _sleepMinutesRemaining;
   EqualizerPreset get currentEqPreset => _currentEqPreset;
@@ -110,8 +118,28 @@ class PlayerProvider extends ChangeNotifier {
     );
     _bandGains = List<double>.from(eqData['gains']);
 
-    // 3. Load online catalog
+    // 3. Check device storage permission and scan if already granted
+    _hasDevicePermission = await _deviceAudioService.hasPermission();
+    if (_hasDevicePermission) {
+      _deviceSongs = await _deviceAudioService.scanDeviceSongs();
+      _syncFavoritesFlag(_deviceSongs);
+    }
+
+    // 4. Load online catalog
     await refreshCatalog();
+  }
+
+  /// Scan local songs from device storage folders
+  Future<void> scanDeviceSongs() async {
+    _isScanningDevice = true;
+    notifyListeners();
+
+    _deviceSongs = await _deviceAudioService.scanDeviceSongs();
+    _hasDevicePermission = await _deviceAudioService.hasPermission();
+    _syncFavoritesFlag(_deviceSongs);
+
+    _isScanningDevice = false;
+    notifyListeners();
   }
 
   Future<void> refreshCatalog() async {

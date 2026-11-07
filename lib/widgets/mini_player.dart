@@ -78,14 +78,19 @@ class MiniPlayer extends StatelessWidget {
                               child: SizedBox(
                                 width: 46,
                                 height: 46,
-                                child: CachedNetworkImage(
-                                  imageUrl: currentSong.coverUrl,
-                                  fit: BoxFit.cover,
-                                  errorWidget: (_, __, ___) => Container(
-                                    color: AppColors.card,
-                                    child: const Icon(Icons.music_note, color: AppColors.accentCyan),
-                                  ),
-                                ),
+                                child: currentSong.coverUrl.startsWith('http')
+                                    ? CachedNetworkImage(
+                                        imageUrl: currentSong.coverUrl,
+                                        fit: BoxFit.cover,
+                                        errorWidget: (_, __, ___) => Container(
+                                          color: AppColors.card,
+                                          child: const Icon(Icons.music_note, color: AppColors.accentCyan),
+                                        ),
+                                      )
+                                    : Container(
+                                        color: AppColors.card,
+                                        child: const Icon(Icons.music_note, color: AppColors.accentCyan),
+                                      ),
                               ),
                             ),
                           ),

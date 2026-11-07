@@ -75,11 +75,19 @@ class AudioPlayerService {
       }
 
       await _player.stop();
-      await _player.setUrl(song.streamUrl);
+
+      // Check whether track is online stream, content URI, or local device file
+      if (song.streamUrl.startsWith('http://') || song.streamUrl.startsWith('https://')) {
+        await _player.setUrl(song.streamUrl);
+      } else if (song.streamUrl.startsWith('content://')) {
+        await _player.setAudioSource(AudioSource.uri(Uri.parse(song.streamUrl)));
+      } else {
+        await _player.setFilePath(song.streamUrl);
+      }
+
       await _player.play();
     } catch (e) {
-      // In case of network error on direct MP3 stream
-      // player safely keeps state
+      // In case of error, player safely keeps state
     }
   }
 
@@ -135,7 +143,6 @@ class AudioPlayerService {
     if (_queue.isEmpty) return;
 
     if (_player.position.inSeconds > 3) {
-      // If played more than 3 seconds, replay track
       await _player.seek(Duration.zero);
       return;
     }

@@ -1,0 +1,73 @@
+import 'dart:io';
+import 'package:on_audio_query/on_audio_query.dart';
+import 'package:permission_handler/permission_handler.dart';
+import '../models/song.dart';
+
+class DeviceAudioService {
+  final OnAudioQuery _audioQuery = OnAudioQuery();
+
+  /// Requests storage and media audio permissions from the user
+  Future<bool> requestPermission() async {
+    if (Platform.isAndroid) {
+      // For Android 13+ (SDK 33+), request audio permission
+      final audioStatus = await Permission.audio.status;
+      if (audioStatus.isGranted) return true;
+
+      final audioReq = await Permission.audio.request();
+      if (audioReq.isGranted) return true;
+
+      // For Android 12 and below, fallback to storage permission
+      final storageReq = await Permission.storage.request();
+      return storageReq.isGranted;
+    }
+    return true;
+  }
+
+  /// Checks if permission is already granted
+  Future<bool> hasPermission() async {
+    if (Platform.isAndroid) {
+      final audioStatus = await Permission.audio.status;
+      if (audioStatus.isGranted) return true;
+
+      final storageStatus = await Permission.storage.status;
+      return storageStatus.isGranted;
+    }
+    return true;
+  }
+
+  /// Scans all local MP3 and audio files from device storage folders
+  Future<List<Song>> scanDeviceSongs() async {
+    try {
+      final hasPerm = await hasPermission();
+      if (!hasPerm) {
+        final granted = await requestPermission();
+        if (!granted) return [];
+      }
+
+      final songModels = await _audioQuery.querySongs(
+        sortType: SongSortType.TITLE,
+        orderType: OrderType.ASC_OR_SMALLER,
+        uriType: UriType.EXTERNAL,
+        ignoreCase: true,
+      );
+
+      return songModels.where((s) => (s.duration ?? 0) > 10000).map((s) {
+        return Song(
+          id: 'device_${s.id}',
+          title: s.title.isNotEmpty ? s.title : 'Unknown Track',
+          artist: (s.artist != null && s.artist != '<unknown>') ? s.artist! : 'Device Music',
+          album: (s.album != null && s.album != '<unknown>') ? s.album! : 'Phone Storage',
+          duration: (s.duration ?? 0) ~/ 1000,
+          streamUrl: s.uri ?? s.data,
+          coverUrl: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&q=80',
+          genre: 'Offline',
+          license: 'Personal Offline Audio',
+          licenseUrl: 'local',
+          source: 'Phone Storage (Offline)',
+        );
+      }).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+}
