@@ -91,12 +91,16 @@ graph TD
   5. *Lo-Fi & Ghazal:* Bajrang Baan Lo-Fi (11 Baar Non-Stop), Kagaz Ki Kashti (Jagjit Singh).
 - **Acceptance Criteria:** Songs must play instantly with zero network buffering when the user is offline.
 
-### FR-02: Mandatory User Registration with Mobile SMS OTP
-- **Description:** User must register before accessing the player or community features.
-- **Workflow:**
-  1. *Stage 1 (User Profile):* Input Full Name, 10-digit Indian Mobile Number, and optional email address.
-  2. *Stage 2 (Phone SMS OTP):* Dynamic 6-digit OTP displayed with one-tap Auto-fill and universal test code fallback (`123456`).
-- **Acceptance Criteria:** Verification completes immediately upon OTP confirmation. User profile persists across app restarts without requiring email codes.
+### FR-02: Instant User Registration with Mandatory Details & Auto-Playlist Recovery (Zero OTP)
+- **Description:** User creates or logs into their account via a streamlined, single-screen onboarding flow without any OTP wait or SMS gateway delays.
+- **Mandatory Fields:**
+  1. *Full Name:* Strictly required (minimum 2 characters).
+  2. *10-Digit Mobile Number:* Strictly required (Indian 10-digit format).
+  3. *Email Address:* Strictly required with RFC regex validation (`name@domain.com`).
+- **Account & State Recovery Behavior:**
+  - If a user inputs an existing mobile number, the system automatically matches the record, preserves the original `uid` and creation date, updates last active timestamp, and instantly reloads all previously saved playlists, favorite songs, and recently played tracks.
+  - Zero OTP verification codes required; prevents onboarding drop-offs and eliminates telecom SMS failures.
+- **Acceptance Criteria:** Account creation and login are blocked until all 3 fields are validly filled. Returning users instantly access their previous playlists upon entering the same mobile number.
 
 ### FR-03: Real-Time Active User Heartbeat & Analytics
 - **Description:** The client sends periodic timestamp heartbeats upon app foregrounding and song playback.

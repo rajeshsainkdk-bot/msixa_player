@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/player_provider.dart';
 import '../services/app_share_service.dart';
+import '../services/language_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/song_list_tile.dart';
 
@@ -368,53 +369,210 @@ class _LibraryScreenState extends State<LibraryScreen>
   }
 
   Widget _buildPlaylistsTab(BuildContext context, PlayerProvider provider) {
-    final playlists = provider.curatedPlaylists;
+    final lang = LanguageService();
+    final custom = provider.customPlaylists;
+    final curated = provider.curatedPlaylists;
 
-    return ListView.builder(
+    return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      itemCount: playlists.length,
-      itemBuilder: (context, index) {
-        final pl = playlists[index];
-
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          decoration: BoxDecoration(
-            color: AppColors.card,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.white.withOpacity(0.06)),
-          ),
-          child: ListTile(
-            contentPadding: const EdgeInsets.all(12),
-            leading: Container(
-              width: 54,
-              height: 54,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                gradient: AppColors.primaryGradient,
+      children: [
+        // Create Playlist Action Button
+        Container(
+          margin: const EdgeInsets.only(bottom: 14),
+          child: ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.card,
+              foregroundColor: AppColors.accentCyan,
+              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(color: AppColors.accentCyan.withOpacity(0.3)),
               ),
-              child: const Icon(Icons.playlist_play_rounded, color: Colors.white, size: 30),
+              elevation: 0,
             ),
-            title: Text(
-              pl.title,
-              style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+            icon: const Icon(Icons.playlist_add_rounded, color: AppColors.accentCyan, size: 22),
+            label: Text(
+              lang.t('create_playlist'),
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
             ),
-            subtitle: Text(
-              '${pl.songs.length} Tracks • ${pl.description}',
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
-            ),
-            trailing: IconButton(
-              icon: const Icon(Icons.play_circle_fill_rounded, color: AppColors.accentCyan, size: 36),
-              onPressed: () {
-                if (pl.songs.isNotEmpty) {
-                  provider.playSong(pl.songs.first, queueContext: pl.songs);
-                }
-              },
+            onPressed: () => _showCreatePlaylistDialog(context, provider, lang),
+          ),
+        ),
+
+        // Custom User Playlists
+        if (custom.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8, left: 4),
+            child: Text(
+              lang.t('my_playlist_badge'),
+              style: const TextStyle(
+                color: AppColors.accentCyan,
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+                letterSpacing: 0.5,
+              ),
             ),
           ),
-        );
-      },
+          ...custom.map((pl) => Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: AppColors.card,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.accentCyan.withOpacity(0.2)),
+                ),
+                child: ListTile(
+                  contentPadding: const EdgeInsets.all(12),
+                  leading: Container(
+                    width: 54,
+                    height: 54,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF00E5FF), Color(0xFF4F46E5)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                    child: const Icon(Icons.queue_music_rounded, color: Colors.white, size: 28),
+                  ),
+                  title: Text(
+                    pl.title,
+                    style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                  ),
+                  subtitle: Text(
+                    '${pl.songs.length} Tracks • ${pl.description}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 22),
+                        tooltip: 'Delete Playlist',
+                        onPressed: () => provider.removePlaylist(pl.id),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.play_circle_fill_rounded, color: AppColors.accentCyan, size: 34),
+                        onPressed: () {
+                          if (pl.songs.isNotEmpty) {
+                            provider.playSong(pl.songs.first, queueContext: pl.songs);
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              )),
+          const SizedBox(height: 10),
+        ],
+
+        // Curated Featured Playlists
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8, left: 4),
+          child: Text(
+            lang.isHindi ? 'विशेष प्लेलिस्ट्स (Featured)' : 'Featured Playlists',
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+            ),
+          ),
+        ),
+        ...curated.map((pl) => Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                color: AppColors.card,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.white.withOpacity(0.06)),
+              ),
+              child: ListTile(
+                contentPadding: const EdgeInsets.all(12),
+                leading: Container(
+                  width: 54,
+                  height: 54,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    gradient: AppColors.primaryGradient,
+                  ),
+                  child: const Icon(Icons.playlist_play_rounded, color: Colors.white, size: 30),
+                ),
+                title: Text(
+                  pl.title,
+                  style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                ),
+                subtitle: Text(
+                  '${pl.songs.length} Tracks • ${pl.description}',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                ),
+                trailing: IconButton(
+                  icon: const Icon(Icons.play_circle_fill_rounded, color: AppColors.accentCyan, size: 36),
+                  onPressed: () {
+                    if (pl.songs.isNotEmpty) {
+                      provider.playSong(pl.songs.first, queueContext: pl.songs);
+                    }
+                  },
+                ),
+              ),
+            )),
+        const SizedBox(height: 100),
+      ],
+    );
+  }
+
+  void _showCreatePlaylistDialog(BuildContext context, PlayerProvider provider, LanguageService lang) {
+    final titleCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF131A2A),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          lang.t('create_playlist'),
+          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+        ),
+        content: TextField(
+          controller: titleCtrl,
+          autofocus: true,
+          style: const TextStyle(color: Colors.white),
+          decoration: InputDecoration(
+            hintText: lang.t('playlist_name'),
+            hintStyle: TextStyle(color: Colors.grey.shade500),
+            enabledBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: AppColors.accentCyan.withOpacity(0.5)),
+            ),
+            focusedBorder: const UnderlineInputBorder(
+              borderSide: BorderSide(color: AppColors.accentCyan, width: 2),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(lang.t('cancel'), style: const TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.accentCyan,
+              foregroundColor: Colors.black,
+            ),
+            onPressed: () {
+              final name = titleCtrl.text.trim();
+              if (name.isNotEmpty) {
+                provider.createPlaylist(name);
+                Navigator.pop(ctx);
+              }
+            },
+            child: Text(
+              lang.isHindi ? 'बनाएं' : 'Create',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

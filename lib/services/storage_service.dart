@@ -10,58 +10,83 @@ class StorageService {
   static const String _keyEqPreset = 'msixa_eq_preset';
   static const String _keyEqGains = 'msixa_eq_gains';
 
-  Future<List<Song>> loadFavorites() async {
+  static String _cleanPhone(String? p) => p == null ? '' : p.replaceAll(RegExp(r'[^0-9]'), '');
+  static String _favKey([String? phone]) => _cleanPhone(phone).isNotEmpty ? 'msixa_fav_${_cleanPhone(phone)}' : 'msixa_favorites';
+  static String _recentKey([String? phone]) => _cleanPhone(phone).isNotEmpty ? 'msixa_rec_${_cleanPhone(phone)}' : 'msixa_recently_played';
+  static String _plKey([String? phone]) => _cleanPhone(phone).isNotEmpty ? 'msixa_pl_${_cleanPhone(phone)}' : 'msixa_user_playlists';
+
+  Future<List<Song>> loadFavorites([String? userPhone]) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final list = prefs.getStringList(_keyFavorites) ?? [];
+      List<String>? list;
+      if (userPhone != null && userPhone.isNotEmpty) {
+        list = prefs.getStringList(_favKey(userPhone));
+      }
+      list ??= prefs.getStringList(_keyFavorites) ?? [];
       return list.map((item) => Song.fromJson(json.decode(item))).toList();
     } catch (_) {
       return [];
     }
   }
 
-  Future<void> saveFavorites(List<Song> songs) async {
+  Future<void> saveFavorites(List<Song> songs, [String? userPhone]) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final list = songs.map((s) => json.encode(s.toJson())).toList();
       await prefs.setStringList(_keyFavorites, list);
+      if (userPhone != null && userPhone.isNotEmpty) {
+        await prefs.setStringList(_favKey(userPhone), list);
+      }
     } catch (_) {}
   }
 
-  Future<List<Song>> loadRecentlyPlayed() async {
+  Future<List<Song>> loadRecentlyPlayed([String? userPhone]) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final list = prefs.getStringList(_keyRecent) ?? [];
+      List<String>? list;
+      if (userPhone != null && userPhone.isNotEmpty) {
+        list = prefs.getStringList(_recentKey(userPhone));
+      }
+      list ??= prefs.getStringList(_keyRecent) ?? [];
       return list.map((item) => Song.fromJson(json.decode(item))).toList();
     } catch (_) {
       return [];
     }
   }
 
-  Future<void> saveRecentlyPlayed(List<Song> songs) async {
+  Future<void> saveRecentlyPlayed(List<Song> songs, [String? userPhone]) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      // Keep only last 30 played songs
       final trimmed = songs.take(30).map((s) => json.encode(s.toJson())).toList();
       await prefs.setStringList(_keyRecent, trimmed);
+      if (userPhone != null && userPhone.isNotEmpty) {
+        await prefs.setStringList(_recentKey(userPhone), trimmed);
+      }
     } catch (_) {}
   }
 
-  Future<List<Playlist>> loadCustomPlaylists() async {
+  Future<List<Playlist>> loadCustomPlaylists([String? userPhone]) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final list = prefs.getStringList(_keyCustomPlaylists) ?? [];
+      List<String>? list;
+      if (userPhone != null && userPhone.isNotEmpty) {
+        list = prefs.getStringList(_plKey(userPhone));
+      }
+      list ??= prefs.getStringList(_keyCustomPlaylists) ?? [];
       return list.map((item) => Playlist.fromJson(json.decode(item))).toList();
     } catch (_) {
       return [];
     }
   }
 
-  Future<void> saveCustomPlaylists(List<Playlist> playlists) async {
+  Future<void> saveCustomPlaylists(List<Playlist> playlists, [String? userPhone]) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final list = playlists.map((p) => json.encode(p.toJson())).toList();
       await prefs.setStringList(_keyCustomPlaylists, list);
+      if (userPhone != null && userPhone.isNotEmpty) {
+        await prefs.setStringList(_plKey(userPhone), list);
+      }
     } catch (_) {}
   }
 

@@ -8,6 +8,7 @@ import '../services/audio_player_service.dart';
 import '../services/catalog_service.dart';
 import '../services/storage_service.dart';
 import '../services/device_audio_service.dart';
+import '../services/cloud_backend_service.dart';
 
 class PlayerProvider extends ChangeNotifier {
   final AudioPlayerService _audioService = AudioPlayerService();
@@ -106,10 +107,11 @@ class PlayerProvider extends ChangeNotifier {
       notifyListeners();
     });
 
-    // 2. Load cached persistence
-    _favorites = await _storageService.loadFavorites();
-    _recentlyPlayed = await _storageService.loadRecentlyPlayed();
-    _customPlaylists = await _storageService.loadCustomPlaylists();
+    // 2. Load cached persistence (scoped to current user's phone if signed in)
+    final currentUserPhone = CloudBackendService().currentUser?.phoneNumber;
+    _favorites = await _storageService.loadFavorites(currentUserPhone);
+    _recentlyPlayed = await _storageService.loadRecentlyPlayed(currentUserPhone);
+    _customPlaylists = await _storageService.loadCustomPlaylists(currentUserPhone);
     final eqData = await _storageService.loadEqualizerSettings();
     final presetName = eqData['preset'] as String;
     _currentEqPreset = EqualizerPreset.defaultPresets.firstWhere(
@@ -219,6 +221,17 @@ class PlayerProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Reload user-specific data (favorites, playlists, history) upon login / account recovery
+  Future<void> reloadUserData([String? userPhone]) async {
+    final phone = userPhone ?? CloudBackendService().currentUser?.phoneNumber;
+    _favorites = await _storageService.loadFavorites(phone);
+    _recentlyPlayed = await _storageService.loadRecentlyPlayed(phone);
+    _customPlaylists = await _storageService.loadCustomPlaylists(phone);
+    _syncFavoritesFlag(_trendingSongs);
+    _syncFavoritesFlag(_deviceSongs);
+    notifyListeners();
+  }
+
   // Favorite Management
   void toggleFavorite(Song song) {
     final index = _favorites.indexWhere((s) => s.id == song.id);
@@ -229,7 +242,10 @@ class PlayerProvider extends ChangeNotifier {
       song.isFavorite = true;
       _favorites.insert(0, song);
     }
-    _storageService.saveFavorites(_favorites);
+    _storageService.saveFavorites(
+      _favorites,
+      CloudBackendService().currentUser?.phoneNumber,
+    );
     notifyListeners();
   }
 
@@ -240,7 +256,60 @@ class PlayerProvider extends ChangeNotifier {
   void _addToRecentlyPlayed(Song song) {
     _recentlyPlayed.removeWhere((s) => s.id == song.id);
     _recentlyPlayed.insert(0, song);
-    _storageService.saveRecentlyPlayed(_recentlyPlayed);
+    _storageService.saveRecentlyPlayed(
+      _recentlyPlayed,
+      CloudBackendService().currentUser?.phoneNumber,
+    );
+    notifyListeners();
+  }
+
+  // User Custom Playlists Management
+  void createPlaylist(String title, [List<Song>? initialSongs]) {
+    final newPlaylist = Playlist(
+      id: 'pl_${DateTime.now().millisecondsSinceEpoch}',
+      title: title.trim(),
+      description: 'Created by you',
+      coverUrl: initialSongs?.isNotEmpty == true
+          ? initialSongs!.first.coverUrl
+          : 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&q=80',
+      songs: initialSongs ?? [],
+    );
+    _customPlaylists.insert(0, newPlaylist);
+    _storageService.saveCustomPlaylists(
+      _customPlaylists,
+      CloudBackendService().currentUser?.phoneNumber,
+    );
+    notifyListeners();
+  }
+
+  void addSongToPlaylist(String playlistId, Song song) {
+    final index = _customPlaylists.indexWhere((p) => p.id == playlistId);
+    if (index != -1) {
+      final pl = _customPlaylists[index];
+      if (!pl.songs.any((s) => s.id == song.id)) {
+        final updatedSongs = List<Song>.from(pl.songs)..add(song);
+        _customPlaylists[index] = Playlist(
+          id: pl.id,
+          title: pl.title,
+          description: pl.description,
+          coverUrl: pl.coverUrl.isNotEmpty ? pl.coverUrl : song.coverUrl,
+          songs: updatedSongs,
+        );
+        _storageService.saveCustomPlaylists(
+          _customPlaylists,
+          CloudBackendService().currentUser?.phoneNumber,
+        );
+        notifyListeners();
+      }
+    }
+  }
+
+  void removePlaylist(String playlistId) {
+    _customPlaylists.removeWhere((p) => p.id == playlistId);
+    _storageService.saveCustomPlaylists(
+      _customPlaylists,
+      CloudBackendService().currentUser?.phoneNumber,
+    );
     notifyListeners();
   }
 

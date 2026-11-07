@@ -109,10 +109,72 @@ class CloudBackendService extends ChangeNotifier {
   }
 
   // ==========================================
-  // AUTHENTICATION & PHONE OTP VERIFICATION
+  // AUTHENTICATION & DIRECT REGISTRATION / LOGIN (ZERO OTP)
   // ==========================================
 
-  /// Step 1: Send SMS OTP to phone number
+  /// Direct Registration / Login without OTP
+  /// All 3 fields (Full Name, 10-digit Phone, Email) are strictly mandatory.
+  /// If phone number already exists, restores the existing account & its playlists/songs!
+  Future<UserProfile> registerOrLogin({
+    required String fullName,
+    required String phoneNumber,
+    required String email,
+  }) async {
+    final cleanName = fullName.trim();
+    final cleanEmail = email.trim().toLowerCase();
+
+    // Extract digits to match last 10 digits
+    final digitsOnly = phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
+    final last10Digits = digitsOnly.length >= 10
+        ? digitsOnly.substring(digitsOnly.length - 10)
+        : digitsOnly;
+    final formattedPhone = '+91 $last10Digits';
+
+    // 1. Search existing users for this phone number
+    final existingIndex = _allUsers.indexWhere((u) {
+      final uDigits = u.phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
+      return uDigits.endsWith(last10Digits);
+    });
+
+    UserProfile user;
+    if (existingIndex != -1) {
+      // Existing User: Restore existing UID & registration date, update name/email
+      final existingUser = _allUsers[existingIndex];
+      user = existingUser.copyWith(
+        fullName: cleanName.isNotEmpty ? cleanName : existingUser.fullName,
+        email: cleanEmail.isNotEmpty ? cleanEmail : existingUser.email,
+        phoneNumber: formattedPhone,
+        isPhoneVerified: true,
+        isEmailVerified: true,
+        lastActiveAt: DateTime.now(),
+        isOnline: true,
+      );
+      _allUsers[existingIndex] = user;
+    } else {
+      // New User: Create new profile
+      final uid = 'user_${DateTime.now().millisecondsSinceEpoch}';
+      user = UserProfile(
+        uid: uid,
+        fullName: cleanName,
+        email: cleanEmail,
+        isEmailVerified: true,
+        phoneNumber: formattedPhone,
+        isPhoneVerified: true,
+        role: 'user',
+        createdAt: DateTime.now(),
+        lastActiveAt: DateTime.now(),
+        isOnline: true,
+      );
+      _allUsers.add(user);
+    }
+
+    _currentUser = user;
+    await _persistUsers();
+    notifyListeners();
+    return user;
+  }
+
+  /// Step 1: Send SMS OTP to phone number (optional fallback)
   Future<bool> sendPhoneOtp({
     required String fullName,
     required String phoneNumber,

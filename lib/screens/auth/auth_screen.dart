@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import '../../services/cloud_backend_service.dart';
 import '../../services/language_service.dart';
+import '../../providers/player_provider.dart';
 
 class AuthScreen extends StatefulWidget {
   final VoidCallback onAuthenticated;
@@ -15,12 +17,10 @@ class AuthScreen extends StatefulWidget {
 class _AuthScreenState extends State<AuthScreen> {
   final _backend = CloudBackendService();
   final _lang = LanguageService();
-  int _step = 1; // 1: Info, 2: Phone OTP (Email step removed)
 
   final _nameCtrl = TextEditingController();
-  final _emailCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
-  final _otpCtrl = TextEditingController();
+  final _emailCtrl = TextEditingController();
 
   bool _isLoading = false;
   String? _errorMessage;
@@ -39,27 +39,34 @@ class _AuthScreenState extends State<AuthScreen> {
   void dispose() {
     _lang.removeListener(_onLangUpdate);
     _nameCtrl.dispose();
-    _emailCtrl.dispose();
     _phoneCtrl.dispose();
-    _otpCtrl.dispose();
+    _emailCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _handleSendOtp() async {
+  Future<void> _handleRegisterOrLogin() async {
     final name = _nameCtrl.text.trim();
     final phone = _phoneCtrl.text.trim();
     final email = _emailCtrl.text.trim();
 
+    // 1. Mandatory Name Validation (>= 2 characters)
     if (name.isEmpty || name.length < 2) {
-      setState(() => _errorMessage = _lang.isHindi
-          ? 'कृपया अपना पूरा नाम दर्ज करें'
-          : 'Please enter your full name');
+      setState(() => _errorMessage = _lang.t('err_name_required'));
       return;
     }
-    if (phone.length < 10) {
-      setState(() => _errorMessage = _lang.isHindi
-          ? 'कृपया 10 अंकों का मोबाइल नंबर दर्ज करें'
-          : 'Please enter 10-digit mobile number');
+
+    // 2. Mandatory Mobile Number Validation (Strictly 10 digits)
+    final digitsOnly = phone.replaceAll(RegExp(r'[^0-9]'), '');
+    final last10 = digitsOnly.length >= 10 ? digitsOnly.substring(digitsOnly.length - 10) : digitsOnly;
+    if (last10.length != 10) {
+      setState(() => _errorMessage = _lang.t('err_phone_required'));
+      return;
+    }
+
+    // 3. Mandatory Email ID Validation (RFC compliant standard regex)
+    final emailRegex = RegExp(r'^[\w\.-]+@[\w\.-]+\.[a-zA-Z]{2,}$');
+    if (email.isEmpty || !emailRegex.hasMatch(email)) {
+      setState(() => _errorMessage = _lang.t('err_email_required'));
       return;
     }
 
@@ -68,66 +75,55 @@ class _AuthScreenState extends State<AuthScreen> {
       _errorMessage = null;
     });
 
-    final formattedPhone = phone.startsWith('+91') ? phone : '+91 $phone';
-    final success = await _backend.sendPhoneOtp(
-      fullName: name,
-      phoneNumber: formattedPhone,
-      email: email.isNotEmpty ? email : null,
-    );
+    try {
+      // Check if user already exists before registration to tailor welcome message
+      final existingIndex = _backend.allUsers.indexWhere((u) {
+        final uDigits = u.phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
+        return uDigits.endsWith(last10);
+      });
+      final isExisting = existingIndex != -1;
 
-    setState(() {
-      _isLoading = false;
-      if (success) {
-        _step = 2;
-        // Auto-fill prompt
-        if (_backend.lastGeneratedOtp != null) {
-          _otpCtrl.text = _backend.lastGeneratedOtp!;
-        }
-      } else {
-        _errorMessage = _lang.isHindi
-            ? 'OTP भेजने में समस्या हुई। कृपया दोबारा प्रयास करें।'
-            : 'Failed to send OTP. Please try again.';
+      final user = await _backend.registerOrLogin(
+        fullName: name,
+        phoneNumber: last10,
+        email: email,
+      );
+
+      if (mounted) {
+        // Automatically restore and reload user playlists, favorites & history
+        final playerProvider = Provider.of<PlayerProvider>(context, listen: false);
+        await playerProvider.reloadUserData(user.phoneNumber);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              isExisting ? _lang.t('welcome_back') : _lang.t('welcome_new'),
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            backgroundColor: isExisting ? const Color(0xFF10B981) : const Color(0xFF00E5FF),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+
+        widget.onAuthenticated();
       }
-    });
-  }
-
-  Future<void> _handleVerifyPhoneOtp() async {
-    final otp = _otpCtrl.text.trim();
-    if (otp.length < 6) {
-      setState(() => _errorMessage = _lang.isHindi
-          ? 'कृपया 6 अंकों का SMS OTP दर्ज करें'
-          : 'Please enter 6-digit SMS OTP');
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    final verified = await _backend.verifyPhoneOtp(otp);
-
-    setState(() => _isLoading = false);
-
-    if (verified) {
-      widget.onAuthenticated();
-    } else {
-      setState(() => _errorMessage = _lang.isHindi
-          ? 'अमान्य OTP कोड। कृपया सही कोड दर्ज करें (या 123456 का उपयोग करें)।'
-          : 'Invalid OTP. Please enter the correct code (or use 123456).');
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Error: $e';
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final otpCode = _backend.lastGeneratedOtp ?? '123456';
-
     return Scaffold(
       backgroundColor: const Color(0xFF0B0F19),
       body: SafeArea(
         child: Stack(
           children: [
-            // Language Switcher Top Bar
+            // Top Right: Language Switcher Button
             Positioned(
               top: 14,
               right: 18,
@@ -162,7 +158,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
             Center(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -206,26 +202,43 @@ class _AuthScreenState extends State<AuthScreen> {
                     const SizedBox(height: 6),
                     Text(
                       _lang.t('auth_subtitle'),
+                      textAlign: TextAlign.center,
                       style: GoogleFonts.outfit(
                         fontSize: 13,
                         color: Colors.cyanAccent.withOpacity(0.9),
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 20),
 
-                    // Stepper Indicator (2 Steps: Info -> Mobile OTP)
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _buildStepDot(1, _lang.t('step_info')),
-                        _buildStepLine(1),
-                        _buildStepDot(2, _lang.t('step_otp')),
-                      ],
+                    // Account Recovery & Auto-Sync Banner
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF00E5FF).withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFF00E5FF).withOpacity(0.25)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.sync_rounded, color: Color(0xFF00E5FF), size: 20),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              _lang.t('account_recovery_banner'),
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 11,
+                                height: 1.3,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 20),
 
-                    // Form Container
+                    // Form Container with 3 Mandatory Fields
                     Container(
                       padding: const EdgeInsets.all(22),
                       decoration: BoxDecoration(
@@ -247,16 +260,16 @@ class _AuthScreenState extends State<AuthScreen> {
                         children: [
                           if (_errorMessage != null) ...[
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                               decoration: BoxDecoration(
                                 color: Colors.redAccent.withOpacity(0.12),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: Colors.redAccent.withOpacity(0.3)),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: Colors.redAccent.withOpacity(0.35)),
                               ),
                               child: Row(
                                 children: [
-                                  const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 18),
-                                  const SizedBox(width: 8),
+                                  const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 20),
+                                  const SizedBox(width: 10),
                                   Expanded(
                                     child: Text(
                                       _errorMessage!,
@@ -269,148 +282,42 @@ class _AuthScreenState extends State<AuthScreen> {
                             const SizedBox(height: 16),
                           ],
 
-                          // STEP 1: Registration Form
-                          if (_step == 1) ...[
-                            _buildInputField(
-                              controller: _nameCtrl,
-                              label: _lang.t('full_name'),
-                              hint: _lang.t('full_name_hint'),
-                              icon: Icons.person_outline_rounded,
-                            ),
-                            const SizedBox(height: 14),
-                            _buildInputField(
-                              controller: _phoneCtrl,
-                              label: _lang.t('phone_number'),
-                              hint: _lang.t('phone_number_hint'),
-                              icon: Icons.phone_android_rounded,
-                              keyboardType: TextInputType.phone,
-                              prefixText: '+91 ',
-                            ),
-                            const SizedBox(height: 14),
-                            _buildInputField(
-                              controller: _emailCtrl,
-                              label: _lang.t('email_optional'),
-                              hint: _lang.t('email_hint'),
-                              icon: Icons.mail_outline_rounded,
-                              keyboardType: TextInputType.emailAddress,
-                            ),
-                            const SizedBox(height: 22),
-                            _buildSubmitButton(
-                              title: _lang.t('send_otp'),
-                              icon: Icons.arrow_forward_rounded,
-                              onPressed: _isLoading ? null : _handleSendOtp,
-                            ),
-                          ],
+                          // 1. Mandatory Full Name Field
+                          _buildInputField(
+                            controller: _nameCtrl,
+                            label: _lang.t('full_name'),
+                            hint: _lang.t('full_name_hint'),
+                            icon: Icons.person_rounded,
+                          ),
+                          const SizedBox(height: 14),
 
-                          // STEP 2: Phone SMS OTP
-                          if (_step == 2) ...[
-                            // Prominent On-Screen OTP Notification Card
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    const Color(0xFF00E5FF).withOpacity(0.15),
-                                    const Color(0xFF10B981).withOpacity(0.15),
-                                  ],
-                                ),
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(color: const Color(0xFF10B981).withOpacity(0.4)),
-                              ),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF10B981).withOpacity(0.2),
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(Icons.mark_chat_unread_rounded, color: Colors.greenAccent, size: 20),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          _lang.t('otp_banner_title'),
-                                          style: const TextStyle(color: Colors.white70, fontSize: 11),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          otpCode,
-                                          style: const TextStyle(
-                                            color: Colors.greenAccent,
-                                            fontSize: 20,
-                                            fontWeight: FontWeight.bold,
-                                            letterSpacing: 3,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  ElevatedButton(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.greenAccent,
-                                      foregroundColor: Colors.black,
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                      minimumSize: Size.zero,
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                    ),
-                                    onPressed: () {
-                                      setState(() {
-                                        _otpCtrl.text = otpCode;
-                                      });
-                                    },
-                                    child: Text(
-                                      _lang.t('autofill_otp'),
-                                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 16),
+                          // 2. Mandatory 10-Digit Mobile Number Field
+                          _buildInputField(
+                            controller: _phoneCtrl,
+                            label: _lang.t('phone_number'),
+                            hint: _lang.t('phone_number_hint'),
+                            icon: Icons.phone_android_rounded,
+                            keyboardType: TextInputType.phone,
+                            prefixText: '+91 ',
+                          ),
+                          const SizedBox(height: 14),
 
-                            Text(
-                              _lang.t('otp_sent_to'),
-                              style: TextStyle(color: Colors.grey.shade300, fontSize: 12),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              _phoneCtrl.text.startsWith('+91') ? _phoneCtrl.text : '+91 ${_phoneCtrl.text}',
-                              style: const TextStyle(
-                                color: Color(0xFF00E5FF),
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
+                          // 3. Mandatory Email Address Field
+                          _buildInputField(
+                            controller: _emailCtrl,
+                            label: _lang.t('email_mandatory'),
+                            hint: _lang.t('email_hint'),
+                            icon: Icons.alternate_email_rounded,
+                            keyboardType: TextInputType.emailAddress,
+                          ),
+                          const SizedBox(height: 22),
 
-                            _buildInputField(
-                              controller: _otpCtrl,
-                              label: _lang.t('enter_otp'),
-                              hint: '123456',
-                              icon: Icons.lock_outline_rounded,
-                              keyboardType: TextInputType.number,
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 22),
-
-                            _buildSubmitButton(
-                              title: _lang.t('verify_and_start'),
-                              icon: Icons.check_circle_outline_rounded,
-                              onPressed: _isLoading ? null : _handleVerifyPhoneOtp,
-                            ),
-                            const SizedBox(height: 12),
-                            TextButton(
-                              onPressed: () => setState(() => _step = 1),
-                              child: Text(
-                                _lang.t('change_phone'),
-                                style: const TextStyle(color: Colors.grey, fontSize: 12),
-                              ),
-                            ),
-                          ],
+                          // Submit Button: Instant Direct Sign-up / Login
+                          _buildSubmitButton(
+                            title: _lang.t('start_listening'),
+                            icon: Icons.headphones_rounded,
+                            onPressed: _isLoading ? null : _handleRegisterOrLogin,
+                          ),
                         ],
                       ),
                     ),
@@ -428,57 +335,6 @@ class _AuthScreenState extends State<AuthScreen> {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildStepDot(int step, String label) {
-    final isActive = _step >= step;
-    final isCurrent = _step == step;
-
-    return Column(
-      children: [
-        Container(
-          width: 32,
-          height: 32,
-          decoration: BoxDecoration(
-            color: isActive ? const Color(0xFF00E5FF) : const Color(0xFF1E293B),
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: isCurrent ? Colors.white : Colors.transparent,
-              width: 2,
-            ),
-          ),
-          child: Center(
-            child: Text(
-              '$step',
-              style: TextStyle(
-                color: isActive ? Colors.black : Colors.grey,
-                fontWeight: FontWeight.bold,
-                fontSize: 13,
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(
-            color: isActive ? Colors.white : Colors.grey.shade600,
-            fontSize: 10,
-            fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStepLine(int afterStep) {
-    final isPassed = _step > afterStep;
-    return Container(
-      width: 50,
-      height: 2,
-      margin: const EdgeInsets.only(bottom: 16),
-      color: isPassed ? const Color(0xFF00E5FF) : Colors.grey.shade800,
     );
   }
 

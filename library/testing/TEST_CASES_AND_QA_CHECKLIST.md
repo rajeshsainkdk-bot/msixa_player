@@ -28,33 +28,37 @@
 - **Test Steps:**
   1. Launch Msixa Player.
   2. Observe the initial screen displayed.
-- **Expected Result:** `AuthScreen` is rendered immediately. The main music player is completely inaccessible until registration is completed.
+- **Expected Result:** `AuthScreen` is rendered immediately. The main music player is completely inaccessible until mandatory details are submitted.
 - **Status:** PASS
 
-### TC-AUTH-002: Form Validation on Empty Inputs
-- **Precondition:** On `AuthScreen` Stage 1.
+### TC-AUTH-002: Form Validation on Empty & Incomplete Mandatory Inputs
+- **Precondition:** On `AuthScreen`.
 - **Test Steps:**
-  1. Leave "Full Name" blank.
-  2. Enter invalid email (e.g. `user@`).
-  3. Enter 7-digit phone number.
-  4. Tap `[Send OTP]`.
-- **Expected Result:** Validation snackbar appears ("कृपया सही नाम, ईमेल और 10-अंकों का मोबाइल नंबर दर्ज करें"). The flow does not advance.
+  1. Leave "Full Name" blank and tap `[Start Listening]`.
+     - *Expected:* "कृपया अपना पूरा नाम दर्ज करें (कम से कम 2 अक्षर)" error.
+  2. Fill Name (`Rajesh`), enter 8-digit phone (`98765432`) and tap `[Start Listening]`.
+     - *Expected:* "कृपया 10 अंकों का वैध मोबाइल नंबर दर्ज करें" error.
+  3. Fill 10-digit phone (`9876543210`), leave Email blank or enter invalid format (`rajesh@`) and tap `[Start Listening]`.
+     - *Expected:* "कृपया एक वैध ईमेल आईडी दर्ज करें (उदा. user@mail.com)" error.
+- **Expected Result:** Account creation is strictly blocked until all 3 mandatory fields pass validation.
 - **Status:** PASS
 
-### TC-AUTH-003: SMS OTP Generation & Reception
-- **Precondition:** Valid details entered (e.g., Name: `Rohan Sharma`, Phone: `9876543210`, Email: `rohan@gmail.com`).
+### TC-AUTH-003: Zero-OTP Direct Account Creation (New User)
+- **Precondition:** Valid inputs (Name: `Aman Verma`, Phone: `9812345678`, Email: `aman@example.com`).
 - **Test Steps:**
-  1. Tap `[Send OTP]`.
-  2. Observe transition to Stage 2.
-- **Expected Result:** 6-digit numeric OTP is generated and displayed/logged. Stage 2 input UI displays the user's phone number and 6-digit entry field.
+  1. Tap `[🎧 शुरू करें (Start Listening)]`.
+- **Expected Result:** Account is instantly created without any OTP prompt. Welcome toast appears. User is immediately transitioned to `MainNavigationScreen`.
 - **Status:** PASS
 
-### TC-AUTH-004: Incorrect SMS OTP Entry (Negative Test)
-- **Precondition:** On Stage 2 (Phone OTP).
+### TC-AUTH-004: Returning User Account & Playlist Recovery
+- **Precondition:** User `Aman Verma` previously saved favorite songs and created a custom playlist "My Devotional Hits".
 - **Test Steps:**
-  1. Enter wrong 6-digit code (`000000`).
-  2. Tap `[Verify Phone Number]`.
-- **Expected Result:** Error message displayed ("गलत OTP! कृपया सही 6-अंकों का कोड डालें"). Flow remains on Stage 2.
+  1. Sign out or re-enter the same 10-digit number (`9812345678`).
+  2. Tap `[🎧 शुरू करें (Start Listening)]`.
+- **Expected Result:**
+  - Existing user profile matched and restored.
+  - Success banner: "वापसी पर स्वागत है! आपकी प्लेलिस्ट व गाने रीस्टोर हो गए हैं।"
+  - In Library tab, "My Devotional Hits" playlist and all previous favorites are fully restored and playable.
 - **Status:** PASS
 
 ### TC-AUTH-005: Correct SMS OTP Entry & Instant Completion

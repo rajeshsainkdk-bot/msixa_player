@@ -18,7 +18,7 @@ graph TB
 
     subgraph "State Controllers & Business Logic"
         PP["PlayerProvider (ChangeNotifier)<br/>Playback State, Queue, Local Audio"]
-        CBS["CloudBackendService (ChangeNotifier Singleton)<br/>Auth, OTP, Moderation, Duplicate Engine"]
+        CBS["CloudBackendService (ChangeNotifier Singleton)<br/>Auth, Account Recovery, Moderation, Duplicate Engine"]
     end
 
     subgraph "Core Service Abstraction Layer"
@@ -62,7 +62,7 @@ graph TB
 | `lib/services/` | `cloud_backend_service.dart`, `audio_player_service.dart`, `catalog_service.dart`, `app_share_service.dart`, `storage_service.dart`, `device_audio_service.dart` | Business logic, state synchronization, hardware abstraction, and audio decoding. |
 | `lib/providers/` | `player_provider.dart` | Primary view-model orchestrating the audio queue, playback status, sleep timer, and equalizer curves. |
 | `lib/screens/` | `home_screen.dart`, `upload_song_screen.dart`, `now_playing_screen.dart`, `search_screen.dart`, `library_screen.dart`, `equalizer_screen.dart` | User App views styled in obsidian dark theme. |
-| `lib/screens/auth/` | `auth_screen.dart` | 3-stage user onboarding and OTP verification wizard. |
+| `lib/screens/auth/` | `auth_screen.dart` | Direct listener onboarding with 3 mandatory fields & instant playlist recovery. |
 | `lib/screens/admin/` | `admin_dashboard_screen.dart` | Executive analytics, audio preview player, pending moderation, and user directory CRM. |
 | `lib/` | `main.dart`, `main_admin.dart` | Entry points for User App and Admin App respectively. |
 | `android/` | `AndroidManifest.xml`, `build.gradle`, `settings.gradle`, `file_paths.xml` | Native permissions, FileProvider registry, and Gradle dependency overrides. |
@@ -81,18 +81,20 @@ graph TB
   - `msixa_all_registered_users`: Full user directory array.
   - `msixa_community_songs`: All submitted, pending, and approved tracks.
 
-### 3.2 User Registration & Verification State Machine
+### 3.2 User Registration & Account Recovery State Machine (Zero OTP)
 
 ```mermaid
 stateDiagram-v2
     [*] --> Unregistered: User launches User App
     Unregistered --> AuthScreen: Intercepted by UserAppRootView
-    AuthScreen --> Stage1_UserInfo: Full Name, Email, Phone Number input
-    Stage1_UserInfo --> Stage2_PhoneOtp: Send SMS OTP Triggered
-    Stage2_PhoneOtp --> Stage3_EmailCode: 6-Digit Phone OTP Validated
-    Stage3_EmailCode --> Stage2_PhoneOtp: Invalid OTP / Retry
-    Stage3_EmailCode --> VerifiedActiveUser: 4-Digit Email Code Validated
-    VerifiedActiveUser --> MainNavigationScreen: Session Persisted, Heartbeat Active
+    AuthScreen --> MandatoryValidation: Full Name, 10-Digit Mobile, Email
+    MandatoryValidation --> AuthScreen: Any field invalid / incomplete
+    MandatoryValidation --> AccountLookup: All 3 fields verified
+    AccountLookup --> RestoreAccount: Mobile number matches existing record
+    AccountLookup --> CreateAccount: New mobile number
+    RestoreAccount --> LoadScopedData: Restore UID, playlists & favorites
+    CreateAccount --> LoadScopedData: New UID, initial state
+    LoadScopedData --> MainNavigationScreen: Session Persisted, Heartbeat Active
 ```
 
 ---
