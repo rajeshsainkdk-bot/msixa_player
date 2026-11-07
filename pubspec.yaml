@@ -10,8 +10,9 @@ dependencies:
   flutter:
     sdk: flutter
   
-  # Audio Playback Engine
+  # Audio Playback Engine & Background Notification
   just_audio: ^0.9.36
+  just_audio_background: ^0.0.1-beta.13
   
   # Device Audio Scanner & Permissions
   on_audio_query: ^2.9.0

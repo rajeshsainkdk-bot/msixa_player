@@ -1,12 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:just_audio_background/just_audio_background.dart';
 import 'theme/app_theme.dart';
 import 'providers/player_provider.dart';
 import 'screens/main_navigation_screen.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize background audio playback with system notification controls
+  try {
+    await JustAudioBackground.init(
+      androidNotificationChannelId: 'com.msixa.player.channel.audio',
+      androidNotificationChannelName: 'Msixa Music Playback',
+      androidNotificationOngoing: true,
+      androidStopForegroundOnPause: true,
+      androidNotificationIcon: 'mipmap/ic_launcher',
+    );
+  } catch (_) {}
 
   // Set system UI to immersive dark styling
   SystemChrome.setSystemUIOverlayStyle(

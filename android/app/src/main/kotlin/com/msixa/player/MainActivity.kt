@@ -2,14 +2,14 @@ package com.msixa.player
 
 import android.content.Intent
 import androidx.core.content.FileProvider
-import io.flutter.embedding.android.FlutterActivity
+import com.ryanheise.audioservice.AudioServiceActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 
-class MainActivity: FlutterActivity() {
+class MainActivity: AudioServiceActivity() {
     private val CHANNEL = "com.msixa.player/app_share"
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -19,8 +19,6 @@ class MainActivity: FlutterActivity() {
                 try {
                     val appInfo = applicationContext.applicationInfo
                     val srcApk = File(appInfo.sourceDir)
-                    
-                    // Copy to app cache with user-friendly file name: MsixaPlayer.apk
                     val destApk = File(cacheDir, "MsixaPlayer.apk")
                     FileInputStream(srcApk).use { input ->
                         FileOutputStream(destApk).use { output ->
@@ -30,7 +28,7 @@ class MainActivity: FlutterActivity() {
 
                     val apkUri = FileProvider.getUriForFile(
                         this,
-                        "com.msixa.player.fileprovider",
+                        "${applicationContext.packageName}.fileprovider",
                         destApk
                     )
 
