@@ -1,0 +1,38 @@
+name: msixa_player
+description: "Msixa Player - Dark Premium Online MP3 Music Player for Android powered by Free Legal Creative Commons Streaming Catalogs."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # Audio Playback Engine
+  just_audio: ^0.9.36
+  
+  # State Management
+  provider: ^6.1.2
+  
+  # Networking & Legal Online Streaming
+  http: ^1.2.0
+  cached_network_image: ^3.3.1
+  
+  # Local Persistence (Favorites, Playlists, Settings)
+  shared_preferences: ^2.2.2
+  
+  # UI & Styling
+  google_fonts: ^6.1.0
+  intl: ^0.19.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
