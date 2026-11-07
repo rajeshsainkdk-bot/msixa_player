@@ -20,6 +20,7 @@ class AppColors {
   static const Color accentPink = Color(0xFFEC4899); // Radiant Magenta
   static const Color accentAmber = Color(0xFFF59E0B); // Amber Glow
   static const Color accentEmerald = Color(0xFF10B981); // Emerald Pulse
+  static const Color accentGreen = Color(0xFF10B981); // Emerald Green for offline
 
   // Text Hierarchy
   static const Color textPrimary = Color(0xFFF8FAFC);

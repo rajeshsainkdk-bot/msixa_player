@@ -33,6 +33,13 @@ class Song {
     return '$minutes:$seconds';
   }
 
+  bool get isOffline =>
+      streamUrl.startsWith('/') ||
+      streamUrl.startsWith('content://') ||
+      streamUrl.startsWith('file://') ||
+      id.startsWith('device_') ||
+      genre == 'Offline';
+
   Song copyWith({
     String? id,
     String? title,
