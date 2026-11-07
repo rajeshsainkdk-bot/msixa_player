@@ -56,9 +56,9 @@ jobs:
                   android:icon="@mipmap/ic_launcher"
                   android:usesCleartextTraffic="true">
 
-                  <!-- AudioServiceActivity for Lock Screen & Notification Bar Playback Controls -->
+                  <!-- MainActivity extending AudioServiceActivity for Media Playback & APK File Sharing -->
                   <activity
-                      android:name="com.ryanheise.audioservice.AudioServiceActivity"
+                      android:name=".MainActivity"
                       android:exported="true"
                       android:launchMode="singleTop"
                       android:theme="@style/LaunchTheme"
@@ -124,9 +124,10 @@ jobs:
           </paths>
           EOF
 
-          mkdir -p android/app/src/main/kotlin/com/msixa/player
-          cat << 'EOF' > android/app/src/main/kotlin/com/msixa/player/MainActivity.kt
-          package com.msixa.player
+          rm -rf android/app/src/main/kotlin/com/msixa/*
+          mkdir -p android/app/src/main/kotlin/com/msixa/msixa_player
+          cat << 'EOF' > android/app/src/main/kotlin/com/msixa/msixa_player/MainActivity.kt
+          package com.msixa.msixa_player
 
           import android.content.Intent
           import androidx.core.content.FileProvider
@@ -180,9 +181,6 @@ jobs:
               }
           }
           EOF
-
-          mkdir -p android/app/src/main/kotlin/com/msixa/msixa_player
-          cp android/app/src/main/kotlin/com/msixa/player/MainActivity.kt android/app/src/main/kotlin/com/msixa/msixa_player/MainActivity.kt
 
       - name: Configure Android Gradle Settings and Resolve Duplicate Kotlin Classes
         run: |
