@@ -7,6 +7,9 @@ class CatalogService {
   static const String _jamendoClientId = '56d30c95';
   static const String _jamendoBaseUrl = 'https://api.jamendo.com/v3.0';
 
+  /// Returns the built-in curated catalog of songs
+  static List<Song> getCuratedSongs() => _curatedCatalog;
+
   /// 100% Real Authentic Indian Music Library (Bollywood, Punjabi, Sufi, Bhakti, Ghazal & Indie)
   /// All tracks bundled directly with original artists, vocal masters, and high-fidelity sound.
   static final List<Song> _curatedCatalog = [
