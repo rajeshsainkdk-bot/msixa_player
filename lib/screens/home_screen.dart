@@ -119,50 +119,29 @@ class HomeScreen extends StatelessWidget {
                               );
                             },
                             child: Container(
-                              margin: const EdgeInsets.only(right: 8),
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                               decoration: BoxDecoration(
                                 gradient: const LinearGradient(
                                   colors: [Color(0xFF00E5FF), Color(0xFF4F46E5)],
                                 ),
                                 borderRadius: BorderRadius.circular(14),
-                              ),
-                              child: Row(
-                                children: const [
-                                  Icon(Icons.cloud_upload_rounded, color: Colors.black, size: 16),
-                                  SizedBox(width: 5),
-                                  Text(
-                                    '+ Upload',
-                                    style: TextStyle(
-                                      color: Colors.black,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFF00E5FF).withOpacity(0.3),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 3),
                                   ),
                                 ],
                               ),
-                            ),
-                          ),
-
-                          // Share Application APK File Button
-                          GestureDetector(
-                            onTap: () => AppShareService.shareAppApk(),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                              decoration: BoxDecoration(
-                                color: AppColors.accentCyan.withOpacity(0.15),
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(color: AppColors.accentCyan.withOpacity(0.4)),
-                              ),
                               child: Row(
                                 children: const [
-                                  Icon(Icons.share_rounded, color: AppColors.accentCyan, size: 16),
-                                  SizedBox(width: 5),
+                                  Icon(Icons.cloud_upload_rounded, color: Colors.black, size: 17),
+                                  SizedBox(width: 6),
                                   Text(
-                                    'Share APK',
+                                    '+ Upload Song',
                                     style: TextStyle(
-                                      color: AppColors.accentCyan,
-                                      fontSize: 11,
+                                      color: Colors.black,
+                                      fontSize: 12,
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),

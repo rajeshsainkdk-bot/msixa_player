@@ -96,12 +96,93 @@ jobs:
                       </intent-filter>
                   </receiver>
 
+                  <!-- FileProvider for Direct APK Sharing -->
+                  <provider
+                      android:name="androidx.core.content.FileProvider"
+                      android:authorities="${applicationId}.fileprovider"
+                      android:exported="false"
+                      android:grantUriPermissions="true">
+                      <meta-data
+                          android:name="android.support.FILE_PROVIDER_PATHS"
+                          android:resource="@xml/file_paths" />
+                  </provider>
+
                   <meta-data
                       android:name="flutterEmbedding"
                       android:value="2" />
               </application>
           </manifest>
           EOF
+
+          mkdir -p android/app/src/main/res/xml
+          cat << 'EOF' > android/app/src/main/res/xml/file_paths.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <paths xmlns:android="http://schemas.android.com/apk/res/android">
+              <cache-path name="apk_cache" path="." />
+              <external-cache-path name="ext_cache" path="." />
+              <external-path name="ext_files" path="." />
+          </paths>
+          EOF
+
+          mkdir -p android/app/src/main/kotlin/com/msixa/player
+          cat << 'EOF' > android/app/src/main/kotlin/com/msixa/player/MainActivity.kt
+          package com.msixa.player
+
+          import android.content.Intent
+          import androidx.core.content.FileProvider
+          import com.ryanheise.audioservice.AudioServiceActivity
+          import io.flutter.embedding.engine.FlutterEngine
+          import io.flutter.plugin.common.MethodChannel
+          import java.io.File
+          import java.io.FileInputStream
+          import java.io.FileOutputStream
+
+          class MainActivity: AudioServiceActivity() {
+              private val CHANNEL = "com.msixa.player/app_share"
+
+              override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
+                  super.configureFlutterEngine(flutterEngine)
+                  MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
+                      if (call.method == "shareApk") {
+                          try {
+                              val appInfo = applicationContext.applicationInfo
+                              val srcApk = File(appInfo.sourceDir)
+                              val destApk = File(cacheDir, "MsixaPlayer.apk")
+                              FileInputStream(srcApk).use { input ->
+                                  FileOutputStream(destApk).use { output ->
+                                      input.copyTo(output)
+                                  }
+                              }
+
+                              val apkUri = FileProvider.getUriForFile(
+                                  this,
+                                  "${applicationContext.packageName}.fileprovider",
+                                  destApk
+                              )
+
+                              val intent = Intent(Intent.ACTION_SEND).apply {
+                                  type = "application/vnd.android.package-archive"
+                                  putExtra(Intent.EXTRA_STREAM, apkUri)
+                                  putExtra(Intent.EXTRA_SUBJECT, "Msixa Player APK")
+                                  putExtra(Intent.EXTRA_TEXT, "Msixa Player APK")
+                                  addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                              }
+
+                              startActivity(Intent.createChooser(intent, "Share Msixa Player APK"))
+                              result.success(true)
+                          } catch (e: Exception) {
+                              result.error("SHARE_ERROR", e.localizedMessage, null)
+                          }
+                      } else {
+                          result.notImplemented()
+                      }
+                  }
+              }
+          }
+          EOF
+
+          mkdir -p android/app/src/main/kotlin/com/msixa/msixa_player
+          cp android/app/src/main/kotlin/com/msixa/player/MainActivity.kt android/app/src/main/kotlin/com/msixa/msixa_player/MainActivity.kt
 
       - name: Configure Android Gradle Settings and Resolve Duplicate Kotlin Classes
         run: |
