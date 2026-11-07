@@ -178,7 +178,7 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
                 decoration: BoxDecoration(
                   color: const Color(0xFF0B101D),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.Border.all(color: Colors.amberAccent.withOpacity(0.3)),
+                  border: Border.all(color: Colors.amberAccent.withOpacity(0.3)),
                 ),
                 child: Row(
                   children: const [
@@ -247,7 +247,7 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
                   colors: [const Color(0xFF00E5FF).withOpacity(0.12), const Color(0xFF4F46E5).withOpacity(0.12)],
                 ),
                 borderRadius: BorderRadius.circular(14),
-                border: Border.Border.all(color: const Color(0xFF00E5FF).withOpacity(0.3)),
+                border: Border.all(color: const Color(0xFF00E5FF).withOpacity(0.3)),
               ),
               child: Row(
                 children: [
@@ -276,7 +276,7 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
                 decoration: BoxDecoration(
                   color: const Color(0xFF131A2A),
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.Border.all(
+                  border: Border.all(
                     color: _pickedFilePath != null ? const Color(0xFF00E5FF) : Colors.white.withOpacity(0.12),
                     width: _pickedFilePath != null ? 1.5 : 1,
                   ),
@@ -329,7 +329,7 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
                 decoration: BoxDecoration(
                   color: Colors.amber.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.Border.all(color: Colors.amberAccent.withOpacity(0.5)),
+                  border: Border.all(color: Colors.amberAccent.withOpacity(0.5)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -404,7 +404,7 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
                 decoration: BoxDecoration(
                   color: Colors.emerald.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.Border.all(color: Colors.emerald.withOpacity(0.3)),
+                  border: Border.all(color: Colors.emerald.withOpacity(0.3)),
                 ),
                 child: Row(
                   children: const [
@@ -438,7 +438,7 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
               decoration: BoxDecoration(
                 color: const Color(0xFF131A2A),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.Border.all(color: Colors.white.withOpacity(0.08)),
+                border: Border.all(color: Colors.white.withOpacity(0.08)),
               ),
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<String>(
@@ -513,7 +513,7 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
           decoration: BoxDecoration(
             color: const Color(0xFF131A2A),
             borderRadius: BorderRadius.circular(12),
-            border: Border.Border.all(color: Colors.white.withOpacity(0.08)),
+            border: Border.all(color: Colors.white.withOpacity(0.08)),
           ),
           child: TextField(
             controller: controller,
@@ -530,3 +530,4 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
     );
   }
 }
+

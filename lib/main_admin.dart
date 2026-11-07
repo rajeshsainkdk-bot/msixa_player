@@ -133,7 +133,7 @@ class _AdminRootViewState extends State<AdminRootView> {
                 decoration: BoxDecoration(
                   color: const Color(0xFF101726),
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.Border.all(color: Colors.white10),
+                  border: Border.all(color: Colors.white10),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -152,7 +152,7 @@ class _AdminRootViewState extends State<AdminRootView> {
                       decoration: BoxDecoration(
                         color: const Color(0xFF090D16),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.Border.all(color: Colors.white10),
+                        border: Border.all(color: Colors.white10),
                       ),
                       child: TextField(
                         controller: _pinCtrl,
@@ -198,3 +198,4 @@ class _AdminRootViewState extends State<AdminRootView> {
     );
   }
 }
+

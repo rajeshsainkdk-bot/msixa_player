@@ -202,7 +202,7 @@ class _AuthScreenState extends State<AuthScreen> {
                   decoration: BoxDecoration(
                     color: const Color(0xFF131A2A),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.Border.all(
+                    border: Border.all(
                       color: Colors.white.withOpacity(0.08),
                     ),
                     boxShadow: [
@@ -222,7 +222,7 @@ class _AuthScreenState extends State<AuthScreen> {
                           decoration: BoxDecoration(
                             color: Colors.redAccent.withOpacity(0.12),
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.Border.all(color: Colors.redAccent.withOpacity(0.3)),
+                            border: Border.all(color: Colors.redAccent.withOpacity(0.3)),
                           ),
                           child: Row(
                             children: [
@@ -375,7 +375,7 @@ class _AuthScreenState extends State<AuthScreen> {
           decoration: BoxDecoration(
             color: isActive ? const Color(0xFF00E5FF) : const Color(0xFF1E293B),
             shape: BoxShape.circle,
-            border: Border.Border.all(
+            border: Border.all(
               color: isCurrent ? Colors.white : Colors.transparent,
               width: 2,
             ),
@@ -439,7 +439,7 @@ class _AuthScreenState extends State<AuthScreen> {
           decoration: BoxDecoration(
             color: const Color(0xFF0B101D),
             borderRadius: BorderRadius.circular(12),
-            border: Border.Border.all(color: Colors.white.withOpacity(0.08)),
+            border: Border.all(color: Colors.white.withOpacity(0.08)),
           ),
           child: TextField(
             controller: controller,
@@ -495,3 +495,4 @@ class _AuthScreenState extends State<AuthScreen> {
     );
   }
 }
+

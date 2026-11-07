@@ -274,7 +274,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
           decoration: BoxDecoration(
             color: const Color(0xFF131B2C),
             borderRadius: BorderRadius.circular(16),
-            border: Border.Border.all(
+            border: Border.all(
               color: isThisPlaying ? const Color(0xFFFFB300) : Colors.white.withOpacity(0.08),
             ),
           ),
@@ -426,7 +426,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
             decoration: BoxDecoration(
               color: const Color(0xFF131B2C),
               borderRadius: BorderRadius.circular(12),
-              border: Border.Border.all(color: Colors.white10),
+              border: Border.all(color: Colors.white10),
             ),
             child: TextField(
               onChanged: (val) => setState(() => _userSearchQuery = val),
@@ -459,7 +459,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                       decoration: BoxDecoration(
                         color: const Color(0xFF131B2C),
                         borderRadius: BorderRadius.circular(14),
-                        border: Border.Border.all(color: Colors.white.withOpacity(0.06)),
+                        border: Border.all(color: Colors.white.withOpacity(0.06)),
                       ),
                       child: Row(
                         children: [
@@ -483,7 +483,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                                   decoration: BoxDecoration(
                                     color: isOnline ? Colors.greenAccent : Colors.grey,
                                     shape: BoxShape.circle,
-                                    border: Border.Border.all(color: Colors.black, width: 2),
+                                    border: Border.all(color: Colors.black, width: 2),
                                   ),
                                 ),
                               ),
@@ -591,7 +591,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
           decoration: BoxDecoration(
             color: const Color(0xFF131B2C),
             borderRadius: BorderRadius.circular(12),
-            border: Border.Border.all(color: Colors.white10),
+            border: Border.all(color: Colors.white10),
           ),
           child: Row(
             children: [
@@ -634,3 +634,4 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
     );
   }
 }
+
