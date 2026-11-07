@@ -402,15 +402,15 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
-                  color: Colors.emerald.withOpacity(0.12),
+                  color: Colors.green.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.emerald.withOpacity(0.3)),
+                  border: Border.all(color: Colors.green.withOpacity(0.3)),
                 ),
                 child: Row(
                   children: const [
-                    Icon(Icons.check_circle_outline_rounded, color: Colors.emeraldAccent, size: 18),
+                    Icon(Icons.check_circle_outline_rounded, color: Colors.greenAccent, size: 18),
                     SizedBox(width: 8),
-                    Text('✅ नया गाना! यह हमारे डेटाबेस में पहले से नहीं है।', style: TextStyle(color: Colors.emeraldAccent, fontSize: 12)),
+                    Text('✅ नया गाना! यह हमारे डेटाबेस में पहले से नहीं है।', style: TextStyle(color: Colors.greenAccent, fontSize: 12)),
                   ],
                 ),
               ),
