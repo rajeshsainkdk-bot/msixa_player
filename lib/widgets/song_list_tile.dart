@@ -20,7 +20,7 @@ class SongListTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final playerProvider = Provider.read<PlayerProvider>(context);
+    final playerProvider = Provider.of<PlayerProvider>(context, listen: false);
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
