@@ -39,6 +39,12 @@ class AppColors {
     end: Alignment.bottomRight,
   );
 
+  static const LinearGradient accentGradient = LinearGradient(
+    colors: [Color(0xFF06B6D4), Color(0xFF10B981)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
   static const LinearGradient pinkCyanGradient = LinearGradient(
     colors: [Color(0xFFEC4899), Color(0xFF6366F1), Color(0xFF06B6D4)],
     begin: Alignment.topLeft,
