@@ -28,11 +28,63 @@ jobs:
           channel: 'stable'
           cache: true
 
+      - name: Ensure Complete Android Wrapper and Scaffolding
+        run: flutter create . --platforms=android --org=com.msixa
+
+      - name: Configure Android Permissions and Media Service
+        run: |
+          cat << 'EOF' > android/app/src/main/AndroidManifest.xml
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+              package="com.msixa.player">
+
+              <uses-permission android:name="android.permission.INTERNET" />
+              <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+              <uses-permission android:name="android.permission.WAKE_LOCK" />
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+              <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+              <application
+                  android:label="Msixa Player"
+                  android:name="${applicationName}"
+                  android:icon="@mipmap/ic_launcher"
+                  android:usesCleartextTraffic="true">
+
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true"
+                      android:launchMode="singleTop"
+                      android:theme="@style/LaunchTheme"
+                      android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+                      android:hardwareAccelerated="true"
+                      android:windowSoftInputMode="adjustResize">
+                      <meta-data
+                        android:name="io.flutter.embedding.android.NormalTheme"
+                        android:resource="@style/NormalTheme"
+                        />
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN"/>
+                          <category android:name="android.intent.category.LAUNCHER"/>
+                      </intent-filter>
+                  </activity>
+
+                  <meta-data
+                      android:name="flutterEmbedding"
+                      android:value="2" />
+              </application>
+          </manifest>
+          EOF
+
+      - name: Configure minSdkVersion 21
+        run: |
+          sed -i 's/minSdkVersion .*/minSdkVersion 21/' android/app/build.gradle || true
+          sed -i 's/minSdk = .*/minSdk = 21/' android/app/build.gradle || true
+
       - name: Get Dependencies
         run: flutter pub get
 
       - name: Build APK (Release)
-        run: flutter build apk --release
+        run: flutter build apk --release --no-tree-shake-icons
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
