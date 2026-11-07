@@ -36,8 +36,7 @@ jobs:
       - name: Configure Android Permissions and Media Service
         run: |
           cat << 'EOF' > android/app/src/main/AndroidManifest.xml
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-              package="com.msixa.player">
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
               <uses-permission android:name="android.permission.INTERNET" />
               <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />

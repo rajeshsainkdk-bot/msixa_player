@@ -32,7 +32,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final provider = Provider.watch<PlayerProvider>(context);
+    final provider = Provider.of<PlayerProvider>(context);
 
     return Scaffold(
       backgroundColor: AppColors.background,
