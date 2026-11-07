@@ -183,10 +183,14 @@ jobs:
           </manifest>
           EOF
 
-      - name: Configure minSdkVersion 21
+      - name: Configure SDK Versions
         run: |
           sed -i 's/minSdkVersion .*/minSdkVersion = 21/' android/app/build.gradle || true
           sed -i 's/minSdk = .*/minSdk = 21/' android/app/build.gradle || true
+          sed -i 's/compileSdkVersion .*/compileSdkVersion = 34/' android/app/build.gradle || true
+          sed -i 's/compileSdk = .*/compileSdk = 34/' android/app/build.gradle || true
+          sed -i 's/targetSdkVersion .*/targetSdkVersion = 34/' android/app/build.gradle || true
+          sed -i 's/targetSdk = .*/targetSdk = 34/' android/app/build.gradle || true
 
       - name: Get Dependencies
         run: flutter pub get
