@@ -91,13 +91,12 @@ graph TD
   5. *Lo-Fi & Ghazal:* Bajrang Baan Lo-Fi (11 Baar Non-Stop), Kagaz Ki Kashti (Jagjit Singh).
 - **Acceptance Criteria:** Songs must play instantly with zero network buffering when the user is offline.
 
-### FR-02: Mandatory User Registration & 2-Factor Identity Wizard
-- **Description:** No user may access the player or community features without full identity verification.
+### FR-02: Mandatory User Registration with Mobile SMS OTP
+- **Description:** User must register before accessing the player or community features.
 - **Workflow:**
-  1. *Stage 1 (User Profile):* Input Full Name, valid Email address, and 10-digit Indian Mobile Number.
-  2. *Stage 2 (Phone SMS OTP):* Dynamic 6-digit OTP generated and verified.
-  3. *Stage 3 (Email Code Verification):* 4-digit security code verified to confirm email ownership.
-- **Acceptance Criteria:** Unverified users are blocked by `AuthScreen` barrier. Session persists across app restarts.
+  1. *Stage 1 (User Profile):* Input Full Name, 10-digit Indian Mobile Number, and optional email address.
+  2. *Stage 2 (Phone SMS OTP):* Dynamic 6-digit OTP displayed with one-tap Auto-fill and universal test code fallback (`123456`).
+- **Acceptance Criteria:** Verification completes immediately upon OTP confirmation. User profile persists across app restarts without requiring email codes.
 
 ### FR-03: Real-Time Active User Heartbeat & Analytics
 - **Description:** The client sends periodic timestamp heartbeats upon app foregrounding and song playback.

@@ -107,7 +107,7 @@ class LanguageService extends ChangeNotifier {
     'cancel': {'hi': 'रद्द करें (Cancel)', 'en': 'Cancel'},
 
     // Admin Dashboard
-    'admin_title': {'hi': 'Msixa Admin कंट्रोल', 'en': 'Msixa Admin Control'},
+    'admin_title': {'hi': 'Msixa Player Admin', 'en': 'Msixa Player Admin'},
     'tab_pending': {'hi': 'लंबित गाने', 'en': 'Pending Songs'},
     'tab_users': {'hi': 'यूज़र्स डेटा', 'en': 'Users Directory'},
     'tab_live': {'hi': 'लाइव गाने', 'en': 'Live Songs'},
@@ -137,3 +137,4 @@ class LanguageService extends ChangeNotifier {
     'switch_lang': {'hi': 'English में बदलें', 'en': 'हिंदी में बदलें'},
   };
 }
+

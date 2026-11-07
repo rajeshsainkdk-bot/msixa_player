@@ -19,7 +19,7 @@ class MsixaAdminApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Msixa Admin Control',
+      title: 'Msixa Player Admin',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
@@ -120,7 +120,7 @@ class _AdminRootViewState extends State<AdminRootView> {
               const SizedBox(height: 20),
 
               Text(
-                'Msixa Admin Control',
+                'Msixa Player Admin',
                 style: GoogleFonts.syne(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
               ),
               const SizedBox(height: 6),

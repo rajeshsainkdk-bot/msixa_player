@@ -57,20 +57,19 @@
 - **Expected Result:** Error message displayed ("गलत OTP! कृपया सही 6-अंकों का कोड डालें"). Flow remains on Stage 2.
 - **Status:** PASS
 
-### TC-AUTH-005: Correct SMS OTP Entry & Transition to Email Verification
-- **Precondition:** On Stage 2.
+### TC-AUTH-005: Correct SMS OTP Entry & Instant Completion
+- **Precondition:** On Stage 2 (Phone OTP).
 - **Test Steps:**
-  1. Enter generated 6-digit OTP.
-  2. Tap `[Verify Phone Number]`.
-- **Expected Result:** Flow transitions seamlessly to Stage 3 (Email Code Verification). 4-digit email code is dispatched/logged.
+  1. Enter generated 6-digit OTP or tap `[Auto-fill Code]` (or enter `123456`).
+  2. Tap `[Verify & Start Listening]`.
+- **Expected Result:** Registration completes instantly. User profile is persisted to `SharedPreferences`. User is taken straight to `MainNavigationScreen` (Home) with full music access.
 - **Status:** PASS
 
-### TC-AUTH-006: Complete Verification & Main Player Access
-- **Precondition:** On Stage 3.
+### TC-AUTH-006: Language Switcher Toggle on Auth Screen
+- **Precondition:** On `AuthScreen`.
 - **Test Steps:**
-  1. Enter valid 4-digit email code.
-  2. Tap `[Complete Registration]`.
-- **Expected Result:** Success animation displays. User profile is persisted to `SharedPreferences`. User is taken to `MainNavigationScreen` (Home) with full access.
+  1. Tap the top-right language toggle button `[ 🇮🇳 हिंदी / English ]`.
+- **Expected Result:** All labels, placeholders, stepper titles, and buttons instantly switch language between Hindi and English without reloading or losing input data.
 - **Status:** PASS
 
 ### TC-AUTH-007: App Restart Session Persistence
