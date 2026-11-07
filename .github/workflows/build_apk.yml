@@ -107,7 +107,6 @@ jobs:
         run: |
           sed -i 's/minSdkVersion .*/minSdkVersion = 21/' android/app/build.gradle || true
           sed -i 's/minSdk = .*/minSdk = 21/' android/app/build.gradle || true
-          sed -i 's/org.jetbrains.kotlin.android" version "[^"]*"/org.jetbrains.kotlin.android" version "1.9.24"/' android/settings.gradle || true
 
           cat << 'EOF' >> android/app/build.gradle
 
@@ -117,19 +116,19 @@ jobs:
               resolutionStrategy {
                   eachDependency { details ->
                       if (details.requested.group == 'org.jetbrains.kotlin' && details.requested.name.startsWith('kotlin-stdlib')) {
-                          details.useVersion('1.9.24')
+                          details.useVersion('1.8.22')
                       }
                   }
               }
           }
 
           dependencies {
-              implementation platform('org.jetbrains.kotlin:kotlin-bom:1.9.24')
+              implementation platform('org.jetbrains.kotlin:kotlin-bom:1.8.22')
               constraints {
-                  implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.9.24") {
+                  implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22") {
                       because("kotlin-stdlib-jdk7 is now a part of kotlin-stdlib")
                   }
-                  implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.24") {
+                  implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22") {
                       because("kotlin-stdlib-jdk8 is now a part of kotlin-stdlib")
                   }
               }
@@ -144,7 +143,7 @@ jobs:
                   exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk7'
                   resolutionStrategy.eachDependency { details ->
                       if (details.requested.group == 'org.jetbrains.kotlin' && details.requested.name.startsWith('kotlin-stdlib')) {
-                          details.useVersion '1.9.24'
+                          details.useVersion '1.8.22'
                       }
                   }
               }
@@ -156,7 +155,7 @@ jobs:
                   exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk7'
                   resolutionStrategy.eachDependency { details ->
                       if (details.requested.group == 'org.jetbrains.kotlin' && details.requested.name.startsWith('kotlin-stdlib')) {
-                          details.useVersion '1.9.24'
+                          details.useVersion '1.8.22'
                       }
                   }
               }
