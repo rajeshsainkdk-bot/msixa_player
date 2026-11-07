@@ -7,484 +7,315 @@ class CatalogService {
   static const String _jamendoClientId = '56d30c95';
   static const String _jamendoBaseUrl = 'https://api.jamendo.com/v3.0';
 
-  /// 100% Free Built-in Catalog of Verified Legal Indian & International Songs.
-  /// Zero subscription, zero payment required - ready to stream instantly.
+  /// 100% Real Authentic Indian Music Library (Bollywood, Punjabi, Sufi, Bhakti, Ghazal & Indie)
+  /// All tracks bundled directly with original artists, vocal masters, and high-fidelity sound.
   static final List<Song> _curatedCatalog = [
     // ==========================================================
-    // 1. BOLLYWOOD TOP HITS & ACOUSTIC MELODIES
+    // 1. BHAKTI, DEVOTIONAL & SPIRITUAL MANTRAS
     // ==========================================================
     Song(
-      id: 'msixa_bol_01',
-      title: 'Tum Mile (Bollywood Acoustic Lounge)',
-      artist: 'Arjun Sharma & Strings',
-      album: 'Bollywood Lounge Vol. 1',
-      duration: 214,
-      streamUrl: 'https://cdn.pixabay.com/download/audio/2022/11/06/audio_c97f48dfa2.mp3',
-      coverUrl: 'https://images.unsplash.com/photo-1548013146-72479768bada?w=600&q=80',
-      genre: 'Bollywood',
-      license: '100% Free Creative Commons CC-BY',
-      licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
-      source: 'Desi Acoustic Sessions',
+      id: 'msixa_bhakti_01',
+      title: 'Sankat Mochan Hanuman Ashtak',
+      artist: 'Hariharan',
+      album: 'Shree Hanuman Amritwani',
+      duration: 236,
+      streamUrl: 'assets/audio/sankat_mochan_hanuman_ashtak.mp3',
+      coverUrl: 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=600&q=80',
+      genre: 'Bhakti',
+      license: 'Personal Music Library',
+      licenseUrl: 'local',
+      source: 'Devotional Master Library',
     ),
     Song(
-      id: 'msixa_bol_02',
-      title: 'Kesariya Tera (Unplugged Acoustic Guitar)',
-      artist: 'Acoustic Desi Project',
-      album: 'Heartstrings Unplugged',
+      id: 'msixa_bhakti_02',
+      title: 'Ye Chamak Ye Damak (Sab Kuch Sarkar Tumhi Se)',
+      artist: 'Sudhir Vyas',
+      album: 'Sab Kuch Sarkar Tumhi Se Hai',
       duration: 228,
-      streamUrl: 'https://cdn.pixabay.com/download/audio/2022/01/18/audio_d0a13f69d2.mp3',
-      coverUrl: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&q=80',
-      genre: 'Bollywood',
-      license: '100% Free Creative Commons CC0',
-      licenseUrl: 'https://creativecommons.org/publicdomain/zero/1.0/',
-      source: 'Indian Acoustic Heritage',
+      streamUrl: 'assets/audio/ye_chamak_ye_damak.mp3',
+      coverUrl: 'https://images.unsplash.com/photo-1590076215667-875d4ef2d7ee?w=600&q=80',
+      genre: 'Bhakti',
+      license: 'Personal Music Library',
+      licenseUrl: 'local',
+      source: 'Devotional Master Library',
     ),
     Song(
-      id: 'msixa_bol_03',
-      title: 'Dil Ki Dhadkan (Romantic Hindi Lounge)',
-      artist: 'Kabir & Aastha',
-      album: 'Coffee House Sessions',
-      duration: 208,
-      streamUrl: 'https://cdn.pixabay.com/download/audio/2022/03/15/audio_c8c8a73467.mp3',
-      coverUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600&q=80',
-      genre: 'Bollywood',
-      license: '100% Free Creative Commons CC-BY',
-      licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
-      source: 'Desi Acoustic Sessions',
+      id: 'msixa_bhakti_03',
+      title: 'Powerful Hanuman Chalisa',
+      artist: 'Sai Charan Bhaskaruni',
+      album: 'HanuMan Original Motion Picture',
+      duration: 234,
+      streamUrl: 'assets/audio/powerful_hanuman_chalisa.mp3',
+      coverUrl: 'https://images.unsplash.com/photo-1609137144822-1d577e02581c?w=600&q=80',
+      genre: 'Bhakti',
+      license: 'Personal Music Library',
+      licenseUrl: 'local',
+      source: 'Devotional Master Library',
     ),
     Song(
-      id: 'msixa_bol_04',
-      title: 'Raataan Lambiyan (Late Night Piano & Flute)',
-      artist: 'Siddharth Strings',
-      album: 'Midnight Melodies',
-      duration: 245,
-      streamUrl: 'https://cdn.pixabay.com/download/audio/2022/08/02/audio_884fe92c21.mp3',
-      coverUrl: 'https://images.unsplash.com/photo-1506461883276-594a12b11cf3?w=600&q=80',
-      genre: 'Bollywood',
-      license: '100% Free Creative Commons CC-BY',
-      licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
-      source: 'Bollywood Instrumental Lounge',
-    ),
-    Song(
-      id: 'msixa_bol_05',
-      title: 'Chura Liya Retro (Chill Bollywood Redux)',
-      artist: 'Retro Bollywood Lounge',
-      album: 'Golden Era Chillout',
-      duration: 195,
-      streamUrl: 'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3',
-      coverUrl: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&q=80',
-      genre: 'Bollywood',
-      license: '100% Free Creative Commons CC-BY',
-      licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
-      source: 'Retro Redux Collective',
-    ),
-
-    // ==========================================================
-    // 2. RAJASTHANI FOLK & GHOOMAR BEATS
-    // ==========================================================
-    Song(
-      id: 'msixa_raj_01',
-      title: 'Ghoomar Dhol Trance (Rajasthani DJ Remix)',
-      artist: 'DJ Manish & Thar Dhol',
-      album: 'Royal Rajasthan Beats',
-      duration: 235,
-      streamUrl: 'https://cdn.pixabay.com/download/audio/2022/10/14/audio_9939f777dd.mp3',
-      coverUrl: 'https://images.unsplash.com/photo-1599818816930-3f7b823c830b?w=600&q=80',
-      genre: 'Rajasthani',
-      license: '100% Free Creative Commons CC-BY',
-      licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
-      source: 'Rajasthani Folk Archives',
-    ),
-    Song(
-      id: 'msixa_raj_02',
-      title: 'Kesariya Breeze (Rajasthani Sarangi & Morchang)',
-      artist: 'Thar Desert Ensemble',
-      album: 'Golden Dunes of Rajasthan',
-      duration: 225,
-      streamUrl: 'https://cdn.pixabay.com/download/audio/2022/01/18/audio_d0a13f69d2.mp3',
-      coverUrl: 'https://images.unsplash.com/photo-1564507592333-c60657eea523?w=600&q=80',
-      genre: 'Rajasthani',
-      license: '100% Free Creative Commons CC-BY',
-      licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
-      source: 'Folk Heritage Archives',
-    ),
-    Song(
-      id: 'msixa_raj_03',
-      title: 'Choudhary (Desert Bass DJ Mix)',
-      artist: 'Jaipur Electro Folk',
-      album: 'Thar Desert Electronic',
-      duration: 218,
-      streamUrl: 'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3',
-      coverUrl: 'https://images.unsplash.com/photo-1477587458883-47145ed94245?w=600&q=80',
-      genre: 'Rajasthani',
-      license: '100% Free Creative Commons CC-BY',
-      licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
-      source: 'Desert Electro Lab',
-    ),
-    Song(
-      id: 'msixa_raj_04',
-      title: 'Padharo Mhare Des (Acoustic Desert Lounge)',
-      artist: 'Ustad Rahim Khan',
-      album: 'Virasat Rajasthan',
-      duration: 240,
-      streamUrl: 'https://cdn.pixabay.com/download/audio/2021/08/04/audio_bb630cc098.mp3',
+      id: 'msixa_bhakti_04',
+      title: 'Ram Siya Ram',
+      artist: 'Sachet Tandon & Parampara Tandon',
+      album: 'Adipurush Soundscapes',
+      duration: 230,
+      streamUrl: 'assets/audio/ram_siya_ram.mp3',
       coverUrl: 'https://images.unsplash.com/photo-1548013146-72479768bada?w=600&q=80',
-      genre: 'Rajasthani',
-      license: '100% Free Creative Commons CC0',
-      licenseUrl: 'https://creativecommons.org/publicdomain/zero/1.0/',
-      source: 'Heritage Folk Library',
-    ),
-
-    // ==========================================================
-    // 3. DJ SONGS & DESI PARTY BASS
-    // ==========================================================
-    Song(
-      id: 'msixa_dj_01',
-      title: 'Bhangra Dhol Pulse & Bass (Club DJ Mix)',
-      artist: 'DJ Kuldeep & Dhol Master',
-      album: 'Punjab Grooves Vol. 2',
-      duration: 205,
-      streamUrl: 'https://cdn.pixabay.com/download/audio/2022/10/14/audio_9939f777dd.mp3',
-      coverUrl: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=600&q=80',
-      genre: 'DJ Songs',
-      license: '100% Free Creative Commons CC-BY',
-      licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
-      source: 'Folk Beat Archives',
+      genre: 'Bollywood',
+      license: 'Personal Music Library',
+      licenseUrl: 'local',
+      source: 'Bollywood Master Library',
     ),
     Song(
-      id: 'msixa_dj_02',
-      title: 'Dhol Jagiro Da (Bass Boosted Club Remix)',
-      artist: 'Bass Drop India',
-      album: 'Desi Bass 2026',
-      duration: 215,
-      streamUrl: 'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3',
-      coverUrl: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=600&q=80',
-      genre: 'DJ Songs',
-      license: '100% Free Creative Commons CC-BY',
-      licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
-      source: 'Bass Drop Collective',
+      id: 'msixa_bhakti_05',
+      title: 'Radhe Tere Charno Ki Dhool',
+      artist: 'Bhumika Sharma',
+      album: 'Krishna Bhajan Amrit 2025',
+      duration: 290,
+      streamUrl: 'assets/audio/radhe_tere_charno_ki_dhool.mp3',
+      coverUrl: 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=600&q=80',
+      genre: 'Bhakti',
+      license: 'Personal Music Library',
+      licenseUrl: 'local',
+      source: 'Devotional Master Library',
     ),
     Song(
-      id: 'msixa_dj_03',
-      title: 'Desi Cyberpunk Bhangra Drop 2026',
-      artist: 'Vektor 99 & Desi Beats',
-      album: 'Pind to Tokyo',
-      duration: 190,
-      streamUrl: 'https://cdn.pixabay.com/download/audio/2022/08/02/audio_884fe92c21.mp3',
-      coverUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&q=80',
-      genre: 'DJ Songs',
-      license: '100% Free Creative Commons CC-BY',
-      licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
-      source: 'Desi Electro Lab',
-    ),
-    Song(
-      id: 'msixa_dj_04',
-      title: 'Nagada Sang Dhol Bass Blast',
-      artist: 'Dhol Beats Collective',
-      album: 'Indian Wedding Party Hits',
-      duration: 212,
-      streamUrl: 'https://cdn.pixabay.com/download/audio/2022/11/06/audio_c97f48dfa2.mp3',
-      coverUrl: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&q=80',
-      genre: 'DJ Songs',
-      license: '100% Free Creative Commons CC-BY',
-      licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
-      source: 'Party Beats Collective',
-    ),
-
-    // ==========================================================
-    // 4. DESI LO-FI & MONSOON NOSTALGIA
-    // ==========================================================
-    Song(
-      id: 'msixa_lofi_01',
-      title: 'Bollywood Lo-Fi Chai Beats',
-      artist: 'Desi Beat Lab',
-      album: 'Monsoon in Mumbai',
-      duration: 178,
-      streamUrl: 'https://cdn.pixabay.com/download/audio/2022/03/15/audio_c8c8a73467.mp3',
-      coverUrl: 'https://images.unsplash.com/photo-1506461883276-594a12b11cf3?w=600&q=80',
-      genre: 'Desi Lo-Fi',
-      license: '100% Free Creative Commons CC-BY-SA',
-      licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0/',
-      source: 'Creative Commons Desi Music',
-    ),
-    Song(
-      id: 'msixa_lofi_02',
-      title: 'Chai Tapri Lo-Fi (Old Radio Nostalgia)',
-      artist: 'Bombay Beats Project',
-      album: 'Marine Drive Rain',
-      duration: 185,
-      streamUrl: 'https://cdn.pixabay.com/download/audio/2022/03/15/audio_c8c8a73467.mp3',
-      coverUrl: 'https://images.unsplash.com/photo-1564507592333-c60657eea523?w=600&q=80',
-      genre: 'Desi Lo-Fi',
-      license: '100% Free Creative Commons CC-BY-SA',
-      licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0/',
-      source: 'Creative Commons Desi Music',
-    ),
-    Song(
-      id: 'msixa_lofi_03',
-      title: 'Monsoon in Mumbai (Lo-Fi Train Journey)',
-      artist: 'Komorebi Desi',
-      album: 'Local Train Vibes',
-      duration: 195,
-      streamUrl: 'https://cdn.pixabay.com/download/audio/2022/01/18/audio_d0a13f69d2.mp3',
-      coverUrl: 'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=600&q=80',
-      genre: 'Desi Lo-Fi',
-      license: '100% Free Creative Commons CC0',
-      licenseUrl: 'https://creativecommons.org/publicdomain/zero/1.0/',
-      source: 'Lo-Fi Chill Collective',
-    ),
-
-    // ==========================================================
-    // 5. SUFI & GHAZAL SOUL
-    // ==========================================================
-    Song(
-      id: 'msixa_sufi_01',
-      title: 'Sufi Roohani Qawwal Lounge',
-      artist: 'Al-Madina Strings',
-      album: 'Ishq & Soul',
-      duration: 245,
-      streamUrl: 'https://cdn.pixabay.com/download/audio/2022/08/02/audio_884fe92c21.mp3',
-      coverUrl: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&q=80',
-      genre: 'Sufi',
-      license: '100% Free Creative Commons CC-BY',
-      licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
-      source: 'Sufi Soul Records',
-    ),
-    Song(
-      id: 'msixa_sufi_02',
-      title: 'Dama Dam Mast Qalandar (Sufi Trance)',
-      artist: 'Dargah Echoes & Beats',
-      album: 'Sufi Ecstasy',
-      duration: 240,
-      streamUrl: 'https://cdn.pixabay.com/download/audio/2022/08/02/audio_884fe92c21.mp3',
-      coverUrl: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&q=80',
-      genre: 'Sufi',
-      license: '100% Free Creative Commons CC-BY',
-      licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
-      source: 'Sufi Soul Records',
-    ),
-    Song(
-      id: 'msixa_sufi_03',
-      title: 'Shaam-e-Ghazal (Harmonium & Tabla Evening)',
-      artist: 'Mehfil-e-Khaas',
-      album: 'Lucknow Nights',
-      duration: 275,
-      streamUrl: 'https://cdn.pixabay.com/download/audio/2021/08/04/audio_bb630cc098.mp3',
-      coverUrl: 'https://images.unsplash.com/photo-1506461883276-594a12b11cf3?w=600&q=80',
-      genre: 'Sufi',
-      license: '100% Free Creative Commons CC-BY',
-      licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
-      source: 'Ghazal Archives',
-    ),
-
-    // ==========================================================
-    // 6. INDIAN CLASSICAL, RAGAS & MEDITATION
-    // ==========================================================
-    Song(
-      id: 'msixa_clas_01',
-      title: 'Midnight Raga (Bansuri Flute & Sitar)',
-      artist: 'Pandit Ronu Fusion',
-      album: 'Sacred Ragas of India',
-      duration: 265,
-      streamUrl: 'https://cdn.pixabay.com/download/audio/2022/01/18/audio_d0a13f69d2.mp3',
-      coverUrl: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&q=80',
-      genre: 'Classical',
-      license: '100% Free Creative Commons CC0',
-      licenseUrl: 'https://creativecommons.org/publicdomain/zero/1.0/',
-      source: 'Indian Classical Heritage',
-    ),
-    Song(
-      id: 'msixa_clas_02',
-      title: 'Taj Sunset Sitar Raga',
-      artist: 'Ravi Shankar Inspired Ensemble',
-      album: 'Varanasi Morning Strings',
-      duration: 232,
-      streamUrl: 'https://cdn.pixabay.com/download/audio/2021/08/04/audio_bb630cc098.mp3',
-      coverUrl: 'https://images.unsplash.com/photo-1564507592333-c60657eea523?w=600&q=80',
-      genre: 'Classical',
-      license: '100% Free Creative Commons CC0',
-      licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
-      source: 'Indian Instrumental Library',
-    ),
-    Song(
-      id: 'msixa_clas_03',
-      title: 'Jaipur Palace Tabla Fusion',
-      artist: 'Ustad Zakir Sound Collective',
-      album: 'Desert Beats',
-      duration: 210,
-      streamUrl: 'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3',
-      coverUrl: 'https://images.unsplash.com/photo-1477587458883-47145ed94245?w=600&q=80',
-      genre: 'Classical',
-      license: '100% Free Creative Commons CC-BY',
-      licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
-      source: 'Heritage Sound Collective',
-    ),
-    Song(
-      id: 'msixa_clas_04',
-      title: 'Monsoon Raag Megh (Santoor & Jal Tarang)',
-      artist: 'Pandit Shivkumar Tribute',
-      album: 'Kashmir Valley Melodies',
-      duration: 250,
-      streamUrl: 'https://cdn.pixabay.com/download/audio/2022/11/06/audio_c97f48dfa2.mp3',
+      id: 'msixa_bhakti_06',
+      title: 'Bajrang Baan Lofi (11 Baar Non-Stop)',
+      artist: 'Rasraj Ji Maharaj',
+      album: 'Divine Lo-Fi Chants',
+      duration: 1412,
+      streamUrl: 'assets/audio/bajrang_baan_lofi.mp3',
       coverUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600&q=80',
-      genre: 'Classical',
-      license: '100% Free Creative Commons CC0',
-      licenseUrl: 'https://creativecommons.org/publicdomain/zero/1.0/',
-      source: 'Indian Classical Heritage',
+      genre: 'Desi Lo-Fi',
+      license: 'Personal Music Library',
+      licenseUrl: 'local',
+      source: 'Devotional Lo-Fi Library',
     ),
     Song(
-      id: 'msixa_clas_05',
-      title: 'Morning Gayatri Raga Mantra (Peaceful Flute)',
-      artist: 'Vedic Soundscapes',
-      album: 'Rishikesh Sunrise',
-      duration: 280,
-      streamUrl: 'https://cdn.pixabay.com/download/audio/2022/01/18/audio_d0a13f69d2.mp3',
-      coverUrl: 'https://images.unsplash.com/photo-1548013146-72479768bada?w=600&q=80',
-      genre: 'Classical',
-      license: '100% Free Creative Commons CC0',
-      licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
-      source: 'Indian Classical Heritage',
+      id: 'msixa_bhakti_07',
+      title: 'Aadesh Hanuman (Alakh Niranjan)',
+      artist: 'Baba Gorakhnath Parampara',
+      album: 'Powerful Hanuman Stotra',
+      duration: 245,
+      streamUrl: 'assets/audio/aadesh_hanuman.mp3',
+      coverUrl: 'https://images.unsplash.com/photo-1506461883276-594a12b11cf3?w=600&q=80',
+      genre: 'Spiritual',
+      license: 'Personal Music Library',
+      licenseUrl: 'local',
+      source: 'Spiritual Master Library',
+    ),
+    Song(
+      id: 'msixa_bhakti_08',
+      title: 'Alakh Niranjan (Aghori Trance)',
+      artist: 'Aghori Music',
+      album: 'Tandav Spiritual Vibes',
+      duration: 485,
+      streamUrl: 'assets/audio/alakh_niranjan_aghori.mp3',
+      coverUrl: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&q=80',
+      genre: 'Spiritual',
+      license: 'Personal Music Library',
+      licenseUrl: 'local',
+      source: 'Spiritual Master Library',
+    ),
+    Song(
+      id: 'msixa_bhakti_09',
+      title: 'Powerful Siddh Shabar Mantra',
+      artist: 'Baba Gorakhnath Tradition',
+      album: 'Siddh Shabar Sangrah',
+      duration: 350,
+      streamUrl: 'assets/audio/siddh_shabar_mantra.mp3',
+      coverUrl: 'https://images.unsplash.com/photo-1590076215667-875d4ef2d7ee?w=600&q=80',
+      genre: 'Spiritual',
+      license: 'Personal Music Library',
+      licenseUrl: 'local',
+      source: 'Spiritual Master Library',
     ),
 
     // ==========================================================
-    // 7. INTERNATIONAL ELECTRONIC & LO-FI
+    // 2. SUFI, PUNJABI & CLASSIC SOUL (SATINDER SARTAAJ)
     // ==========================================================
     Song(
-      id: 'msixa_cc_01',
-      title: 'Neon Horizon',
-      artist: 'Aura Wave',
-      album: 'Cyber Odyssey',
-      duration: 198,
-      streamUrl: 'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3',
-      coverUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&q=80',
-      genre: 'Synthwave',
-      license: '100% Free Creative Commons CC-BY',
-      licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
-      source: 'Creative Commons Public Audio',
+      id: 'msixa_punjabi_01',
+      title: 'Guzarish (गुज़ारिश)',
+      artist: 'Satinder Sartaaj',
+      album: 'Shayar Soul Tracks',
+      duration: 220,
+      streamUrl: 'assets/audio/guzarish_sartaaj.mp3',
+      coverUrl: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&q=80',
+      genre: 'Sufi',
+      license: 'Personal Music Library',
+      licenseUrl: 'local',
+      source: 'Sufi Master Library',
     ),
     Song(
-      id: 'msixa_cc_02',
-      title: 'Midnight Coffee Lofi',
-      artist: 'Komorebi Sound',
-      album: 'Tokyo Rain Vol. 1',
-      duration: 165,
-      streamUrl: 'https://cdn.pixabay.com/download/audio/2022/03/15/audio_c8c8a73467.mp3',
-      coverUrl: 'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=600&q=80',
-      genre: 'Lo-Fi',
-      license: '100% Free Creative Commons CC0',
-      licenseUrl: 'https://creativecommons.org/publicdomain/zero/1.0/',
-      source: 'Free Sound Library',
-    ),
-    Song(
-      id: 'msixa_cc_03',
-      title: 'Deep Etherium',
-      artist: 'Solaris Project',
-      album: 'Astral Plane',
+      id: 'msixa_punjabi_02',
+      title: 'Udaarian (Badi Lambi Hai Kahani)',
+      artist: 'Satinder Sartaaj',
+      album: 'Seasons of Sartaaj',
       duration: 242,
-      streamUrl: 'https://cdn.pixabay.com/download/audio/2022/01/18/audio_d0a13f69d2.mp3',
+      streamUrl: 'assets/audio/udaarian.mp3',
+      coverUrl: 'https://images.unsplash.com/photo-1465847899084-d164df4dedc6?w=600&q=80',
+      genre: 'Punjabi',
+      license: 'Personal Music Library',
+      licenseUrl: 'local',
+      source: 'Punjabi Master Library',
+    ),
+    Song(
+      id: 'msixa_punjabi_03',
+      title: 'Sajjan Raazi',
+      artist: 'Satinder Sartaaj',
+      album: 'Sajjan Raazi Romantic Sufi',
+      duration: 232,
+      streamUrl: 'assets/audio/sajjan_raazi.mp3',
       coverUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600&q=80',
-      genre: 'Ambient',
-      license: '100% Free Creative Commons CC-BY-SA',
-      licenseUrl: 'https://creativecommons.org/licenses/by-sa/3.0/',
-      source: 'Jamendo Open Commons',
+      genre: 'Sufi',
+      license: 'Personal Music Library',
+      licenseUrl: 'local',
+      source: 'Sufi Master Library',
+    ),
+    Song(
+      id: 'msixa_punjabi_04',
+      title: 'Tere Bina Na Guzara',
+      artist: 'Satinder Sartaaj & Neeru Bajwa',
+      album: 'Shayar Emotional Tracks',
+      duration: 185,
+      streamUrl: 'assets/audio/tere_bina_na_guzara.mp3',
+      coverUrl: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&q=80',
+      genre: 'Punjabi',
+      license: 'Personal Music Library',
+      licenseUrl: 'local',
+      source: 'Punjabi Master Library',
+    ),
+    Song(
+      id: 'msixa_punjabi_05',
+      title: 'Jaiye Sajana',
+      artist: 'Satinder Sartaaj, Shashwat Sachdev, Jasmine Sandlas',
+      album: 'Dhurandhar Soundtrack',
+      duration: 195,
+      streamUrl: 'assets/audio/jaiye_sajana.mp3',
+      coverUrl: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=600&q=80',
+      genre: 'Bollywood',
+      license: 'Personal Music Library',
+      licenseUrl: 'local',
+      source: 'Bollywood Master Library',
+    ),
+    Song(
+      id: 'msixa_punjabi_06',
+      title: 'Best Punjabi Hits Jukebox',
+      artist: 'Satinder Sartaaj',
+      album: 'Sartaaj Live & Studio Classics',
+      duration: 980,
+      streamUrl: 'assets/audio/satinder_sartaaj_jukebox.mp3',
+      coverUrl: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=600&q=80',
+      genre: 'Punjabi',
+      license: 'Personal Music Library',
+      licenseUrl: 'local',
+      source: 'Punjabi Master Library',
+    ),
+
+    // ==========================================================
+    // 3. INDIE, GHAZAL & HEARTFELT CLASSICS
+    // ==========================================================
+    Song(
+      id: 'msixa_indie_01',
+      title: 'Intezaar Reh Gya (Pain in Love)',
+      artist: 'Vibe Chapters',
+      album: 'Broken Hearts Chapter 1',
+      duration: 178,
+      streamUrl: 'assets/audio/intezaar_reh_gya.mp3',
+      coverUrl: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=600&q=80',
+      genre: 'Indie Pop',
+      license: 'Personal Music Library',
+      licenseUrl: 'local',
+      source: 'Indie Master Library',
+    ),
+    Song(
+      id: 'msixa_indie_02',
+      title: 'Kagaz Ki Kashti Dariya Hai Gehra',
+      artist: 'Jagjit Singh & Chitra Singh',
+      album: 'The Golden Ghazals Collection',
+      duration: 235,
+      streamUrl: 'assets/audio/kagaz_ki_kashti.mp3',
+      coverUrl: 'https://images.unsplash.com/photo-1447752875215-b2761acb3c5d?w=600&q=80',
+      genre: 'Ghazal',
+      license: 'Personal Music Library',
+      licenseUrl: 'local',
+      source: 'Ghazal Master Library',
     ),
   ];
 
-  /// Fetches featured trending tracks with Indian songs prioritized
-  Future<List<Song>> fetchTrendingTracks({int limit = 30}) async {
-    return _curatedCatalog;
+  /// Fetch initial trending tracks (instantly available)
+  Future<List<Song>> fetchTrendingTracks() async {
+    return List.from(_curatedCatalog);
   }
 
-  /// Searches tracks legally by keyword
-  Future<List<Song>> searchTracks(String query) async {
-    if (query.trim().isEmpty) return _curatedCatalog;
-
-    final lower = query.toLowerCase();
-    final localMatches = _curatedCatalog.where((song) {
-      return song.title.toLowerCase().contains(lower) ||
-          song.artist.toLowerCase().contains(lower) ||
-          song.genre.toLowerCase().contains(lower) ||
-          song.album.toLowerCase().contains(lower);
-    }).toList();
-
-    return localMatches;
-  }
-
-  /// Fetches tracks filtered by specific Genre / Mood
+  /// Filter tracks by selected genre
   Future<List<Song>> fetchTracksByGenre(String genre) async {
-    if (genre == 'All' || genre == 'All Indian') {
-      return _curatedCatalog;
+    final lower = genre.toLowerCase().trim();
+    if (lower == 'all' || lower == 'all indian') {
+      return fetchTrendingTracks();
     }
-
-    final lower = genre.toLowerCase();
-    final filtered = _curatedCatalog.where((s) {
-      return s.genre.toLowerCase().contains(lower) ||
-          lower.contains(s.genre.toLowerCase());
-    }).toList();
-
-    if (filtered.isNotEmpty) return filtered;
-    return _curatedCatalog;
+    return _curatedCatalog.where((s) => s.genre.toLowerCase() == lower).toList();
   }
 
-  /// Returns featured 100% free ready-to-listen playlists without subscription or payment
+  /// Get categorized curated playlists
   List<Playlist> getCuratedPlaylists() {
+    final bhaktiSongs = _curatedCatalog.where((s) => s.genre == 'Bhakti' || s.genre == 'Spiritual').toList();
+    final sufiSongs = _curatedCatalog.where((s) => s.genre == 'Sufi' || s.genre == 'Punjabi').toList();
+    final bollywoodSongs = _curatedCatalog.where((s) => s.genre == 'Bollywood' || s.genre == 'Indie Pop').toList();
+    final lofiSongs = _curatedCatalog.where((s) => s.genre == 'Desi Lo-Fi' || s.genre == 'Ghazal' || s.genre == 'Indie Pop').toList();
+    final spiritualSongs = _curatedCatalog.where((s) => s.genre == 'Spiritual').toList();
+
     return [
       Playlist(
-        id: 'pl_indian_all',
-        title: '🇮🇳 All Indian Free Songs (No Subscription)',
-        description: 'Complete 24-track collection: Bollywood acoustic, Rajasthani folk, DJ dhol remix, Desi Lo-Fi, Sufi & Classical. 100% Free forever!',
-        coverUrl: 'https://images.unsplash.com/photo-1548013146-72479768bada?w=600&q=80',
-        songs: _curatedCatalog.where((s) => s.id.startsWith('msixa_bol') || s.id.startsWith('msixa_raj') || s.id.startsWith('msixa_dj') || s.id.startsWith('msixa_lofi') || s.id.startsWith('msixa_sufi') || s.id.startsWith('msixa_clas')).toList(),
-        isCurated: true,
+        id: 'pl_bhakti',
+        name: '🕉️ Divine Bhakti & Mantras',
+        description: 'Hanuman Chalisa, Ashtak, Ram Siya Ram, Radhe Krishna & Shabar Mantras',
+        coverUrl: 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=600&q=80',
+        songs: bhaktiSongs,
+      ),
+      Playlist(
+        id: 'pl_sartaaj',
+        name: '🪕 Sufi & Punjabi Classics (Satinder Sartaaj)',
+        description: 'Guzarish, Udaarian, Sajjan Raazi, Tere Bina Na Guzara & Hit Jukebox',
+        coverUrl: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&q=80',
+        songs: sufiSongs,
       ),
       Playlist(
         id: 'pl_bollywood',
-        title: '🎬 Bollywood Hits & Acoustic Lounge',
-        description: 'Mellow acoustic guitars, Bollywood melodies, and soulful chillout renditions.',
-        coverUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600&q=80',
-        songs: _curatedCatalog.where((s) => s.genre == 'Bollywood').toList(),
-        isCurated: true,
-      ),
-      Playlist(
-        id: 'pl_rajasthani',
-        title: '🐪 Rajasthani Folk & Ghoomar DJ',
-        description: 'Desert sarangi, morchang, Ghoomar trance, and royal folk bass grooves.',
-        coverUrl: 'https://images.unsplash.com/photo-1599818816930-3f7b823c830b?w=600&q=80',
-        songs: _curatedCatalog.where((s) => s.genre == 'Rajasthani').toList(),
-        isCurated: true,
-      ),
-      Playlist(
-        id: 'pl_dj_party',
-        title: '🎧 DJ Songs & Desi Party Bass',
-        description: 'High octane Bhangra dhol, club remixes, and wedding party bass drops.',
-        coverUrl: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=600&q=80',
-        songs: _curatedCatalog.where((s) => s.genre == 'DJ Songs').toList(),
-        isCurated: true,
+        name: '🎬 Bollywood & Indie Melodies',
+        description: 'Ram Siya Ram, Jaiye Sajana, Intezaar Reh Gya & Kagaz Ki Kashti',
+        coverUrl: 'https://images.unsplash.com/photo-1548013146-72479768bada?w=600&q=80',
+        songs: bollywoodSongs,
       ),
       Playlist(
         id: 'pl_lofi',
-        title: '☕ Desi Lo-Fi & Monsoon Chai Beats',
-        description: 'Warm vinyl crackles, old radio Bollywood nostalgia, and monsoon train journeys.',
-        coverUrl: 'https://images.unsplash.com/photo-1506461883276-594a12b11cf3?w=600&q=80',
-        songs: _curatedCatalog.where((s) => s.genre == 'Desi Lo-Fi').toList(),
-        isCurated: true,
+        name: '🌙 Late Night Desi Lo-Fi & Ghazals',
+        description: 'Bajrang Baan Lo-Fi, Kagaz Ki Kashti, Intezaar Reh Gya & Soulful Beats',
+        coverUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600&q=80',
+        songs: lofiSongs,
       ),
       Playlist(
-        id: 'pl_classical',
-        title: '🪕 Bansuri Flute & Sitar Ragas',
-        description: 'Meditative Indian classical instruments for peace, deep focus, and relaxation.',
-        coverUrl: 'https://images.unsplash.com/photo-1564507592333-c60657eea523?w=600&q=80',
-        songs: _curatedCatalog.where((s) => s.genre == 'Classical').toList(),
-        isCurated: true,
-      ),
-      Playlist(
-        id: 'pl_sufi',
-        title: '🕯️ Sufi & Ghazal Soul Nights',
-        description: 'Heartfelt Sufi qawwali, harmonium chords, and late-night poetic ghazals.',
+        id: 'pl_spiritual',
+        name: '🔱 Aghori & Spiritual Trance',
+        description: 'Alakh Niranjan Aghori, Aadesh Hanuman & Powerful Siddh Shabar Mantra',
         coverUrl: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&q=80',
-        songs: _curatedCatalog.where((s) => s.genre == 'Sufi').toList(),
-        isCurated: true,
+        songs: spiritualSongs,
       ),
     ];
+  }
+
+  /// Search online/curated catalog with live search
+  Future<List<Song>> searchTracks(String query) async {
+    final lower = query.toLowerCase().trim();
+    if (lower.isEmpty) return [];
+
+    final localMatches = _curatedCatalog.where((s) =>
+        s.title.toLowerCase().contains(lower) ||
+        s.artist.toLowerCase().contains(lower) ||
+        s.album.toLowerCase().contains(lower) ||
+        s.genre.toLowerCase().contains(lower)).toList();
+
+    return localMatches;
   }
 }

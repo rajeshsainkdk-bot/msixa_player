@@ -220,52 +220,11 @@ class NowPlayingScreen extends StatelessWidget {
 
                       const SizedBox(height: 16),
 
-                      // Scrubbing Slider & Timers
-                      Column(
-                        children: [
-                          SliderTheme(
-                            data: SliderTheme.of(context).copyWith(
-                              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                              trackHeight: 3.5,
-                              activeTrackColor: AppColors.accentCyan,
-                              inactiveTrackColor: AppColors.cardLight,
-                              thumbColor: Colors.white,
-                              overlayColor: AppColors.accentCyan.withOpacity(0.2),
-                            ),
-                            child: Slider(
-                              value: currentPosMs,
-                              min: 0.0,
-                              max: maxDurationMs > 0 ? maxDurationMs : 1.0,
-                              onChanged: (val) {
-                                provider.seek(Duration(milliseconds: val.toInt()));
-                              },
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  _formatDuration(provider.currentPosition),
-                                  style: const TextStyle(
-                                    color: AppColors.textMuted,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                Text(
-                                  _formatDuration(provider.totalDuration),
-                                  style: const TextStyle(
-                                    color: AppColors.textMuted,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                      // Smooth Scrubbing Bar & Timers with Drag-Freeze
+                      AudioScrubberBar(
+                        currentPosition: provider.currentPosition,
+                        totalDuration: provider.totalDuration,
+                        onSeek: (pos) => provider.seek(pos),
                       ),
 
                       const SizedBox(height: 16),
@@ -513,3 +472,106 @@ class NowPlayingScreen extends StatelessWidget {
     );
   }
 }
+
+class AudioScrubberBar extends StatefulWidget {
+  final Duration currentPosition;
+  final Duration totalDuration;
+  final ValueChanged<Duration> onSeek;
+
+  const AudioScrubberBar({
+    Key? key,
+    required this.currentPosition,
+    required this.totalDuration,
+    required this.onSeek,
+  }) : super(key: key);
+
+  @override
+  State<AudioScrubberBar> createState() => _AudioScrubberBarState();
+}
+
+class _AudioScrubberBarState extends State<AudioScrubberBar> {
+  double? _dragValue;
+  bool _isDragging = false;
+
+  String _formatDuration(Duration d) {
+    final minutes = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final seconds = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '$minutes:$seconds';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final maxMs = widget.totalDuration.inMilliseconds.toDouble();
+    final actualPosMs = widget.currentPosition.inMilliseconds.toDouble();
+    final clampedPosMs = actualPosMs.clamp(0.0, maxMs > 0 ? maxMs : 1.0);
+    final sliderVal = (_isDragging && _dragValue != null) ? _dragValue! : clampedPosMs;
+
+    final displayPos = (_isDragging && _dragValue != null)
+        ? Duration(milliseconds: _dragValue!.toInt())
+        : widget.currentPosition;
+
+    return Column(
+      children: [
+        SliderTheme(
+          data: SliderTheme.of(context).copyWith(
+            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
+            trackHeight: 4.0,
+            activeTrackColor: AppColors.accentCyan,
+            inactiveTrackColor: AppColors.cardLight,
+            thumbColor: Colors.white,
+            overlayColor: AppColors.accentCyan.withOpacity(0.25),
+          ),
+          child: Slider(
+            value: sliderVal.clamp(0.0, maxMs > 0 ? maxMs : 1.0),
+            min: 0.0,
+            max: maxMs > 0 ? maxMs : 1.0,
+            onChangeStart: (val) {
+              setState(() {
+                _isDragging = true;
+                _dragValue = val;
+              });
+            },
+            onChanged: (val) {
+              setState(() {
+                _dragValue = val;
+              });
+            },
+            onChangeEnd: (val) {
+              final target = Duration(milliseconds: val.toInt());
+              widget.onSeek(target);
+              setState(() {
+                _isDragging = false;
+                _dragValue = null;
+              });
+            },
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                _formatDuration(displayPos),
+                style: const TextStyle(
+                  color: AppColors.textMuted,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              Text(
+                _formatDuration(widget.totalDuration),
+                style: const TextStyle(
+                  color: AppColors.textMuted,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+

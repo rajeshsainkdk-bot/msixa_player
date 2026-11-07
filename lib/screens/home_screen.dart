@@ -18,19 +18,29 @@ class HomeScreen extends StatelessWidget {
       'gradient': LinearGradient(colors: [Color(0xFFFF9933), Color(0xFF138808)]),
     },
     {
+      'title': 'Bhakti',
+      'icon': Icons.temple_hindu_rounded,
+      'gradient': LinearGradient(colors: [Color(0xFFF59E0B), Color(0xFFD97706)]),
+    },
+    {
+      'title': 'Punjabi',
+      'icon': Icons.speaker_group_rounded,
+      'gradient': LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFFEC4899)]),
+    },
+    {
+      'title': 'Sufi',
+      'icon': Icons.self_improvement_rounded,
+      'gradient': LinearGradient(colors: [Color(0xFF10B981), Color(0xFF06B6D4)]),
+    },
+    {
       'title': 'Bollywood',
       'icon': Icons.movie_filter_rounded,
       'gradient': LinearGradient(colors: [Color(0xFFE11D48), Color(0xFF9333EA)]),
     },
     {
-      'title': 'Rajasthani',
-      'icon': Icons.terrain_rounded,
-      'gradient': LinearGradient(colors: [Color(0xFFF59E0B), Color(0xFFD97706)]),
-    },
-    {
-      'title': 'DJ Songs',
-      'icon': Icons.speaker_group_rounded,
-      'gradient': LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFFEC4899)]),
+      'title': 'Spiritual',
+      'icon': Icons.flare_rounded,
+      'gradient': LinearGradient(colors: [Color(0xFF6366F1), Color(0xFF3B82F6)]),
     },
     {
       'title': 'Desi Lo-Fi',
@@ -38,14 +48,9 @@ class HomeScreen extends StatelessWidget {
       'gradient': LinearGradient(colors: [Color(0xFF3B82F6), Color(0xFF06B6D4)]),
     },
     {
-      'title': 'Sufi',
-      'icon': Icons.temple_hindu_rounded,
-      'gradient': LinearGradient(colors: [Color(0xFF10B981), Color(0xFF06B6D4)]),
-    },
-    {
-      'title': 'Classical',
+      'title': 'Ghazal',
       'icon': Icons.waves_rounded,
-      'gradient': LinearGradient(colors: [Color(0xFF6366F1), Color(0xFF3B82F6)]),
+      'gradient': LinearGradient(colors: [Color(0xFFEC4899), Color(0xFFF43F5E)]),
     },
   ];
 
@@ -414,47 +419,58 @@ class HomeScreen extends StatelessWidget {
                 ),
 
                 // ==========================================
-                // SECTION 1: BOLLYWOOD HITS & ACOUSTIC MELODIES
+                // SECTION 1: DIVINE BHAKTI & HANUMAN CHANTS
                 // ==========================================
                 _buildCategorySection(
                   context,
-                  title: '🎬 Bollywood Hits & Acoustic Melodies',
+                  title: '🕉️ Divine Bhakti & Hanuman Chants',
+                  genreKey: 'Bhakti',
+                  provider: provider,
+                  songs: trending.where((s) => s.genre == 'Bhakti').toList(),
+                ),
+
+                // ==========================================
+                // SECTION 2: SUFI & PUNJABI (SATINDER SARTAAJ)
+                // ==========================================
+                _buildCategorySection(
+                  context,
+                  title: '🪕 Sufi & Punjabi (Satinder Sartaaj)',
+                  genreKey: 'Punjabi',
+                  provider: provider,
+                  songs: trending.where((s) => s.genre == 'Punjabi' || s.genre == 'Sufi').toList(),
+                ),
+
+                // ==========================================
+                // SECTION 3: BOLLYWOOD & INDIE MELODIES
+                // ==========================================
+                _buildCategorySection(
+                  context,
+                  title: '🎬 Bollywood & Indie Melodies',
                   genreKey: 'Bollywood',
                   provider: provider,
-                  songs: trending.where((s) => s.genre == 'Bollywood').toList(),
+                  songs: trending.where((s) => s.genre == 'Bollywood' || s.genre == 'Indie Pop').toList(),
                 ),
 
                 // ==========================================
-                // SECTION 2: RAJASTHANI FOLK & GHOOMAR BEATS
+                // SECTION 4: AGHORI & SPIRITUAL TRANCE
                 // ==========================================
                 _buildCategorySection(
                   context,
-                  title: '🐪 Rajasthani Folk & Ghoomar DJ',
-                  genreKey: 'Rajasthani',
+                  title: '🔱 Aghori & Spiritual Trance',
+                  genreKey: 'Spiritual',
                   provider: provider,
-                  songs: trending.where((s) => s.genre == 'Rajasthani').toList(),
+                  songs: trending.where((s) => s.genre == 'Spiritual').toList(),
                 ),
 
                 // ==========================================
-                // SECTION 3: DJ SONGS & DESI PARTY BASS
+                // SECTION 5: DESI LO-FI & GHAZALS
                 // ==========================================
                 _buildCategorySection(
                   context,
-                  title: '🎧 DJ Songs & Desi Party Bass',
-                  genreKey: 'DJ Songs',
-                  provider: provider,
-                  songs: trending.where((s) => s.genre == 'DJ Songs').toList(),
-                ),
-
-                // ==========================================
-                // SECTION 4: DESI LO-FI CHAI BEATS
-                // ==========================================
-                _buildCategorySection(
-                  context,
-                  title: '☕ Desi Lo-Fi Chai Beats',
+                  title: '☕ Desi Lo-Fi & Ghazals',
                   genreKey: 'Desi Lo-Fi',
                   provider: provider,
-                  songs: trending.where((s) => s.genre == 'Desi Lo-Fi').toList(),
+                  songs: trending.where((s) => s.genre == 'Desi Lo-Fi' || s.genre == 'Ghazal').toList(),
                 ),
 
                 const SizedBox(height: 20),

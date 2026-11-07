@@ -6,6 +6,13 @@ import '../models/song.dart';
 enum RepeatMode { off, all, one }
 
 class AudioPlayerService {
+  // Singleton pattern to guarantee only ONE AudioPlayer instance across the entire app
+  static final AudioPlayerService _instance = AudioPlayerService._internal();
+  factory AudioPlayerService() => _instance;
+  AudioPlayerService._internal() {
+    _initListener();
+  }
+
   final AudioPlayer _player = AudioPlayer();
 
   Song? _currentSong;
@@ -14,6 +21,9 @@ class AudioPlayerService {
   RepeatMode _repeatMode = RepeatMode.off;
   bool _isShuffle = false;
   List<int> _shuffleIndices = [];
+
+  // Concurrency token to cancel previous loading operations and prevent two songs playing at once
+  int _sessionToken = 0;
 
   // Expose streams
   Stream<PlayerState> get playerStateStream => _player.playerStateStream;
@@ -29,10 +39,6 @@ class AudioPlayerService {
   bool get isShuffle => _isShuffle;
   double get speed => _player.speed;
   double get volume => _player.volume;
-
-  AudioPlayerService() {
-    _initListener();
-  }
 
   void _initListener() {
     _player.playerStateStream.listen((state) {
@@ -68,19 +74,47 @@ class AudioPlayerService {
       artUri: song.coverUrl.startsWith('http') ? Uri.parse(song.coverUrl) : null,
     );
 
-    Uri uri;
-    if (song.streamUrl.startsWith('http://') || song.streamUrl.startsWith('https://')) {
-      uri = Uri.parse(song.streamUrl);
-    } else if (song.streamUrl.startsWith('content://')) {
-      uri = Uri.parse(song.streamUrl);
-    } else {
-      uri = Uri.file(song.streamUrl);
+    // 1. Asset audio bundled in APK
+    if (song.streamUrl.startsWith('assets/')) {
+      return AudioSource.asset(song.streamUrl, tag: mediaItem);
     }
-
-    return AudioSource.uri(uri, tag: mediaItem);
+    // 2. Online streaming URL
+    if (song.streamUrl.startsWith('http://') || song.streamUrl.startsWith('https://')) {
+      return AudioSource.uri(Uri.parse(song.streamUrl), tag: mediaItem);
+    }
+    // 3. Android Content Provider (Device storage)
+    if (song.streamUrl.startsWith('content://')) {
+      return AudioSource.uri(Uri.parse(song.streamUrl), tag: mediaItem);
+    }
+    // 4. File Path (Device storage file)
+    if (song.streamUrl.startsWith('file://')) {
+      return AudioSource.uri(Uri.parse(song.streamUrl), tag: mediaItem);
+    }
+    return AudioSource.file(song.streamUrl, tag: mediaItem);
   }
 
   Future<void> setQueue(List<Song> songs, {int initialIndex = 0}) async {
+    final currentToken = ++_sessionToken;
+
+    // Check if the same queue is already active
+    final bool sameQueue = _queue.length == songs.length &&
+        _queue.isNotEmpty &&
+        songs.isNotEmpty &&
+        _queue.first.id == songs.first.id &&
+        _queue.last.id == songs.last.id;
+
+    if (sameQueue && _player.audioSource != null) {
+      _currentIndex = initialIndex.clamp(0, _queue.length - 1);
+      _currentSong = _queue[_currentIndex];
+      try {
+        await _player.seek(Duration.zero, index: _currentIndex);
+        if (currentToken == _sessionToken) {
+          await _player.play();
+        }
+        return;
+      } catch (_) {}
+    }
+
     _queue = List.from(songs);
     _currentIndex = initialIndex.clamp(0, _queue.isNotEmpty ? _queue.length - 1 : 0);
     if (_isShuffle) {
@@ -90,25 +124,46 @@ class AudioPlayerService {
     if (_queue.isNotEmpty) {
       _currentSong = _queue[_currentIndex];
       try {
+        // ALWAYS stop previous playback completely before loading new audio
+        await _player.stop();
+        if (currentToken != _sessionToken) return;
+
         final playlist = ConcatenatingAudioSource(
           useLazyPreparation: true,
           children: _queue.map((s) => _createAudioSource(s)).toList(),
         );
 
         await _player.setAudioSource(playlist, initialIndex: _currentIndex);
+        if (currentToken != _sessionToken) return;
+
         await _player.play();
       } catch (_) {
-        await playSong(_queue[_currentIndex]);
+        if (currentToken == _sessionToken) {
+          await playSong(_queue[_currentIndex]);
+        }
       }
     }
   }
 
   Future<void> playSong(Song song) async {
+    final currentToken = ++_sessionToken;
+
     try {
       _currentSong = song;
 
-      // Update queue index if present
+      // If the song is already part of the active queue, seek directly
       final idx = _queue.indexWhere((s) => s.id == song.id);
+      if (idx != -1 && _player.audioSource != null) {
+        _currentIndex = idx;
+        try {
+          await _player.seek(Duration.zero, index: idx);
+          if (currentToken == _sessionToken) {
+            await _player.play();
+          }
+          return;
+        } catch (_) {}
+      }
+
       if (idx != -1) {
         _currentIndex = idx;
       } else {
@@ -116,9 +171,14 @@ class AudioPlayerService {
         _currentIndex = _queue.length - 1;
       }
 
+      // Stop previous playback to ensure strictly ONE song plays
       await _player.stop();
+      if (currentToken != _sessionToken) return;
+
       final source = _createAudioSource(song);
       await _player.setAudioSource(source);
+      if (currentToken != _sessionToken) return;
+
       await _player.play();
     } catch (_) {}
   }

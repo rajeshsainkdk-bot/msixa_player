@@ -256,7 +256,14 @@ class PlayerProvider extends ChangeNotifier {
     _isSearching = true;
     notifyListeners();
 
-    _searchResults = await _catalogService.searchTracks(query);
+    final catalogResults = await _catalogService.searchTracks(query);
+    final lower = query.toLowerCase().trim();
+    final deviceResults = _deviceSongs.where((s) =>
+        s.title.toLowerCase().contains(lower) ||
+        s.artist.toLowerCase().contains(lower) ||
+        s.album.toLowerCase().contains(lower)).toList();
+
+    _searchResults = [...catalogResults, ...deviceResults];
     _syncFavoritesFlag(_searchResults);
     _isSearching = false;
     notifyListeners();

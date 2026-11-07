@@ -15,13 +15,15 @@ class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController _searchController = TextEditingController();
 
   static const List<String> _quickTags = [
+    'Hanuman',
+    'Bhakti',
+    'Satinder Sartaaj',
+    'Sufi',
+    'Bollywood',
+    'Ghazal',
+    'Ram Siya Ram',
     'Lo-Fi',
-    'Synthwave',
-    'Ambient',
-    'Electronic',
-    'Chillhop',
-    'Cyberpunk',
-    'Acoustic',
+    'Mantra',
   ];
 
   @override

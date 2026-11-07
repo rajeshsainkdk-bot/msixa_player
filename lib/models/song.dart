@@ -35,6 +35,7 @@ class Song {
 
   bool get isOffline =>
       streamUrl.startsWith('/') ||
+      streamUrl.startsWith('assets/') ||
       streamUrl.startsWith('content://') ||
       streamUrl.startsWith('file://') ||
       id.startsWith('device_') ||

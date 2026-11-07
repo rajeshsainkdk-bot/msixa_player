@@ -51,7 +51,29 @@ class DeviceAudioService {
         ignoreCase: true,
       );
 
-      return songModels.where((s) => (s.duration ?? 0) > 10000).map((s) {
+      // Filter out files shorter than 60 seconds (1 minute) to eliminate recordings, ringtones, and voice notes
+      return songModels.where((s) {
+        final durationMs = s.duration ?? 0;
+        if (durationMs < 60000) return false; // Minimum 1 minute requirement
+
+        final title = (s.title).toLowerCase();
+        final data = (s.data).toLowerCase();
+
+        // Filter out recording and voice note folders/files
+        if (title.startsWith('audiorecord') ||
+            title.startsWith('rec_') ||
+            title.startsWith('voice_') ||
+            title.startsWith('call_') ||
+            title.startsWith('recording_') ||
+            data.contains('/whatsapp/media/whatsapp voice notes/') ||
+            data.contains('/whatsapp/media/whatsapp audio/') ||
+            data.contains('/recordings/') ||
+            data.contains('/callrecordings/') ||
+            data.contains('/sound_recorder/')) {
+          return false;
+        }
+        return true;
+      }).map((s) {
         return Song(
           id: 'device_${s.id}',
           title: s.title.isNotEmpty ? s.title : 'Unknown Track',

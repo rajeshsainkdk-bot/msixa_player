@@ -314,7 +314,7 @@ class _LibraryScreenState extends State<LibraryScreen>
               ),
               const Spacer(),
               const Text(
-                'Offline Device Audio',
+                'Music Only (> 60s, No Recordings)',
                 style: TextStyle(color: AppColors.accentGreen, fontSize: 11, fontWeight: FontWeight.w500),
               ),
             ],
