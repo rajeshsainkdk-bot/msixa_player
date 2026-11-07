@@ -28,8 +28,10 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Ensure Complete Android Wrapper and Scaffolding
-        run: flutter create . --platforms=android --org=com.msixa
+      - name: Recreate Android Project with Native Wrapper
+        run: |
+          rm -rf android
+          flutter create . --platforms=android --org=com.msixa
 
       - name: Configure Android Permissions and Media Service
         run: |
@@ -77,7 +79,7 @@ jobs:
 
       - name: Configure minSdkVersion 21
         run: |
-          sed -i 's/minSdkVersion .*/minSdkVersion 21/' android/app/build.gradle || true
+          sed -i 's/minSdkVersion .*/minSdkVersion = 21/' android/app/build.gradle || true
           sed -i 's/minSdk = .*/minSdk = 21/' android/app/build.gradle || true
 
       - name: Get Dependencies
