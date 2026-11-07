@@ -852,7 +852,7 @@ class HomeScreen extends StatelessWidget {
             separatorBuilder: (_, __) => const SizedBox(width: 14),
             itemBuilder: (context, index) {
               final song = approved[index];
-              return _buildSongCard(context, song, provider, approved);
+              return _buildIndianSongCard(context, song, provider, approved);
             },
           ),
         ),
