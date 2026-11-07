@@ -1,18 +1,34 @@
-import 'package:flutter/services.dart';
+import 'dart:io';
+import 'package:share_plus/share_plus.dart';
 
 class AppShareService {
-  static const MethodChannel _channel = MethodChannel('com.msixa.player/app_share');
-
-  /// Directly shares the installed APK file with another phone/user
-  /// via native Android Sharesheet (WhatsApp, Bluetooth, Nearby Share, Telegram, etc.)
-  static Future<bool> shareAppApk() async {
+  /// Shares Msixa Player APK file or invitation link directly via native Android sharesheet
+  /// (WhatsApp, Bluetooth, Quick Share, Telegram, Messages, etc.)
+  static Future<void> shareAppApk() async {
     try {
-      final result = await _channel.invokeMethod<bool>('shareApk');
-      return result ?? false;
-    } on PlatformException catch (_) {
-      return false;
-    } catch (_) {
-      return false;
-    }
+      // Check common APK paths on device
+      final candidatePaths = [
+        '/storage/emulated/0/Download/MsixaPlayer.apk',
+        '/storage/emulated/0/Download/app-release.apk',
+      ];
+
+      for (final p in candidatePaths) {
+        final f = File(p);
+        if (await f.exists()) {
+          await Share.shareXFiles(
+            [XFile(f.path, mimeType: 'application/vnd.android.package-archive')],
+            text: 'Install Msixa Player - 100% Free Indian Music & Offline MP3 Player!',
+            subject: 'Msixa Player APK',
+          );
+          return;
+        }
+      }
+
+      // If local APK file not found in download folder, share direct APK release link
+      await Share.share(
+        '🎵 Install Msixa Player - 100% Free Indian Music & Offline MP3 Player!\nZero subscription, no payment required.\n\nDirect APK Download:\nhttps://github.com/rajeshsainkdk-bot/msixa_player/releases',
+        subject: 'Msixa Player APK',
+      );
+    } catch (_) {}
   }
 }
