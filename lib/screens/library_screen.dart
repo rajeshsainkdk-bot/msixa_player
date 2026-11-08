@@ -446,7 +446,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                                 overflow: TextOverflow.ellipsis,
                               ),
                               subtitle: Text(
-                                '${song.artist} • ${song.durationFormatted}',
+                                '${song.artist} • ${song.formattedDuration}',
                                 style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
                                 maxLines: 1,
                               ),
@@ -593,7 +593,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                               overflow: TextOverflow.ellipsis,
                             ),
                             subtitle: Text(
-                              '${song.artist} • ${song.durationFormatted}',
+                              '${song.artist} • ${song.formattedDuration}',
                               style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
                               maxLines: 1,
                             ),

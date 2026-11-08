@@ -45,6 +45,8 @@ class Song {
     return '$minutes:$seconds';
   }
 
+  String get durationFormatted => formattedDuration;
+
   bool get isOffline =>
       streamUrl.startsWith('/') ||
       streamUrl.startsWith('assets/') ||
