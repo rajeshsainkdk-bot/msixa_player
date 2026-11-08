@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:provider/provider.dart';
 import '../models/song.dart';
 import '../services/cloud_backend_service.dart';
+import '../services/r2_storage_service.dart';
 import '../providers/player_provider.dart';
 
 class UploadSongScreen extends StatefulWidget {
@@ -28,6 +29,8 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
 
   Song? _duplicateMatch;
   bool _isUploading = false;
+  double _uploadProgress = 0.0;
+  String? _uploadStatusText;
   String? _errorMessage;
 
   final List<String> _genres = [
@@ -133,16 +136,41 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
 
     setState(() {
       _isUploading = true;
+      _uploadProgress = 0.1;
+      _uploadStatusText = 'गाना प्रोसेस हो रहा है...';
       _errorMessage = null;
     });
 
     try {
+      String finalAudioUrl = _pickedFilePath!;
+      final r2 = R2StorageService();
+
+      if (r2.isConfigured) {
+        setState(() {
+          _uploadStatusText = 'Cloudflare R2 क्लाउड पर अपलोड हो रहा है...';
+          _uploadProgress = 0.3;
+        });
+
+        try {
+          final cloudUrl = await r2.uploadAudioFile(
+            File(_pickedFilePath!),
+            customId: 'user_${DateTime.now().millisecondsSinceEpoch}',
+            onProgress: (p) => setState(() => _uploadProgress = p),
+          );
+          if (cloudUrl != null && cloudUrl.isNotEmpty) {
+            finalAudioUrl = cloudUrl;
+          }
+        } catch (e) {
+          debugPrint('R2 Upload fallback: $e');
+        }
+      }
+
       final song = await _backend.submitUserSong(
         title: title,
         artist: artist,
         album: album.isEmpty ? 'Community Music' : album,
         genre: _selectedGenre,
-        audioPath: _pickedFilePath!,
+        audioPath: finalAudioUrl,
         coverUrl: cover.isNotEmpty ? cover : null,
       );
 
@@ -460,6 +488,24 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
               label: 'पोस्टर आर्ट लिंक (Cover Image URL - Optional)',
               hint: 'https://images.unsplash.com/... (खाली छोड़ने पर डिफ़ॉल्ट पोस्टर लगेगा)',
             ),
+            if (_isUploading) ...[
+              const SizedBox(height: 16),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: LinearProgressIndicator(
+                  value: _uploadProgress > 0 ? _uploadProgress : null,
+                  backgroundColor: Colors.white10,
+                  color: const Color(0xFF00E5FF),
+                  minHeight: 6,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _uploadStatusText ?? 'अपलोड हो रहा है...',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Color(0xFF00E5FF), fontSize: 12, fontWeight: FontWeight.bold),
+              ),
+            ],
             const SizedBox(height: 28),
 
             // Submit Button

@@ -1,10 +1,13 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:file_picker/file_picker.dart';
 import '../../services/cloud_backend_service.dart';
 import '../../services/language_service.dart';
+import '../../services/r2_storage_service.dart';
 import '../../models/song.dart';
 import '../../models/user_profile.dart';
 
@@ -118,6 +121,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
     final coverCtrl = TextEditingController();
     String selectedGenre = 'Bhakti';
     final genres = ['Bhakti', 'Punjabi', 'Sufi', 'Bollywood', 'Spiritual', 'Desi Lo-Fi', 'Ghazal', 'Indie Pop'];
+    bool isUploadingToR2 = false;
 
     showDialog(
       context: context,
@@ -144,7 +148,59 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                 const SizedBox(height: 10),
                 _buildAdminTextField(albumCtrl, _lang.t('album_name'), 'Msixa Originals'),
                 const SizedBox(height: 10),
-                _buildAdminTextField(audioCtrl, 'ऑडियो लिंक या पाथ (Audio Stream URL)', 'assets/audio/... or https://...'),
+
+                // Cloudflare R2 Upload Button
+                Container(
+                  margin: const EdgeInsets.symmetric(vertical: 4),
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF00E5FF),
+                      side: const BorderSide(color: Color(0xFF00E5FF)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                    ),
+                    icon: isUploadingToR2
+                        ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF00E5FF)))
+                        : const Icon(Icons.cloud_upload_rounded, size: 18),
+                    label: Text(
+                      isUploadingToR2 ? 'R2 क्लाउड पर अपलोड हो रहा है...' : '📁 डिवाइस से MP3 चुनें और R2 पर अपलोड करें',
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                    ),
+                    onPressed: isUploadingToR2
+                        ? null
+                        : () async {
+                            try {
+                              final result = await FilePicker.platform.pickFiles(
+                                type: FileType.custom,
+                                allowedExtensions: ['mp3', 'm4a', 'wav'],
+                              );
+                              if (result != null && result.files.single.path != null) {
+                                setDialogState(() => isUploadingToR2 = true);
+                                final pickedFile = File(result.files.single.path!);
+                                final r2 = R2StorageService();
+                                final cloudUrl = await r2.uploadAudioFile(pickedFile);
+                                setDialogState(() {
+                                  isUploadingToR2 = false;
+                                  if (cloudUrl != null) {
+                                    audioCtrl.text = cloudUrl;
+                                    if (titleCtrl.text.isEmpty) {
+                                      titleCtrl.text = result.files.single.name
+                                          .replaceAll(RegExp(r'\.[a-zA-Z0-9]+$'), '')
+                                          .replaceAll('_', ' ');
+                                    }
+                                  }
+                                });
+                              }
+                            } catch (e) {
+                              setDialogState(() => isUploadingToR2 = false);
+                            }
+                          },
+                  ),
+                ),
+                const SizedBox(height: 6),
+
+                _buildAdminTextField(audioCtrl, 'ऑडियो लिंक या पाथ (Audio Stream URL)', 'https://pub-d4f2... or assets/audio/...'),
                 const SizedBox(height: 10),
                 _buildAdminTextField(coverCtrl, _lang.t('cover_url'), 'https://.../cover.jpg'),
                 const SizedBox(height: 10),
@@ -307,6 +363,237 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
     );
   }
 
+  Widget _buildR2CloudStatusCard() {
+    final r2 = R2StorageService();
+    final isConnected = r2.isConfigured;
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF131A2A),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isConnected ? const Color(0xFF10B981).withOpacity(0.4) : const Color(0xFFFFB300).withOpacity(0.3),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: isConnected ? const Color(0xFF10B981).withOpacity(0.15) : const Color(0xFFFFB300).withOpacity(0.15),
+            ),
+            child: Icon(
+              isConnected ? Icons.cloud_done_rounded : Icons.cloud_queue_rounded,
+              color: isConnected ? const Color(0xFF10B981) : const Color(0xFFFFB300),
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      'Cloudflare R2 Storage',
+                      style: GoogleFonts.syne(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: isConnected ? const Color(0xFF10B981).withOpacity(0.2) : Colors.amber.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        isConnected ? '🟢 10 GB Free Live' : '⚠️ Setup Required',
+                        style: TextStyle(
+                          color: isConnected ? Colors.greenAccent : Colors.amberAccent,
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  isConnected
+                      ? 'Bucket: ${r2.bucketName ?? "msixa-music"} • CDN Live Streaming Active'
+                      : 'Tap to configure Account ID & API Tokens',
+                  style: const TextStyle(color: Colors.white70, fontSize: 11),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF1E293B),
+              foregroundColor: const Color(0xFF00E5FF),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+                side: BorderSide(color: const Color(0xFF00E5FF).withOpacity(0.3)),
+              ),
+              elevation: 0,
+            ),
+            icon: const Icon(Icons.settings_rounded, size: 14),
+            label: const Text('Settings', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+            onPressed: _showR2SettingsDialog,
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showR2SettingsDialog() {
+    final r2 = R2StorageService();
+    final accountIdCtrl = TextEditingController(text: r2.accountId ?? R2StorageService.defaultAccountId);
+    final bucketNameCtrl = TextEditingController(text: r2.bucketName ?? R2StorageService.defaultBucketName);
+    final accessKeyCtrl = TextEditingController(text: r2.accessKeyId ?? R2StorageService.defaultAccessKeyId);
+    final secretKeyCtrl = TextEditingController(text: r2.secretAccessKey ?? R2StorageService.defaultSecretAccessKey);
+    final publicDomainCtrl = TextEditingController(text: r2.publicDomain ?? R2StorageService.defaultPublicDomain);
+
+    bool isTesting = false;
+    String? testResultMsg;
+    bool? testSuccess;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: const Color(0xFF131A2A),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: const [
+              Icon(Icons.cloud_circle_rounded, color: Color(0xFF00E5FF), size: 26),
+              SizedBox(width: 8),
+              Text(
+                'Cloudflare R2 Server Settings',
+                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '10 GB Free Storage • 0 Bandwidth Fees • Fast Global Edge Streaming',
+                  style: TextStyle(color: Colors.white70, fontSize: 11),
+                ),
+                const SizedBox(height: 14),
+                _buildAdminTextField(accountIdCtrl, 'Account ID', '25622df2e...'),
+                const SizedBox(height: 10),
+                _buildAdminTextField(bucketNameCtrl, 'Bucket Name', 'msixa-music'),
+                const SizedBox(height: 10),
+                _buildAdminTextField(accessKeyCtrl, 'Access Key ID', '3857da306...'),
+                const SizedBox(height: 10),
+                _buildAdminTextField(secretKeyCtrl, 'Secret Access Key', '77ef640b7...'),
+                const SizedBox(height: 10),
+                _buildAdminTextField(publicDomainCtrl, 'Public CDN Domain / r2.dev', 'pub-xxxx.r2.dev'),
+                const SizedBox(height: 14),
+
+                if (isTesting)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Row(
+                      children: const [
+                        SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF00E5FF))),
+                        SizedBox(width: 10),
+                        Text('Testing connection to Cloudflare R2...', style: TextStyle(color: Color(0xFF00E5FF), fontSize: 12)),
+                      ],
+                    ),
+                  ),
+
+                if (testResultMsg != null)
+                  Container(
+                    margin: const EdgeInsets.only(top: 8),
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: testSuccess == true ? const Color(0xFF10B981).withOpacity(0.15) : Colors.redAccent.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: testSuccess == true ? Colors.greenAccent : Colors.redAccent),
+                    ),
+                    child: Text(
+                      testResultMsg!,
+                      style: TextStyle(
+                        color: testSuccess == true ? Colors.greenAccent : Colors.redAccent,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+            ),
+            OutlinedButton(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF00E5FF),
+                side: const BorderSide(color: Color(0xFF00E5FF)),
+              ),
+              onPressed: isTesting
+                  ? null
+                  : () async {
+                      setDialogState(() {
+                        isTesting = true;
+                        testResultMsg = null;
+                      });
+                      await r2.saveConfig(
+                        accountId: accountIdCtrl.text,
+                        bucketName: bucketNameCtrl.text,
+                        accessKeyId: accessKeyCtrl.text,
+                        secretAccessKey: secretKeyCtrl.text,
+                        publicDomain: publicDomainCtrl.text,
+                      );
+                      final res = await r2.testConnection();
+                      setDialogState(() {
+                        isTesting = false;
+                        testSuccess = res['success'] == true;
+                        testResultMsg = res['message']?.toString();
+                      });
+                      if (mounted) setState(() {});
+                    },
+              child: const Text('⚡ Test Connection', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFFB300), foregroundColor: Colors.black),
+              onPressed: () async {
+                await r2.saveConfig(
+                  accountId: accountIdCtrl.text,
+                  bucketName: bucketNameCtrl.text,
+                  accessKeyId: accessKeyCtrl.text,
+                  secretAccessKey: secretKeyCtrl.text,
+                  publicDomain: publicDomainCtrl.text,
+                );
+                if (mounted) {
+                  setState(() {});
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('✅ Cloudflare R2 Credentials Saved & Synced!')),
+                  );
+                }
+              },
+              child: const Text('Save & Apply', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final pending = _backend.pendingSongs;
@@ -454,6 +741,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
               ],
             ),
           ),
+
+          // Cloudflare R2 Cloud Server Status & Control Pill
+          _buildR2CloudStatusCard(),
 
           // Tab Views
           Expanded(

@@ -30,6 +30,7 @@ dependencies:
   # Networking & Legal Online Streaming
   http: ^1.2.0
   cached_network_image: ^3.3.1
+  crypto: ^3.0.3
   
   # Local Persistence (Favorites, Playlists, Settings)
   shared_preferences: ^2.2.2

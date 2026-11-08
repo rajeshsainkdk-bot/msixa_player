@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'services/cloud_backend_service.dart';
 import 'services/language_service.dart';
+import 'services/r2_storage_service.dart';
 import 'screens/admin/admin_dashboard_screen.dart';
 
 void main() async {
@@ -9,6 +10,7 @@ void main() async {
   final backend = CloudBackendService();
   await backend.init();
   await LanguageService().init();
+  await R2StorageService().init();
 
   runApp(const MsixaAdminApp());
 }

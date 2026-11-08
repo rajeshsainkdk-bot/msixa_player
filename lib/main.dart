@@ -6,6 +6,7 @@ import 'theme/app_theme.dart';
 import 'providers/player_provider.dart';
 import 'services/cloud_backend_service.dart';
 import 'services/language_service.dart';
+import 'services/r2_storage_service.dart';
 import 'screens/main_navigation_screen.dart';
 import 'screens/auth/auth_screen.dart';
 
@@ -27,6 +28,7 @@ Future<void> main() async {
   final backend = CloudBackendService();
   await backend.init();
   await LanguageService().init();
+  await R2StorageService().init();
 
   // Set system UI to immersive dark styling
   SystemChrome.setSystemUIOverlayStyle(
@@ -53,6 +55,9 @@ class MsixaPlayerApp extends StatelessWidget {
         ),
         ChangeNotifierProvider<CloudBackendService>.value(
           value: CloudBackendService(),
+        ),
+        ChangeNotifierProvider<R2StorageService>.value(
+          value: R2StorageService(),
         ),
       ],
       child: MaterialApp(
