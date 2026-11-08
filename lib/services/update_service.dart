@@ -18,6 +18,7 @@ class UpdateService {
   static const String _prefKeyLastChecked = 'msixa_last_update_check';
   static const String _prefKeyDismissedVersion = 'msixa_dismissed_update_version';
   static const String _prefKeyLastPromptTime = 'msixa_last_update_prompt_time';
+  static bool _hasCheckedThisSession = false;
 
   /// Read exact installed package version dynamically from Android PackageManager
   static Future<Map<String, dynamic>> getInstalledVersion() async {
@@ -35,6 +36,9 @@ class UpdateService {
 
   /// Check for latest update from Cloudflare R2
   static Future<void> checkForUpdate(BuildContext context, {bool autoPrompt = false}) async {
+    if (autoPrompt && _hasCheckedThisSession) return;
+    if (autoPrompt) _hasCheckedThisSession = true;
+
     try {
       final ts = DateTime.now().millisecondsSinceEpoch;
       final uri = Uri.parse('$manifestUrl?t=$ts');
@@ -305,10 +309,23 @@ class UpdateService {
                           });
 
                           // Launch Native APK Installer
-                          await _channel.invokeMethod('installApk', {'filePath': apkFile.path});
-
-                          if (dialogContext.mounted) {
-                            Navigator.pop(dialogContext);
+                          try {
+                            await _channel.invokeMethod('installApk', {'filePath': apkFile.path});
+                            if (dialogContext.mounted) {
+                              Navigator.pop(dialogContext);
+                            }
+                          } on PlatformException catch (pe) {
+                            if (pe.code == 'NEED_PERMISSION') {
+                              setState(() {
+                                isDownloading = false;
+                                statusText = 'कृपया सेटिंग्स में "Allow from this source" चालू करें।';
+                              });
+                            } else {
+                              setState(() {
+                                isDownloading = false;
+                                statusText = 'इंस्टॉलर त्रुटि: ${pe.message}';
+                              });
+                            }
                           }
                         } catch (err) {
                           setState(() {

@@ -49,6 +49,19 @@ class MainActivity: AudioServiceActivity() {
                 try {
                     val filePath = call.argument<String>("filePath") ?: throw IllegalArgumentException("filePath required")
                     val file = File(filePath)
+
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                        if (!packageManager.canRequestPackageInstalls()) {
+                            val permIntent = Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                                data = android.net.Uri.parse("package:$packageName")
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            startActivity(permIntent)
+                            result.error("NEED_PERMISSION", "Please allow installing apps from Msixa Player in Settings", null)
+                            return@setMethodCallHandler
+                        }
+                    }
+
                     val apkUri = FileProvider.getUriForFile(
                         this,
                         "${applicationContext.packageName}.fileprovider",
