@@ -303,28 +303,51 @@ class UpdateService {
                           await sink.flush();
                           await sink.close();
 
-                          setState(() {
-                            statusText = 'इंस्टॉलर शुरू हो रहा है...';
-                            downloadProgress = 1.0;
-                          });
+                          // Automatically dismiss the popup dialog immediately
+                          try {
+                            if (Navigator.of(ctx, rootNavigator: true).canPop()) {
+                              Navigator.of(ctx, rootNavigator: true).pop();
+                            }
+                          } catch (_) {}
+
+                          // Show floating success notification
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  '✅ डाउनलोड पूरा हुआ! इंस्टॉलेशन शुरू हो रहा है...',
+                                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+                                ),
+                                backgroundColor: Color(0xFF00E5FF),
+                                duration: Duration(seconds: 4),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          }
 
                           // Launch Native APK Installer
                           try {
                             await _channel.invokeMethod('installApk', {'filePath': apkFile.path});
-                            if (dialogContext.mounted) {
-                              Navigator.pop(dialogContext);
-                            }
                           } on PlatformException catch (pe) {
-                            if (pe.code == 'NEED_PERMISSION') {
-                              setState(() {
-                                isDownloading = false;
-                                statusText = 'कृपया सेटिंग्स में "Allow from this source" चालू करें।';
-                              });
-                            } else {
-                              setState(() {
-                                isDownloading = false;
-                                statusText = 'इंस्टॉलर त्रुटि: ${pe.message}';
-                              });
+                            if (context.mounted) {
+                              if (pe.code == 'NEED_PERMISSION') {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('कृपया सेटिंग्स में "Allow from this source" चालू करें और पुनः अपडेट दबाएं।'),
+                                    backgroundColor: Colors.amber,
+                                    duration: Duration(seconds: 5),
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('इंस्टॉलर त्रुटि: ${pe.message}'),
+                                    backgroundColor: Colors.redAccent,
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              }
                             }
                           }
                         } catch (err) {
