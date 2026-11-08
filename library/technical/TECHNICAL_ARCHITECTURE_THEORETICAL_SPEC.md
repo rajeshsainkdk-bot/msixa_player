@@ -2,7 +2,7 @@
 ## System: Msixa Player & Msixa Admin Ecosystem
 **Codebase Language:** Dart / Flutter (`>= 3.0.0`) & Kotlin (Android Native Layer)  
 **Document Classification:** Engineering Design & QA Test Specification  
-**Version:** 2.0 (Production Release)  
+**Version:** 3.0 (Production Master Release with R2 CDN & OTA In-App Updater)  
 **Archive Location:** `library/technical/TECHNICAL_ARCHITECTURE_THEORETICAL_SPEC.md`  
 
 ---
@@ -246,4 +246,98 @@ The GitHub Actions workflow (`.github/workflows/build_apk.yml`) compiles both pr
    flutter build apk --release --target=lib/main_admin.dart --no-tree-shake-icons
    cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/msixa-admin-release.apk
    ```
+
+---
+
+## 8. Cloudflare R2 Cloud Storage & Zero-Egress Streaming Architecture
+
+### 8.1 AWS SigV4 Native Dart Implementation (`R2StorageService`)
+Msixa Player avoids bulky third-party AWS SDKs by utilizing a pure-Dart AWS Signature Version 4 (SigV4) implementation:
+- **Service Target:** Amazon S3-compatible Cloudflare R2 API (`https://25622df2e6919b63cf30e7d06532d778.r2.cloudflarestorage.com`).
+- **Bucket:** `msixa-music`.
+- **Public CDN Edge:** `https://pub-d4f2e58dc2594d0c8dc1f30bbae4344f.r2.dev/`.
+- **Zero Egress Cost:** Streaming audio and downloading updates incurs \$0 egress bandwidth fees via Cloudflare's global edge network.
+
+### 8.2 Master Audio Catalog Migration
+All 17 high-bitrate Indian master audio tracks (Hanuman Chalisa, Shiv Tandav, Satinder Sartaaj Sufi songs, etc.) were migrated from local APK asset bundles to Cloudflare R2 CDN:
+- **APK Footprint Reduction:** Dropped from 168 MB to ~23 MB (~86% storage reduction).
+- **Fast Startup:** The initial app installation downloads in seconds on mobile networks.
+
+---
+
+## 9. Realtime Dual-Sync Engine (Cloudflare R2 + Local IPC)
+
+### 9.1 Multi-Layer Sync Topology
+To eliminate delay between user registration and admin verification:
+1. **Primary Cloud Layer (Cloudflare R2):**
+   - User database: `db/users.json`.
+   - Song catalog: `db/songs.json`.
+   - Cache-busting: `?t=${DateTime.now().millisecondsSinceEpoch}` and `Cache-Control: no-cache` prevent stale edge reads.
+2. **Secondary Local IPC Layer (Cross-App File Sync):**
+   - Shared device path: `/storage/emulated/0/Download/msixa_users.json` and internal shared file descriptors.
+   - Admin panel executes a non-blocking 2-second background synchronization loop (`Timer.periodic`).
+   - Newly registered users appear instantly on the Admin Dashboard without manual refreshes.
+
+---
+
+## 10. Bulk Multi-Track Audio Upload & UTF-8 BOM Excel Export
+
+### 10.1 Bulk Folder & Multi-Select Audio Upload
+- Admin panel includes `_showBulkUploadDialog` utilizing `FilePicker.platform.pickFiles(allowMultiple: true, type: FileType.audio)`.
+- Features real-time track-by-track upload progress, dynamic title cleaning (removes underscores and extensions), and automatic metadata registration in Cloudflare R2 catalog.
+
+### 10.2 UTF-8 BOM Excel Export
+- **Users Directory Export:** Full name, phone number, email ID, registered date/time, and status.
+- **Uploaded Songs Export:** Song title, artist, genre, upload date, review status, and stream URL.
+- **Excel Compatibility:** Prepend byte order mark `\uFEFF` so Microsoft Excel automatically recognizes UTF-8 encoded Hindi Devanagari text correctly without garbled characters.
+
+---
+
+## 11. In-App OTA Auto-Updater Architecture (`UpdateService`)
+
+### 11.1 Continuous Deployment Flow
+1. During GitHub Actions compilation, `build_apk.yml` uploads:
+   - `build/app/outputs/flutter-apk/msixa-player-release.apk` $\rightarrow$ `update/msixa_player_latest.apk`.
+   - Update manifest JSON $\rightarrow$ `update/version.json`:
+     ```json
+     {
+       "version_code": 48,
+       "version_name": "1.0.48",
+       "apk_url": "https://pub-d4f2e58dc2594d0c8dc1f30bbae4344f.r2.dev/update/msixa_player_latest.apk",
+       "file_size_mb": 23.28,
+       "release_notes": "Auto-Update: Realtime sync and platform enhancements!",
+       "force_update": false
+     }
+     ```
+2. **Version Evaluation:**
+   `UpdateService.checkForUpdate()` calls Android `PackageManager` dynamically via `getAppVersion` MethodChannel. An update dialog is triggered ONLY when `remoteCode > installedCode`.
+
+### 11.2 Native Android Package Installer Integration
+- **Pre-download Permission Check:** Checks `packageManager.canRequestPackageInstalls()` before initiating download. If ungranted, opens `Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES` with clean user guidance.
+- **Android 11+ Package Visibility (`<queries>`):** Declares `application/vnd.android.package-archive` in `AndroidManifest.xml` so `packageManager.queryIntentActivities` resolves system package installers and grants URI read permissions.
+- **Auto-Dismiss Dialog:** Resets downloading state immediately upon completion, dismissing the popup dialog prior to launching the system installer sheet.
+- **Notification Cooldown:** Implements a 2-hour minimum cooldown on automatic launch prompts to avoid user fatigue.
+
+---
+
+## 12. Production Keystore & Cryptographic Signature Specification
+
+### 12.1 Keystore Parameters
+- **Keystore File:** `android/app/msixa_release.jks`
+- **Type:** PKCS12
+- **Key Alias:** `msixakey`
+- **Key Algorithm:** RSA 2048-bit
+- **Validity:** 10,000 Days (~27 Years)
+- **SHA-256 Fingerprint:** `E1:A5:7A:60:3B:57:75:C1:DE:A1:02:78:FB:83:18:2A:DB:8E:A8:B6:D3:FA:8C:E3:4E:23:CC:D1:98:B8:0B:6B`
+
+### 12.2 In-Place Seamless Update Guarantee
+By standardizing on a permanent, version-controlled production keystore across all CI/CD pipelines, Android's package manager verifies matching cryptographic signatures on every update, allowing users to update their app with 1 click without uninstalling or losing local playlists and settings.
+
+---
+
+## 13. Notch, Punch-Hole & Status Bar Adaptation (`SafeArea`)
+
+- **Root Cause:** Immersive transparent system UI (`SystemUiOverlayStyle(statusBarColor: Colors.transparent)`) caused headers without `AppBar` widgets to render at raw $y=0$, overlapping device status bars (signal, battery, clock).
+- **Solution:** Wrapped `HomeScreen` and Admin Root in `SafeArea(bottom: false, ...)`, standardizing top clearance across all Android screen geometries (notches, dynamic islands, corner/center hole punches).
+
 
