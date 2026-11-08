@@ -79,20 +79,22 @@
 - **Expected Result:** All labels, placeholders, stepper titles, and buttons instantly switch language between Hindi and English without reloading or losing input data.
 - **Status:** PASS
 
-### TC-AUTH-007: App Restart Session Persistence
-- **Precondition:** User completed registration in TC-AUTH-006.
+### TC-AUTH-007: Cross-App Real-Time User Sync to Admin Dashboard
+- **Precondition:** User registers on User App (`Msixa Player`) on the device.
 - **Test Steps:**
-  1. Force-kill the app from Recent Apps.
-  2. Relaunch Msixa Player.
-- **Expected Result:** App launches straight into `MainNavigationScreen`. `AuthScreen` is bypassed. User is marked as `isOnline: true`.
+  1. Complete registration for a new user (e.g. `Kavita Sharma`, `9876543222`).
+  2. Switch to / launch `Msixa Player Admin` app.
+  3. Navigate to "यूज़र्स डेटा (Users Directory)" tab or tap `[🔄 Refresh Data]` in AppBar.
+- **Expected Result:** Newly registered user `Kavita Sharma` with phone `+91 9876543222` appears immediately in the Admin directory with real-time `Active (Online)` indicator and working Call/WhatsApp/Email action buttons.
 - **Status:** PASS
 
-### TC-AUTH-008: Sign Out & Re-Verification Barrier
-- **Precondition:** Logged-in user on Library/Profile tab.
+### TC-AUTH-008: User Profile Screen & Identity Verification
+- **Precondition:** Logged-in user on User App home screen.
 - **Test Steps:**
-  1. Tap `[Sign Out]`.
-  2. Confirm logout.
-- **Expected Result:** Stored session is cleared. App immediately redirects back to `AuthScreen`.
+  1. Tap the Profile icon in top header or Library tab.
+  2. Verify displayed details: Full Name, User ID / Phone (+91), Email, Status, Registration Date.
+  3. Tap `[लॉग आउट करें (Sign Out)]` and confirm dialog.
+- **Expected Result:** Profile screen displays all authenticated details accurately. Tapping Sign Out clears session and returns to AuthScreen.
 - **Status:** PASS
 
 ---

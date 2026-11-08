@@ -5,6 +5,7 @@ import '../services/app_share_service.dart';
 import '../services/language_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/song_list_tile.dart';
+import 'profile_screen.dart';
 
 class LibraryScreen extends StatefulWidget {
   const LibraryScreen({Key? key}) : super(key: key);
@@ -38,6 +39,16 @@ class _LibraryScreenState extends State<LibraryScreen>
       appBar: AppBar(
         title: const Text('Your Library'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.account_circle_rounded, color: AppColors.accentCyan),
+            tooltip: 'Profile & Settings',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ProfileScreen()),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.share_rounded, color: AppColors.accentCyan),
             tooltip: 'Share APK with Friends',

@@ -102,6 +102,21 @@ class LanguageService extends ChangeNotifier {
     'my_playlist_badge': {'hi': 'मेरी प्लेलिस्ट', 'en': 'My Playlist'},
     'playlist_name': {'hi': 'प्लेलिस्ट का नाम', 'en': 'Playlist Name'},
 
+    // Profile & Settings Screen
+    'profile_title': {'hi': 'प्रोफ़ाइल एवं सेटिंग्स', 'en': 'Profile & Settings'},
+    'profile_subtitle': {'hi': 'श्रोता खाता विवरण व प्राथमिकताएं', 'en': 'Listener Account Details & Preferences'},
+    'account_info': {'hi': 'खाता विवरण (Account Info)', 'en': 'Account Information'},
+    'account_status': {'hi': 'अकाउंट स्थिति (Status)', 'en': 'Account Status'},
+    'status_active': {'hi': 'सक्रिय (Active / Online) 🟢', 'en': 'Active / Online 🟢'},
+    'member_since': {'hi': 'रजिस्ट्रेशन तिथि (Member Since)', 'en': 'Member Since'},
+    'preferences_heading': {'hi': 'ऐप प्राथमिकताएं (Preferences)', 'en': 'App Preferences'},
+    'app_language': {'hi': 'ऐप की भाषा (App Language)', 'en': 'App Language'},
+    'logout_btn': {'hi': 'लॉग आउट करें (Sign Out)', 'en': 'Sign Out'},
+    'logout_confirm_title': {'hi': 'लॉग आउट करें?', 'en': 'Sign Out?'},
+    'logout_confirm_msg': {'hi': 'क्या आप वाकई अपने खाते से लॉग आउट करना चाहते हैं?', 'en': 'Are you sure you want to sign out of your account?'},
+    'refresh_data': {'hi': 'डेटा रीफ्रेश करें', 'en': 'Refresh Data'},
+    'data_refreshed': {'hi': 'डेटा सफलतापूर्वक अपडेट हो गया!', 'en': 'Data updated successfully!'},
+
     // User App Home Screen
     'upload_song': {'hi': '+ Upload Song', 'en': '+ Upload Song'},
     'share_apk_title': {'hi': 'दोस्तों के साथ ऐप APK शेयर करें', 'en': 'Share App APK with Friends'},

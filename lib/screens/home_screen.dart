@@ -10,6 +10,7 @@ import '../widgets/genre_card.dart';
 import '../widgets/song_list_tile.dart';
 import '../services/language_service.dart';
 import 'upload_song_screen.dart';
+import 'profile_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -180,6 +181,32 @@ class HomeScreen extends StatelessWidget {
                                       ),
                                     ],
                                   ),
+                                ),
+                              ),
+
+                              // Profile & Account Settings Button
+                              GestureDetector(
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                                  );
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.all(7),
+                                  margin: const EdgeInsets.only(left: 8),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF131A2A),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: const Color(0xFF00E5FF).withOpacity(0.4)),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: const Color(0xFF00E5FF).withOpacity(0.2),
+                                        blurRadius: 8,
+                                      ),
+                                    ],
+                                  ),
+                                  child: const Icon(Icons.person_rounded, color: Color(0xFF00E5FF), size: 18),
                                 ),
                               ),
                             ],

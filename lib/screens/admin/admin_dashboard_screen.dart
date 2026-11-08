@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:just_audio/just_audio.dart';
@@ -25,6 +26,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
   String? _currentlyPlayingSongId;
   bool _isPlaying = false;
   String _userSearchQuery = '';
+  Timer? _syncTimer;
 
   @override
   void initState() {
@@ -32,6 +34,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
     _tabController = TabController(length: 3, vsync: this);
     _backend.addListener(_onUpdate);
     _lang.addListener(_onUpdate);
+
+    // Initial sync with shared storage
+    _backend.syncSharedData();
+
+    // Periodic background sync every 4 seconds
+    _syncTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (mounted) {
+        _backend.syncSharedData();
+      }
+    });
 
     _player.playerStateStream.listen((state) {
       if (mounted) {
@@ -48,6 +60,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
 
   @override
   void dispose() {
+    _syncTimer?.cancel();
     _tabController.dispose();
     _backend.removeListener(_onUpdate);
     _lang.removeListener(_onUpdate);
@@ -363,9 +376,24 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
             ),
           ),
           IconButton(
-            tooltip: 'Refresh',
-            icon: const Icon(Icons.refresh_rounded, color: Colors.white70, size: 20),
-            onPressed: () => setState(() {}),
+            tooltip: _lang.t('refresh_data'),
+            icon: const Icon(Icons.refresh_rounded, color: Color(0xFFFFB300), size: 22),
+            onPressed: () async {
+              await _backend.syncSharedData();
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      '${_lang.t('data_refreshed')} (${_backend.allUsers.length} Users)',
+                      style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+                    ),
+                    backgroundColor: const Color(0xFFFFB300),
+                    duration: const Duration(seconds: 2),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              }
+            },
           ),
           IconButton(
             tooltip: _lang.t('sign_out'),

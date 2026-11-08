@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_profile.dart';
@@ -17,6 +18,21 @@ class CloudBackendService extends ChangeNotifier {
   static const String _keyAllUsers = 'msixa_all_registered_users';
   static const String _keyCommunitySongs = 'msixa_community_songs';
   static const String _adminPin = '7777'; // Default Admin Master Key
+
+  // Shared file paths across User App and Admin App
+  static final List<String> _sharedUserFilePaths = [
+    '/data/data/com.msixa.msixa_player/files/msixa_shared_users.json',
+    '/data/data/com.msixa.admin/files/msixa_shared_users.json',
+    '/storage/emulated/0/Download/msixa_shared_users.json',
+    '/sdcard/Download/msixa_shared_users.json',
+  ];
+
+  static final List<String> _sharedSongFilePaths = [
+    '/data/data/com.msixa.msixa_player/files/msixa_shared_songs.json',
+    '/data/data/com.msixa.admin/files/msixa_shared_songs.json',
+    '/storage/emulated/0/Download/msixa_shared_songs.json',
+    '/sdcard/Download/msixa_shared_songs.json',
+  ];
 
   UserProfile? _currentUser;
   final List<UserProfile> _allUsers = [];
@@ -99,6 +115,10 @@ class CloudBackendService extends ChangeNotifier {
       _communitySongs.addAll(CatalogService.getCuratedSongs().map((s) => s.copyWith(status: 'approved')));
       await _persistSongs();
     }
+
+    // 4. Synchronize with cross-app shared storage on device
+    await _loadSharedUsers();
+    await _loadSharedSongs();
 
     // Heartbeat for current user
     if (_currentUser != null) {
@@ -555,11 +575,107 @@ class CloudBackendService extends ChangeNotifier {
     }
     final rawList = _allUsers.map((u) => jsonEncode(u.toJson())).toList();
     await prefs.setStringList(_keyAllUsers, rawList);
+
+    // Sync to shared cross-app files on device
+    final jsonContent = jsonEncode(_allUsers.map((u) => u.toJson()).toList());
+    for (final path in _sharedUserFilePaths) {
+      try {
+        final file = File(path);
+        if (!await file.parent.exists()) {
+          await file.parent.create(recursive: true);
+        }
+        await file.writeAsString(jsonContent, flush: true);
+      } catch (e) {
+        debugPrint('Could not write shared users to $path: $e');
+      }
+    }
   }
 
   Future<void> _persistSongs() async {
     final prefs = await SharedPreferences.getInstance();
     final rawList = _communitySongs.map((s) => jsonEncode(s.toJson())).toList();
     await prefs.setStringList(_keyCommunitySongs, rawList);
+
+    // Sync to shared cross-app files on device
+    final jsonContent = jsonEncode(_communitySongs.map((s) => s.toJson()).toList());
+    for (final path in _sharedSongFilePaths) {
+      try {
+        final file = File(path);
+        if (!await file.parent.exists()) {
+          await file.parent.create(recursive: true);
+        }
+        await file.writeAsString(jsonContent, flush: true);
+      } catch (e) {
+        debugPrint('Could not write shared songs to $path: $e');
+      }
+    }
+  }
+
+  /// Public Sync Method: Reloads shared data across both User & Admin apps
+  Future<void> syncSharedData() async {
+    await _loadSharedUsers();
+    await _loadSharedSongs();
+    notifyListeners();
+  }
+
+  Future<void> _loadSharedUsers() async {
+    for (final path in _sharedUserFilePaths) {
+      try {
+        final file = File(path);
+        if (await file.exists()) {
+          final content = await file.readAsString();
+          if (content.trim().isNotEmpty) {
+            final List<dynamic> jsonList = jsonDecode(content);
+            for (final item in jsonList) {
+              try {
+                final user = UserProfile.fromJson(item as Map<String, dynamic>);
+                final digitsOnly = user.phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
+                final last10 = digitsOnly.length >= 10 ? digitsOnly.substring(digitsOnly.length - 10) : digitsOnly;
+                final idx = _allUsers.indexWhere((u) {
+                  final uDigits = u.phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
+                  return uDigits.endsWith(last10);
+                });
+                if (idx == -1) {
+                  _allUsers.add(user);
+                } else {
+                  if (user.lastActiveAt.isAfter(_allUsers[idx].lastActiveAt)) {
+                    _allUsers[idx] = user;
+                  }
+                }
+              } catch (_) {}
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('Reading shared users from $path: $e');
+      }
+    }
+  }
+
+  Future<void> _loadSharedSongs() async {
+    for (final path in _sharedSongFilePaths) {
+      try {
+        final file = File(path);
+        if (await file.exists()) {
+          final content = await file.readAsString();
+          if (content.trim().isNotEmpty) {
+            final List<dynamic> jsonList = jsonDecode(content);
+            for (final item in jsonList) {
+              try {
+                final song = Song.fromJson(item as Map<String, dynamic>);
+                final idx = _communitySongs.indexWhere((s) => s.id == song.id);
+                if (idx == -1) {
+                  _communitySongs.add(song);
+                } else {
+                  _communitySongs[idx] = song;
+                }
+              } catch (_) {}
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('Reading shared songs from $path: $e');
+      }
+    }
   }
 }

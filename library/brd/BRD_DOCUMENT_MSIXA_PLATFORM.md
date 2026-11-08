@@ -128,19 +128,27 @@ graph TD
   - `[स्वीकार करें (Approve)]`: Transitions song to `status: 'approved'`. Instantly exposes song on the User App's `"🔥 Newly Added by Community"` shelf.
   - `[हटाएँ (Reject)]`: Permanently purges submission with confirmation.
 
-### FR-08: Searchable Users Directory with Native CRM Triggers
+### FR-08: Searchable Users Directory with Native CRM Triggers & Cross-App Sync
 - **Description:** Admin views all registered users with real-time active indicators, email, and phone numbers.
+- **Cross-App Sync:** Synchronized between User App (`com.msixa.msixa_player`) and Admin App (`com.msixa.admin`) via shared storage and `android:sharedUserId`.
 - **One-Tap Actions:**
   - `[📞 Call]`: Opens device phone dialer with user's number.
   - `[💬 WhatsApp]`: Launches official WhatsApp chat with pre-filled support message.
   - `[✉️ Email]`: Opens default mail client addressing the user.
+  - `[🔄 Refresh]`: Instant sync button in AppBar to re-read cross-app database.
 
 ### FR-09: Direct Native APK File Sharing (No Links)
 - **Description:** In the User App, clicking the `Share APK` card triggers native Android file sharing (`Intent.ACTION_SEND`).
 - **Mechanism:** Extracts installed `base.apk` from `applicationInfo.sourceDir` into app cache via `androidx.core.content.FileProvider`.
 - **Acceptance Criteria:** Shares the actual `.apk` file (`application/vnd.android.package-archive`). Strictly zero web links or plain text messages are transmitted.
 
-### FR-10: Background Audio Service & Lock Screen Controls
+### FR-10: User Profile & Account Settings Hub
+- **Description:** Dedicated profile dashboard in User App displaying authenticated identity details:
+  - Full Name, User ID (Mobile Number with verified badge), Email Address, Member Since date, Online Status.
+  - Quick App Preferences: Language Switcher (`🇮🇳 हिंदी` / `🇬🇧 English`), Device Storage Scanner trigger, and Direct APK Sharing.
+  - Account Sign Out (`लॉग आउट करें`) action with confirmation dialog.
+
+### FR-11: Background Audio Service & Lock Screen Controls
 - **Description:** Audio playback must continue uninterrupted when the screen is locked or the app is minimized.
 - **Acceptance Criteria:** Notification bar shows active track title, artist, album art, play/pause, seek bar, and next/prev controls linked to `com.ryanheise.audioservice`.
 
