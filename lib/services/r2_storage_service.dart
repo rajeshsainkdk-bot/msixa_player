@@ -242,6 +242,25 @@ class R2StorageService extends ChangeNotifier {
     }
   }
 
+  /// Upload raw text / JSON string to Cloudflare R2
+  Future<bool> putString(String objectKey, String content, {String contentType = 'application/json'}) async {
+    if (!isConfigured) return false;
+    final bytes = Uint8List.fromList(utf8.encode(content));
+    return _putObject(objectKey: objectKey, data: bytes, contentType: contentType);
+  }
+
+  /// Read text / JSON string from Cloudflare R2 public CDN
+  Future<String?> getString(String objectKey) async {
+    if (!isConfigured) return null;
+    try {
+      final res = await http.get(Uri.parse('https://$_publicDomain/$objectKey')).timeout(const Duration(seconds: 6));
+      if (res.statusCode == 200) {
+        return utf8.decode(res.bodyBytes);
+      }
+    } catch (_) {}
+    return null;
+  }
+
   /// Upload an audio track file (.mp3, .m4a, .wav) to Cloudflare R2
   /// Returns the permanent public live-streaming HTTPS URL.
   Future<String?> uploadAudioFile(

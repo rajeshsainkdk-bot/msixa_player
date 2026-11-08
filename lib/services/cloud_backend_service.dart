@@ -2,9 +2,12 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/intl.dart';
+import 'package:share_plus/share_plus.dart';
 import '../models/user_profile.dart';
 import '../models/song.dart';
 import 'catalog_service.dart';
+import 'r2_storage_service.dart';
 
 /// Central Cloud & Community Backend Service
 /// Handles User Registration with Phone OTP verification,
@@ -589,6 +592,14 @@ class CloudBackendService extends ChangeNotifier {
         debugPrint('Could not write shared users to $path: $e');
       }
     }
+
+    // Sync to Cloudflare R2 cloud database
+    try {
+      final r2 = R2StorageService();
+      if (r2.isConfigured) {
+        r2.putString('db/users.json', jsonContent);
+      }
+    } catch (_) {}
   }
 
   Future<void> _persistSongs() async {
@@ -609,6 +620,14 @@ class CloudBackendService extends ChangeNotifier {
         debugPrint('Could not write shared songs to $path: $e');
       }
     }
+
+    // Sync to Cloudflare R2 cloud database
+    try {
+      final r2 = R2StorageService();
+      if (r2.isConfigured) {
+        r2.putString('db/songs.json', jsonContent);
+      }
+    } catch (_) {}
   }
 
   /// Public Sync Method: Reloads shared data across both User & Admin apps
@@ -619,62 +638,215 @@ class CloudBackendService extends ChangeNotifier {
   }
 
   Future<void> _loadSharedUsers() async {
+    // 1. Local Shared Files
     for (final path in _sharedUserFilePaths) {
       try {
         final file = File(path);
         if (await file.exists()) {
           final content = await file.readAsString();
           if (content.trim().isNotEmpty) {
-            final List<dynamic> jsonList = jsonDecode(content);
-            for (final item in jsonList) {
-              try {
-                final user = UserProfile.fromJson(item as Map<String, dynamic>);
-                final digitsOnly = user.phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
-                final last10 = digitsOnly.length >= 10 ? digitsOnly.substring(digitsOnly.length - 10) : digitsOnly;
-                final idx = _allUsers.indexWhere((u) {
-                  final uDigits = u.phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
-                  return uDigits.endsWith(last10);
-                });
-                if (idx == -1) {
-                  _allUsers.add(user);
-                } else {
-                  if (user.lastActiveAt.isAfter(_allUsers[idx].lastActiveAt)) {
-                    _allUsers[idx] = user;
-                  }
-                }
-              } catch (_) {}
-            }
+            _mergeUsersFromJson(content);
           }
         }
       } catch (e) {
         debugPrint('Reading shared users from $path: $e');
       }
     }
+
+    // 2. Cloudflare R2 Remote Cloud Database
+    try {
+      final r2 = R2StorageService();
+      if (r2.isConfigured) {
+        final cloudUsersJson = await r2.getString('db/users.json');
+        if (cloudUsersJson != null && cloudUsersJson.trim().isNotEmpty) {
+          _mergeUsersFromJson(cloudUsersJson);
+        }
+      }
+    } catch (_) {}
+  }
+
+  void _mergeUsersFromJson(String content) {
+    try {
+      final List<dynamic> jsonList = jsonDecode(content);
+      for (final item in jsonList) {
+        try {
+          final user = UserProfile.fromJson(item as Map<String, dynamic>);
+          final digitsOnly = user.phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
+          final last10 = digitsOnly.length >= 10 ? digitsOnly.substring(digitsOnly.length - 10) : digitsOnly;
+          final idx = _allUsers.indexWhere((u) {
+            final uDigits = u.phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
+            return uDigits.endsWith(last10);
+          });
+          if (idx == -1) {
+            _allUsers.add(user);
+          } else {
+            if (user.lastActiveAt.isAfter(_allUsers[idx].lastActiveAt)) {
+              _allUsers[idx] = user;
+            }
+          }
+        } catch (_) {}
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadSharedSongs() async {
+    // 1. Local Shared Files
     for (final path in _sharedSongFilePaths) {
       try {
         final file = File(path);
         if (await file.exists()) {
           final content = await file.readAsString();
           if (content.trim().isNotEmpty) {
-            final List<dynamic> jsonList = jsonDecode(content);
-            for (final item in jsonList) {
-              try {
-                final song = Song.fromJson(item as Map<String, dynamic>);
-                final idx = _communitySongs.indexWhere((s) => s.id == song.id);
-                if (idx == -1) {
-                  _communitySongs.add(song);
-                } else {
-                  _communitySongs[idx] = song;
-                }
-              } catch (_) {}
-            }
+            _mergeSongsFromJson(content);
           }
         }
       } catch (e) {
         debugPrint('Reading shared songs from $path: $e');
+      }
+    }
+
+    // 2. Cloudflare R2 Remote Cloud Database
+    try {
+      final r2 = R2StorageService();
+      if (r2.isConfigured) {
+        final cloudSongsJson = await r2.getString('db/songs.json');
+        if (cloudSongsJson != null && cloudSongsJson.trim().isNotEmpty) {
+          _mergeSongsFromJson(cloudSongsJson);
+        }
+      }
+    } catch (_) {}
+  }
+
+  void _mergeSongsFromJson(String content) {
+    try {
+      final List<dynamic> jsonList = jsonDecode(content);
+      for (final item in jsonList) {
+        try {
+          final song = Song.fromJson(item as Map<String, dynamic>);
+          final idx = _communitySongs.indexWhere((s) => s.id == song.id);
+          if (idx == -1) {
+            _communitySongs.add(song);
+          } else {
+            _communitySongs[idx] = song;
+          }
+        } catch (_) {}
+      }
+    } catch (_) {}
+  }
+
+  // ==========================================
+  // EXCEL / CSV EXPORT UTILITIES
+  // ==========================================
+
+  /// Export all registered users to Excel CSV format and trigger system share sheet
+  Future<File> exportUsersToExcel() async {
+    final buffer = StringBuffer();
+    // UTF-8 BOM for Microsoft Excel auto-detecting UTF-8
+    buffer.write('\uFEFF');
+    buffer.writeln('User ID,Full Name,Mobile Number,Email,Role,Account Status,Member Since,Last Active');
+
+    for (final u in _allUsers) {
+      final joinDate = DateFormat('yyyy-MM-dd HH:mm').format(u.createdAt);
+      final activeDate = DateFormat('yyyy-MM-dd HH:mm').format(u.lastActiveAt);
+      final status = DateTime.now().difference(u.lastActiveAt).inMinutes < 60 ? 'Active' : 'Offline';
+
+      buffer.writeln(
+        '"${u.uid}",'
+        '"${u.fullName.replaceAll('"', '""')}",'
+        '"${u.phoneNumber}",'
+        '"${u.email}",'
+        '"${u.role}",'
+        '"$status",'
+        '"$joinDate",'
+        '"$activeDate"',
+      );
+    }
+
+    final fileName = 'msixa_users_export_${DateFormat("yyyyMMdd_HHmm").format(DateTime.now())}.csv';
+    final targetPaths = [
+      '/storage/emulated/0/Download/$fileName',
+      '${Directory.systemTemp.path}/$fileName',
+    ];
+
+    File? exportFile;
+    for (final p in targetPaths) {
+      try {
+        final f = File(p);
+        if (!await f.parent.exists()) await f.parent.create(recursive: true);
+        await f.writeAsString(buffer.toString(), flush: true);
+        exportFile = f;
+        break;
+      } catch (_) {}
+    }
+
+    exportFile ??= File('${Directory.systemTemp.path}/$fileName')..writeAsStringSync(buffer.toString());
+
+    // Trigger Native Share Sheet
+    await Share.shareXFiles(
+      [XFile(exportFile.path, mimeType: 'text/csv')],
+      subject: 'Msixa Registered Users List (${_allUsers.length} Users)',
+      text: 'Msixa Player Registered Users Excel Export (${_allUsers.length} Total Users)',
+    );
+
+    return exportFile;
+  }
+
+  /// Export community & user uploaded songs to Excel CSV format and trigger system share sheet
+  Future<File> exportUploadedSongsToExcel() async {
+    final buffer = StringBuffer();
+    buffer.write('\uFEFF');
+    buffer.writeln('Song ID,Song Title,Artist,Album,Genre,Duration,Status,Uploader Name,Uploader Phone,Uploader UID,Upload Date,Stream URL,Cover Image URL');
+
+    for (final s in _communitySongs) {
+      final uploadDate = s.createdAt != null
+          ? DateFormat('yyyy-MM-dd HH:mm').format(s.createdAt!)
+          : 'N/A';
+
+      buffer.writeln(
+        '"${s.id}",'
+        '"${s.title.replaceAll('"', '""')}",'
+        '"${s.artist.replaceAll('"', '""')}",'
+        '"${s.album.replaceAll('"', '""')}",'
+        '"${s.genre}",'
+        '"${s.formattedDuration}",'
+        '"${s.status.toUpperCase()}",'
+        '"${(s.uploaderName ?? "Admin").replaceAll('"', '""')}",'
+        '"${s.uploaderPhone ?? "N/A"}",'
+        '"${s.uploadedBy ?? "N/A"}",'
+        '"$uploadDate",'
+        '"${s.streamUrl}",'
+        '"${s.coverUrl}"',
+      );
+    }
+
+    final fileName = 'msixa_uploaded_songs_${DateFormat("yyyyMMdd_HHmm").format(DateTime.now())}.csv';
+    final targetPaths = [
+      '/storage/emulated/0/Download/$fileName',
+      '${Directory.systemTemp.path}/$fileName',
+    ];
+
+    File? exportFile;
+    for (final p in targetPaths) {
+      try {
+        final f = File(p);
+        if (!await f.parent.exists()) await f.parent.create(recursive: true);
+        await f.writeAsString(buffer.toString(), flush: true);
+        exportFile = f;
+        break;
+      } catch (_) {}
+    }
+
+    exportFile ??= File('${Directory.systemTemp.path}/$fileName')..writeAsStringSync(buffer.toString());
+
+    // Trigger Native Share Sheet
+    await Share.shareXFiles(
+      [XFile(exportFile.path, mimeType: 'text/csv')],
+      subject: 'Msixa Community & User Uploaded Songs (${_communitySongs.length} Tracks)',
+      text: 'Msixa Player Uploaded Songs Excel Export (${_communitySongs.length} Tracks)',
+    );
+
+    return exportFile;
+  }
       }
     }
   }

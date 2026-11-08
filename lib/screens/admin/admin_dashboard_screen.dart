@@ -41,8 +41,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
     // Initial sync with shared storage
     _backend.syncSharedData();
 
-    // Periodic background sync every 4 seconds
-    _syncTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+    // Periodic background sync every 2 seconds for instant updates
+    _syncTimer = Timer.periodic(const Duration(seconds: 2), (_) {
       if (mounted) {
         _backend.syncSharedData();
       }
@@ -111,6 +111,266 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
   Future<void> _launchMail(String email) async {
     final uri = Uri.parse('mailto:$email?subject=Msixa%20Player%20Support');
     if (await canLaunchUrl(uri)) await launchUrl(uri);
+  }
+
+  void _showBulkUploadDialog() {
+    List<PlatformFile> pickedFiles = [];
+    bool isUploading = false;
+    int currentIndex = 0;
+    double currentTrackProgress = 0.0;
+    String statusMessage = '';
+    String selectedGenre = 'Bhakti';
+    final genres = ['Bhakti', 'Punjabi', 'Sufi', 'Bollywood', 'Spiritual', 'Desi Lo-Fi', 'Ghazal', 'Indie Pop'];
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: const Color(0xFF131A2A),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: const [
+              Icon(Icons.folder_copy_rounded, color: Color(0xFFFFB300), size: 24),
+              SizedBox(width: 8),
+              Text(
+                'बल्क / फ़ोल्डर गाने अपलोड करें',
+                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'डिवाइस से एक साथ कई गाने (Multiple MP3s) चुनें और Cloudflare R2 पर एक क्लिक में लाइव करें।',
+                    style: TextStyle(color: Colors.white70, fontSize: 11),
+                  ),
+                  const SizedBox(height: 14),
+
+                  if (!isUploading)
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF1E293B),
+                        foregroundColor: const Color(0xFF00E5FF),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          side: BorderSide(color: const Color(0xFF00E5FF).withOpacity(0.4)),
+                        ),
+                      ),
+                      icon: const Icon(Icons.file_open_rounded, size: 20),
+                      label: Text(
+                        pickedFiles.isEmpty
+                            ? '📁 गाने चुनें (Select Multiple MP3 Files)'
+                            : '📁 और गाने जोड़ें / बदलें (${pickedFiles.length} Chune Gaye)',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                      ),
+                      onPressed: () async {
+                        try {
+                          final result = await FilePicker.platform.pickFiles(
+                            allowMultiple: true,
+                            type: FileType.custom,
+                            allowedExtensions: ['mp3', 'm4a', 'wav'],
+                          );
+                          if (result != null && result.files.isNotEmpty) {
+                            setDialogState(() {
+                              pickedFiles = result.files.where((f) => f.path != null).toList();
+                            });
+                          }
+                        } catch (e) {
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('File picker error: $e')));
+                        }
+                      },
+                    ),
+
+                  if (pickedFiles.isNotEmpty) ...[
+                    const SizedBox(height: 14),
+                    const Text(
+                      'डिफ़ॉल्ट संगीत विधा (Default Genre):',
+                      style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 6),
+                    DropdownButtonFormField<String>(
+                      value: selectedGenre,
+                      dropdownColor: const Color(0xFF1E293B),
+                      style: const TextStyle(color: Colors.white, fontSize: 13),
+                      decoration: InputDecoration(
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Colors.white24)),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFFFB300))),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      ),
+                      items: genres.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
+                      onChanged: isUploading
+                          ? null
+                          : (val) {
+                              if (val != null) setDialogState(() => selectedGenre = val);
+                            },
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'चयनित गाने (${pickedFiles.length}):',
+                      style: const TextStyle(color: Color(0xFFFFB300), fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      constraints: const BoxConstraints(maxHeight: 160),
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0F1728),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.white12),
+                      ),
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: pickedFiles.length,
+                        itemBuilder: (context, idx) {
+                          final f = pickedFiles[idx];
+                          final isCurrent = isUploading && currentIndex == idx;
+                          final isDone = isUploading && idx < currentIndex;
+                          final mb = (f.size / (1024 * 1024)).toStringAsFixed(1);
+
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 2),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  isDone
+                                      ? Icons.check_circle_rounded
+                                      : isCurrent
+                                          ? Icons.cloud_upload_rounded
+                                          : Icons.music_note_rounded,
+                                  size: 14,
+                                  color: isDone
+                                      ? Colors.greenAccent
+                                      : isCurrent
+                                          ? const Color(0xFF00E5FF)
+                                          : Colors.grey,
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    f.name,
+                                    style: TextStyle(
+                                      color: isCurrent ? const Color(0xFF00E5FF) : Colors.white70,
+                                      fontSize: 11,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                Text('$mb MB', style: const TextStyle(color: Colors.grey, fontSize: 10)),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+
+                  if (isUploading) ...[
+                    const SizedBox(height: 16),
+                    LinearProgressIndicator(
+                      value: pickedFiles.isNotEmpty ? (currentIndex + currentTrackProgress) / pickedFiles.length : null,
+                      backgroundColor: Colors.white10,
+                      color: const Color(0xFFFFB300),
+                      minHeight: 8,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      statusMessage,
+                      style: const TextStyle(color: Color(0xFFFFB300), fontSize: 11, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            if (!isUploading)
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('रद्द करें (Cancel)', style: TextStyle(color: Colors.grey)),
+              ),
+            if (pickedFiles.isNotEmpty && !isUploading)
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFFB300),
+                  foregroundColor: Colors.black,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                ),
+                icon: const Icon(Icons.cloud_upload_rounded, size: 18),
+                label: Text(
+                  'R2 पर अपलोड शुरू करें (${pickedFiles.length})',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                ),
+                onPressed: () async {
+                  setDialogState(() {
+                    isUploading = true;
+                    currentIndex = 0;
+                    currentTrackProgress = 0.0;
+                    statusMessage = 'अपलोड शुरू हो रहा है...';
+                  });
+
+                  final r2 = R2StorageService();
+                  int successCount = 0;
+
+                  for (int i = 0; i < pickedFiles.length; i++) {
+                    final pf = pickedFiles[i];
+                    if (pf.path == null) continue;
+
+                    setDialogState(() {
+                      currentIndex = i;
+                      currentTrackProgress = 0.1;
+                      statusMessage = 'अपलोड हो रहा है (${i + 1}/${pickedFiles.length}): ${pf.name}...';
+                    });
+
+                    try {
+                      final file = File(pf.path!);
+                      final cleanName = pf.name.replaceAll(RegExp(r'\.[a-zA-Z0-9]+$'), '').replaceAll('_', ' ');
+
+                      final cloudUrl = await r2.uploadAudioFile(
+                        file,
+                        customId: 'bulk_${DateTime.now().millisecondsSinceEpoch}_$i',
+                        onProgress: (p) => setDialogState(() => currentTrackProgress = p),
+                      );
+
+                      if (cloudUrl != null && cloudUrl.isNotEmpty) {
+                        await _backend.addAdminSong(
+                          title: cleanName,
+                          artist: 'Various Artists',
+                          album: 'Msixa Cloud Hits',
+                          genre: selectedGenre,
+                          audioPath: cloudUrl,
+                        );
+                        successCount++;
+                      }
+                    } catch (e) {
+                      debugPrint('Error uploading ${pf.name}: $e');
+                    }
+                  }
+
+                  if (mounted) {
+                    Navigator.pop(ctx);
+                    setState(() {});
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('🎉 $successCount / ${pickedFiles.length} गाने Cloudflare R2 पर सफलतापूर्वक लाइव हो गए!'),
+                        backgroundColor: const Color(0xFF10B981),
+                        duration: const Duration(seconds: 4),
+                      ),
+                    );
+                  }
+                },
+              ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showAddSongDialog() {
@@ -971,6 +1231,41 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
   Widget _buildUsersDirectoryTab(List<UserProfile> users) {
     return Column(
       children: [
+        // Users Export & Stats Header
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+          child: Row(
+            children: [
+              Text(
+                '${_lang.t('tab_users')} (${users.length})',
+                style: GoogleFonts.syne(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+              const Spacer(),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF10B981),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  elevation: 0,
+                ),
+                icon: const Icon(Icons.file_download_rounded, size: 16),
+                label: const Text('Excel Export', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                onPressed: () async {
+                  try {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Generating Users Excel Sheet...')),
+                    );
+                    await _backend.exportUsersToExcel();
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Export error: $e')));
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
+
         // Search Box
         Padding(
           padding: const EdgeInsets.all(14),
@@ -1129,32 +1424,74 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
   Widget _buildLiveSongsTab(List<Song> songs) {
     return Column(
       children: [
-        // Add Song Header Button Bar
+        // Add Song & Export Header Button Bar
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           color: const Color(0xFF0F1728),
-          child: Row(
-            children: [
-              Text(
-                '${_lang.t('tab_live')} (${songs.length})',
-                style: GoogleFonts.syne(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
-              ),
-              const Spacer(),
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFFFB300),
-                  foregroundColor: Colors.black,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                Text(
+                  '${_lang.t('tab_live')} (${songs.length})',
+                  style: GoogleFonts.syne(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
                 ),
-                icon: const Icon(Icons.add_rounded, size: 18),
-                label: Text(
-                  _lang.t('add_song_admin'),
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                const SizedBox(width: 12),
+
+                // Bulk Folder / Multi-File Upload Button
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF00E5FF),
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    elevation: 0,
+                  ),
+                  icon: const Icon(Icons.drive_folder_upload_rounded, size: 16),
+                  label: const Text('बल्क / फ़ोल्डर अपलोड', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                  onPressed: _showBulkUploadDialog,
                 ),
-                onPressed: _showAddSongDialog,
-              ),
-            ],
+                const SizedBox(width: 8),
+
+                // Export Songs to Excel
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF10B981),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    elevation: 0,
+                  ),
+                  icon: const Icon(Icons.file_download_rounded, size: 16),
+                  label: const Text('Excel Export', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                  onPressed: () async {
+                    try {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Generating Uploaded Songs Excel Sheet...')),
+                      );
+                      await _backend.exportUploadedSongsToExcel();
+                    } catch (e) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Export error: $e')));
+                    }
+                  },
+                ),
+                const SizedBox(width: 8),
+
+                // Single Add Song Dialog
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFFB300),
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    elevation: 0,
+                  ),
+                  icon: const Icon(Icons.add_rounded, size: 16),
+                  label: Text(_lang.t('add_song_admin'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                  onPressed: _showAddSongDialog,
+                ),
+              ],
+            ),
           ),
         ),
 
