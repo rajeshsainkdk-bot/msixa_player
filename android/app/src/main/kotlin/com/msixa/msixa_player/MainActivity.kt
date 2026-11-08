@@ -64,6 +64,22 @@ class MainActivity: AudioServiceActivity() {
                 } catch (e: Exception) {
                     result.error("INSTALL_ERROR", e.localizedMessage, null)
                 }
+            } else if (call.method == "getAppVersion") {
+                try {
+                    val pInfo = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                        packageManager.getPackageInfo(packageName, 0).longVersionCode
+                    } else {
+                        @Suppress("DEPRECATION")
+                        packageManager.getPackageInfo(packageName, 0).versionCode.toLong()
+                    }
+                    val versionName = packageManager.getPackageInfo(packageName, 0).versionName ?: "1.0.0"
+                    result.success(mapOf(
+                        "versionCode" to pInfo,
+                        "versionName" to versionName
+                    ))
+                } catch (e: Exception) {
+                    result.error("VERSION_ERROR", e.localizedMessage, null)
+                }
             } else {
                 result.notImplemented()
             }

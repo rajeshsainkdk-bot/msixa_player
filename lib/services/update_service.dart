@@ -16,10 +16,22 @@ class UpdateService {
   static const String manifestUrl = 'https://pub-d4f2e58dc2594d0c8dc1f30bbae4344f.r2.dev/update/version.json';
   static const MethodChannel _channel = MethodChannel('com.msixa.player/app_share');
   static const String _prefKeyLastChecked = 'msixa_last_update_check';
+  static const String _prefKeyDismissedVersion = 'msixa_dismissed_update_version';
+  static const String _prefKeyLastPromptTime = 'msixa_last_update_prompt_time';
 
-  // Base build version code of the installed application
-  static const int currentVersionCode = 2;
-  static const String currentVersionName = '1.0.2';
+  /// Read exact installed package version dynamically from Android PackageManager
+  static Future<Map<String, dynamic>> getInstalledVersion() async {
+    try {
+      final res = await _channel.invokeMethod<Map>('getAppVersion');
+      if (res != null) {
+        return {
+          'versionCode': (res['versionCode'] as num?)?.toInt() ?? 1,
+          'versionName': res['versionName']?.toString() ?? '1.0.0',
+        };
+      }
+    } catch (_) {}
+    return {'versionCode': 1, 'versionName': '1.0.0'};
+  }
 
   /// Check for latest update from Cloudflare R2
   static Future<void> checkForUpdate(BuildContext context, {bool autoPrompt = false}) async {
@@ -52,7 +64,24 @@ class UpdateService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt(_prefKeyLastChecked, ts);
 
-      if (remoteCode > currentVersionCode && apkUrl.isNotEmpty) {
+      // Get exact installed version from device OS
+      final installed = await getInstalledVersion();
+      final installedCode = installed['versionCode'] as int;
+      final installedName = installed['versionName'] as String;
+
+      debugPrint('📱 App Version Check: Installed=$installedCode (v$installedName), Remote=$remoteCode (v$remoteName)');
+
+      // If user dismissed this version within the last 6 hours, don't show auto-prompt again
+      if (autoPrompt && !forceUpdate) {
+        final dismissedCode = prefs.getInt(_prefKeyDismissedVersion) ?? 0;
+        final lastPromptTime = prefs.getInt(_prefKeyLastPromptTime) ?? 0;
+        if (dismissedCode >= remoteCode && (ts - lastPromptTime) < 6 * 3600 * 1000) {
+          return;
+        }
+      }
+
+      // ONLY prompt if remote version is strictly newer than installed version
+      if (remoteCode > installedCode && apkUrl.isNotEmpty) {
         if (context.mounted) {
           _showUpdateDialog(
             context,
@@ -61,11 +90,12 @@ class UpdateService {
             releaseNotes: releaseNotes,
             apkUrl: apkUrl,
             forceUpdate: forceUpdate,
+            remoteCode: remoteCode,
           );
         }
       } else {
         if (!autoPrompt && context.mounted) {
-          _showToast(context, '🎉 आप पहले से नवीनतम वर्ज़न (v$currentVersionName) पर हैं!');
+          _showToast(context, '🎉 आप पहले से नवीनतम वर्ज़न (v$installedName) पर हैं!');
         }
       }
     } catch (e) {
@@ -93,6 +123,7 @@ class UpdateService {
     required String releaseNotes,
     required String apkUrl,
     required bool forceUpdate,
+    required int remoteCode,
   }) {
     showDialog(
       context: context,
@@ -203,7 +234,16 @@ class UpdateService {
                 actions: [
                   if (!isDownloading && !forceUpdate)
                     TextButton(
-                      onPressed: () => Navigator.pop(dialogContext),
+                      onPressed: () async {
+                        try {
+                          final p = await SharedPreferences.getInstance();
+                          await p.setInt(_prefKeyDismissedVersion, remoteCode);
+                          await p.setInt(_prefKeyLastPromptTime, DateTime.now().millisecondsSinceEpoch);
+                        } catch (_) {}
+                        if (dialogContext.mounted) {
+                          Navigator.pop(dialogContext);
+                        }
+                      },
                       child: const Text('बाद में (Later)', style: TextStyle(color: Colors.grey)),
                     ),
                   if (!isDownloading)
@@ -287,3 +327,4 @@ class UpdateService {
     );
   }
 }
+

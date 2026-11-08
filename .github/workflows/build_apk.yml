@@ -199,6 +199,22 @@ jobs:
                           } catch (e: Exception) {
                               result.error("INSTALL_ERROR", e.localizedMessage, null)
                           }
+                      } else if (call.method == "getAppVersion") {
+                          try {
+                              val pInfo = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                                  packageManager.getPackageInfo(packageName, 0).longVersionCode
+                              } else {
+                                  @Suppress("DEPRECATION")
+                                  packageManager.getPackageInfo(packageName, 0).versionCode.toLong()
+                              }
+                              val versionName = packageManager.getPackageInfo(packageName, 0).versionName ?: "1.0.0"
+                              result.success(mapOf(
+                                  "versionCode" to pInfo,
+                                  "versionName" to versionName
+                              ))
+                          } catch (e: Exception) {
+                              result.error("VERSION_ERROR", e.localizedMessage, null)
+                          }
                       } else {
                           result.notImplemented()
                       }
@@ -271,7 +287,7 @@ jobs:
 
       - name: Build User APK (Release)
         run: |
-          flutter build apk --release --no-tree-shake-icons
+          flutter build apk --release --build-name=1.0.${{ github.run_number }} --build-number=${{ github.run_number }} --no-tree-shake-icons
           cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/msixa-player-release.apk
 
       - name: Deploy Live Update Package to Cloudflare R2
@@ -327,7 +343,7 @@ jobs:
           sed -i 's/android:label="Msixa Player"/android:label="Msixa Player Admin"/' android/app/src/main/AndroidManifest.xml || true
           rm -rf build/app/outputs/flutter-apk/app-release.apk
 
-          flutter build apk --release --target=lib/main_admin.dart --no-tree-shake-icons
+          flutter build apk --release --target=lib/main_admin.dart --build-name=1.0.${{ github.run_number }} --build-number=${{ github.run_number }} --no-tree-shake-icons
           cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/msixa-admin-release.apk
 
       - name: Upload User APK Artifact
