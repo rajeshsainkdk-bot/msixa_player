@@ -24,15 +24,21 @@ class CloudBackendService extends ChangeNotifier {
 
   // Shared file paths across User App and Admin App
   static final List<String> _sharedUserFilePaths = [
-    '/data/data/com.msixa.msixa_player/files/msixa_shared_users.json',
+    '/data/data/com.msixa.player/files/msixa_shared_users.json',
     '/data/data/com.msixa.admin/files/msixa_shared_users.json',
+    '/data/user/0/com.msixa.player/files/msixa_shared_users.json',
+    '/data/user/0/com.msixa.admin/files/msixa_shared_users.json',
+    '/data/data/com.msixa.msixa_player/files/msixa_shared_users.json',
     '/storage/emulated/0/Download/msixa_shared_users.json',
     '/sdcard/Download/msixa_shared_users.json',
   ];
 
   static final List<String> _sharedSongFilePaths = [
-    '/data/data/com.msixa.msixa_player/files/msixa_shared_songs.json',
+    '/data/data/com.msixa.player/files/msixa_shared_songs.json',
     '/data/data/com.msixa.admin/files/msixa_shared_songs.json',
+    '/data/user/0/com.msixa.player/files/msixa_shared_songs.json',
+    '/data/user/0/com.msixa.admin/files/msixa_shared_songs.json',
+    '/data/data/com.msixa.msixa_player/files/msixa_shared_songs.json',
     '/storage/emulated/0/Download/msixa_shared_songs.json',
     '/sdcard/Download/msixa_shared_songs.json',
   ];
@@ -178,6 +184,9 @@ class CloudBackendService extends ChangeNotifier {
         ? digitsOnly.substring(digitsOnly.length - 10)
         : digitsOnly;
     final formattedPhone = '+91 $last10Digits';
+
+    // 1. Fetch latest users from cloud database before validating
+    await _loadSharedUsers();
 
     final existingIndex = _allUsers.indexWhere((u) {
       final uDigits = u.phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
@@ -593,13 +602,16 @@ class CloudBackendService extends ChangeNotifier {
       }
     }
 
-    // Sync to Cloudflare R2 cloud database
+    // Sync to Cloudflare R2 cloud database (Awaited for instant consistency)
     try {
       final r2 = R2StorageService();
       if (r2.isConfigured) {
-        r2.putString('db/users.json', jsonContent);
+        final success = await r2.putString('db/users.json', jsonContent);
+        debugPrint('✅ Persisted ${_allUsers.length} users to Cloudflare R2: success=$success');
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('❌ Cloud R2 persist users error: $e');
+    }
   }
 
   Future<void> _persistSongs() async {
@@ -621,23 +633,39 @@ class CloudBackendService extends ChangeNotifier {
       }
     }
 
-    // Sync to Cloudflare R2 cloud database
+    // Sync to Cloudflare R2 cloud database (Awaited)
     try {
       final r2 = R2StorageService();
       if (r2.isConfigured) {
-        r2.putString('db/songs.json', jsonContent);
+        final success = await r2.putString('db/songs.json', jsonContent);
+        debugPrint('✅ Persisted ${_communitySongs.length} songs to Cloudflare R2: success=$success');
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('❌ Cloud R2 persist songs error: $e');
+    }
   }
+
+  bool _isSyncing = false;
 
   /// Public Sync Method: Reloads shared data across both User & Admin apps
   Future<void> syncSharedData() async {
-    await _loadSharedUsers();
-    await _loadSharedSongs();
-    notifyListeners();
+    if (_isSyncing) return;
+    _isSyncing = true;
+    try {
+      final usersChanged = await _loadSharedUsers();
+      final songsChanged = await _loadSharedSongs();
+      if (usersChanged || songsChanged) {
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('syncSharedData error: $e');
+    } finally {
+      _isSyncing = false;
+    }
   }
 
-  Future<void> _loadSharedUsers() async {
+  Future<bool> _loadSharedUsers() async {
+    bool hasChanges = false;
     // 1. Local Shared Files
     for (final path in _sharedUserFilePaths) {
       try {
@@ -645,7 +673,7 @@ class CloudBackendService extends ChangeNotifier {
         if (await file.exists()) {
           final content = await file.readAsString();
           if (content.trim().isNotEmpty) {
-            _mergeUsersFromJson(content);
+            if (_mergeUsersFromJson(content)) hasChanges = true;
           }
         }
       } catch (e) {
@@ -653,19 +681,31 @@ class CloudBackendService extends ChangeNotifier {
       }
     }
 
-    // 2. Cloudflare R2 Remote Cloud Database
+    // 2. Cloudflare R2 Remote Cloud Database (Live cache-busted)
     try {
       final r2 = R2StorageService();
       if (r2.isConfigured) {
         final cloudUsersJson = await r2.getString('db/users.json');
         if (cloudUsersJson != null && cloudUsersJson.trim().isNotEmpty) {
-          _mergeUsersFromJson(cloudUsersJson);
+          if (_mergeUsersFromJson(cloudUsersJson)) hasChanges = true;
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Reading shared users from R2: $e');
+    }
+
+    if (hasChanges) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setStringList(_keyAllUsers, _allUsers.map((u) => jsonEncode(u.toJson())).toList());
+      } catch (_) {}
+    }
+
+    return hasChanges;
   }
 
-  void _mergeUsersFromJson(String content) {
+  bool _mergeUsersFromJson(String content) {
+    bool hasChanges = false;
     try {
       final List<dynamic> jsonList = jsonDecode(content);
       for (final item in jsonList) {
@@ -679,17 +719,22 @@ class CloudBackendService extends ChangeNotifier {
           });
           if (idx == -1) {
             _allUsers.add(user);
+            hasChanges = true;
           } else {
-            if (user.lastActiveAt.isAfter(_allUsers[idx].lastActiveAt)) {
+            if (user.lastActiveAt.isAfter(_allUsers[idx].lastActiveAt) ||
+                (user.password.isNotEmpty && _allUsers[idx].password.isEmpty)) {
               _allUsers[idx] = user;
+              hasChanges = true;
             }
           }
         } catch (_) {}
       }
     } catch (_) {}
+    return hasChanges;
   }
 
-  Future<void> _loadSharedSongs() async {
+  Future<bool> _loadSharedSongs() async {
+    bool hasChanges = false;
     // 1. Local Shared Files
     for (final path in _sharedSongFilePaths) {
       try {
@@ -697,7 +742,7 @@ class CloudBackendService extends ChangeNotifier {
         if (await file.exists()) {
           final content = await file.readAsString();
           if (content.trim().isNotEmpty) {
-            _mergeSongsFromJson(content);
+            if (_mergeSongsFromJson(content)) hasChanges = true;
           }
         }
       } catch (e) {
@@ -711,13 +756,25 @@ class CloudBackendService extends ChangeNotifier {
       if (r2.isConfigured) {
         final cloudSongsJson = await r2.getString('db/songs.json');
         if (cloudSongsJson != null && cloudSongsJson.trim().isNotEmpty) {
-          _mergeSongsFromJson(cloudSongsJson);
+          if (_mergeSongsFromJson(cloudSongsJson)) hasChanges = true;
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Reading shared songs from R2: $e');
+    }
+
+    if (hasChanges) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setStringList(_keyCommunitySongs, _communitySongs.map((s) => jsonEncode(s.toJson())).toList());
+      } catch (_) {}
+    }
+
+    return hasChanges;
   }
 
-  void _mergeSongsFromJson(String content) {
+  bool _mergeSongsFromJson(String content) {
+    bool hasChanges = false;
     try {
       final List<dynamic> jsonList = jsonDecode(content);
       for (final item in jsonList) {
@@ -726,12 +783,18 @@ class CloudBackendService extends ChangeNotifier {
           final idx = _communitySongs.indexWhere((s) => s.id == song.id);
           if (idx == -1) {
             _communitySongs.add(song);
+            hasChanges = true;
           } else {
-            _communitySongs[idx] = song;
+            if (song.status != _communitySongs[idx].status ||
+                song.streamUrl != _communitySongs[idx].streamUrl) {
+              _communitySongs[idx] = song;
+              hasChanges = true;
+            }
           }
         } catch (_) {}
       }
     } catch (_) {}
+    return hasChanges;
   }
 
   // ==========================================

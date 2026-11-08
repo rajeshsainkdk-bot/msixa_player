@@ -7,10 +7,10 @@ import 'screens/admin/admin_dashboard_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await R2StorageService().init();
   final backend = CloudBackendService();
   await backend.init();
   await LanguageService().init();
-  await R2StorageService().init();
 
   runApp(const MsixaAdminApp());
 }

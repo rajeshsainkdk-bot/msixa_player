@@ -34,11 +34,11 @@ class R2StorageService extends ChangeNotifier {
   static const String defaultSecretAccessKey = '77ef640b75cc5d1858ef76bb88872d8baeed1c60f581d4ef0280e67a43dd4ddd';
   static const String defaultPublicDomain = 'pub-d4f2e58dc2594d0c8dc1f30bbae4344f.r2.dev';
 
-  String? _accountId;
-  String? _bucketName;
-  String? _accessKeyId;
-  String? _secretAccessKey;
-  String? _publicDomain; // e.g. "pub-xxxx.r2.dev" or custom domain "music.msixa.com"
+  String? _accountId = defaultAccountId;
+  String? _bucketName = defaultBucketName;
+  String? _accessKeyId = defaultAccessKeyId;
+  String? _secretAccessKey = defaultSecretAccessKey;
+  String? _publicDomain = defaultPublicDomain; // e.g. "pub-xxxx.r2.dev" or custom domain "music.msixa.com"
 
   bool _isInitialized = false;
 
@@ -249,15 +249,25 @@ class R2StorageService extends ChangeNotifier {
     return _putObject(objectKey: objectKey, data: bytes, contentType: contentType);
   }
 
-  /// Read text / JSON string from Cloudflare R2 public CDN
+  /// Read text / JSON string from Cloudflare R2 public CDN with cache-busting
   Future<String?> getString(String objectKey) async {
     if (!isConfigured) return null;
     try {
-      final res = await http.get(Uri.parse('https://$_publicDomain/$objectKey')).timeout(const Duration(seconds: 6));
+      final ts = DateTime.now().millisecondsSinceEpoch;
+      final uri = Uri.parse('https://$_publicDomain/$objectKey?t=$ts');
+      final res = await http.get(
+        uri,
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+        },
+      ).timeout(const Duration(seconds: 5));
       if (res.statusCode == 200) {
         return utf8.decode(res.bodyBytes);
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('R2 getString [$objectKey] exception: $e');
+    }
     return null;
   }
 
@@ -395,23 +405,28 @@ class R2StorageService extends ChangeNotifier {
     final authorization = '$algorithm Credential=$_accessKeyId/$credentialScope, '
         'SignedHeaders=$signedHeaders, Signature=$signature';
 
-    final response = await http.put(
-      requestUri,
-      headers: {
-        'Host': endpointHost,
-        'x-amz-date': amzDate,
-        'x-amz-content-sha256': payloadHash,
-        'Authorization': authorization,
-        'Content-Type': contentType,
-        'Content-Length': data.length.toString(),
-      },
-      body: data,
-    );
+    try {
+      final response = await http.put(
+        requestUri,
+        headers: {
+          'Host': endpointHost,
+          'x-amz-date': amzDate,
+          'x-amz-content-sha256': payloadHash,
+          'Authorization': authorization,
+          'Content-Type': contentType,
+        },
+        body: data,
+      ).timeout(const Duration(seconds: 20));
 
-    if (response.statusCode >= 200 && response.statusCode < 300) {
-      return true;
-    } else {
-      debugPrint('Cloudflare R2 PUT failed (${response.statusCode}): ${response.body}');
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        debugPrint('✅ Cloudflare R2 PUT Success [$objectKey] (HTTP ${response.statusCode})');
+        return true;
+      } else {
+        debugPrint('❌ Cloudflare R2 PUT failed (${response.statusCode}): ${response.body}');
+        return false;
+      }
+    } catch (e) {
+      debugPrint('❌ Cloudflare R2 PUT exception [$objectKey]: $e');
       return false;
     }
   }

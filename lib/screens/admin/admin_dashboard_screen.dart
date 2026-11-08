@@ -35,6 +35,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging) {
+        _backend.syncSharedData();
+      }
+    });
     _backend.addListener(_onUpdate);
     _lang.addListener(_onUpdate);
 
