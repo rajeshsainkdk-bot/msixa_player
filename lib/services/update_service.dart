@@ -265,6 +265,57 @@ class UpdateService {
                         style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                       ),
                       onPressed: () async {
+                        // 1. Check if Android "Install Unknown Apps" permission is granted BEFORE starting download
+                        try {
+                          final canInstall = await _channel.invokeMethod<bool>('canInstallPackages') ?? true;
+                          if (!canInstall) {
+                            if (dialogContext.mounted) {
+                              final shouldOpenSettings = await showDialog<bool>(
+                                context: dialogContext,
+                                builder: (permCtx) => AlertDialog(
+                                  backgroundColor: const Color(0xFF131B2C),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                  title: Row(
+                                    children: const [
+                                      Icon(Icons.security_rounded, color: Color(0xFFFFB300), size: 24),
+                                      SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          'अनुमति आवश्यक है',
+                                          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  content: const Text(
+                                    'ऐप को बिना प्ले स्टोर के सीधे अपडेट करने के लिए कृपया सेटिंग्स में "Allow from this source" (अज्ञात ऐप्स इंस्टॉल करें) की अनुमति चालू करें।\n\nअनुमति देने के बाद तुरंत अपडेट शुरू हो जाएगा।',
+                                    style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(permCtx, false),
+                                      child: const Text('रद्द करें (Cancel)', style: TextStyle(color: Colors.grey)),
+                                    ),
+                                    ElevatedButton(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(0xFFFFB300),
+                                        foregroundColor: Colors.black,
+                                      ),
+                                      onPressed: () => Navigator.pop(permCtx, true),
+                                      child: const Text('सेटिंग्स खोलें (Open Settings)', style: TextStyle(fontWeight: FontWeight.bold)),
+                                    ),
+                                  ],
+                                ),
+                              );
+
+                              if (shouldOpenSettings == true) {
+                                await _channel.invokeMethod('openInstallSettings');
+                              }
+                              return;
+                            }
+                          }
+                        } catch (_) {}
+
                         setState(() {
                           isDownloading = true;
                           statusText = 'डाउनलोड शुरू हो रहा है...';

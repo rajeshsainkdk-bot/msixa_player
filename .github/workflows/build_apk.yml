@@ -37,8 +37,7 @@ jobs:
         run: |
           cat << 'EOF' > android/app/src/main/AndroidManifest.xml
           <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-              xmlns:tools="http://schemas.android.com/tools"
-              android:sharedUserId="com.msixa.shared">
+              xmlns:tools="http://schemas.android.com/tools">
 
               <uses-permission android:name="android.permission.INTERNET" />
               <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -53,6 +52,18 @@ jobs:
               <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
               <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
               <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" tools:ignore="ScopedStorage" />
+
+              <!-- Package Visibility Queries for Android 11+ Package Installer Resolution -->
+              <queries>
+                  <intent>
+                      <action android:name="android.intent.action.VIEW" />
+                      <data android:mimeType="application/vnd.android.package-archive" />
+                  </intent>
+                  <intent>
+                      <action android:name="android.intent.action.INSTALL_PACKAGE" />
+                      <data android:mimeType="application/vnd.android.package-archive" />
+                  </intent>
+              </queries>
 
               <application
                   android:label="Msixa Player"
@@ -182,6 +193,35 @@ jobs:
                               result.success(true)
                           } catch (e: Exception) {
                               result.error("SHARE_ERROR", e.localizedMessage, null)
+                          }
+                      } else if (call.method == "canInstallPackages") {
+                          if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                              result.success(packageManager.canRequestPackageInstalls())
+                          } else {
+                              result.success(true)
+                          }
+                      } else if (call.method == "openInstallSettings") {
+                          if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                              try {
+                                  val permIntent = Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                                      data = android.net.Uri.parse("package:$packageName")
+                                      addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                  }
+                                  startActivity(permIntent)
+                                  result.success(true)
+                              } catch (e: Exception) {
+                                  try {
+                                      val fallbackIntent = Intent(android.provider.Settings.ACTION_SECURITY_SETTINGS).apply {
+                                          addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                      }
+                                      startActivity(fallbackIntent)
+                                      result.success(true)
+                                  } catch (fe: Exception) {
+                                      result.error("SETTINGS_ERROR", fe.localizedMessage, null)
+                                  }
+                              }
+                          } else {
+                              result.success(true)
                           }
                       } else if (call.method == "installApk") {
                           try {
