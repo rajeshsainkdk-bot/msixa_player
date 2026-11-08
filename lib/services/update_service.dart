@@ -75,17 +75,18 @@ class UpdateService {
 
       debugPrint('📱 App Version Check: Installed=$installedCode (v$installedName), Remote=$remoteCode (v$remoteName)');
 
-      // If user dismissed this version within the last 6 hours, don't show auto-prompt again
+      // If user dismissed this version or was prompted recently, don't show auto-prompt again
       if (autoPrompt && !forceUpdate) {
         final dismissedCode = prefs.getInt(_prefKeyDismissedVersion) ?? 0;
         final lastPromptTime = prefs.getInt(_prefKeyLastPromptTime) ?? 0;
-        if (dismissedCode >= remoteCode && (ts - lastPromptTime) < 6 * 3600 * 1000) {
+        if (dismissedCode >= remoteCode || (ts - lastPromptTime) < 2 * 3600 * 1000) {
           return;
         }
       }
 
       // ONLY prompt if remote version is strictly newer than installed version
       if (remoteCode > installedCode && apkUrl.isNotEmpty) {
+        await prefs.setInt(_prefKeyLastPromptTime, ts);
         if (context.mounted) {
           _showUpdateDialog(
             context,
@@ -303,14 +304,30 @@ class UpdateService {
                           await sink.flush();
                           await sink.close();
 
-                          // Automatically dismiss the popup dialog immediately
+                          // 1. Reset isDownloading immediately so WillPopScope won't block dialog dismissal
+                          setState(() {
+                            isDownloading = false;
+                            downloadProgress = 1.0;
+                            statusText = 'डाउनलोड पूरा हुआ! इंस्टॉलेशन...';
+                          });
+
+                          // 2. Remember dismissed version code to avoid nagging on immediate restart
                           try {
-                            if (Navigator.of(ctx, rootNavigator: true).canPop()) {
-                              Navigator.of(ctx, rootNavigator: true).pop();
-                            }
+                            final p = await SharedPreferences.getInstance();
+                            await p.setInt(_prefKeyDismissedVersion, remoteCode);
+                            await p.setInt(_prefKeyLastPromptTime, DateTime.now().millisecondsSinceEpoch);
                           } catch (_) {}
 
-                          // Show floating success notification
+                          // 3. Automatically dismiss the popup dialog immediately
+                          try {
+                            Navigator.of(dialogContext).pop();
+                          } catch (_) {
+                            try {
+                              Navigator.of(ctx, rootNavigator: true).pop();
+                            } catch (_) {}
+                          }
+
+                          // 4. Show floating success notification
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
@@ -325,7 +342,7 @@ class UpdateService {
                             );
                           }
 
-                          // Launch Native APK Installer
+                          // 5. Launch Native APK Installer
                           try {
                             await _channel.invokeMethod('installApk', {'filePath': apkFile.path});
                           } on PlatformException catch (pe) {
