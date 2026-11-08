@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../services/cloud_backend_service.dart';
 import '../services/language_service.dart';
+import '../services/update_service.dart';
 import '../services/app_share_service.dart';
 import '../providers/player_provider.dart';
 import '../theme/app_colors.dart';
@@ -293,6 +294,23 @@ class ProfileScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 28),
+
+            // Check for Updates Button
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF00E5FF),
+                side: const BorderSide(color: Color(0xFF00E5FF)),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+              icon: const Icon(Icons.system_update_rounded, size: 18),
+              label: Text(
+                'अपडेट जांचें (Check for Updates)',
+                style: GoogleFonts.syne(fontSize: 14, fontWeight: FontWeight.bold),
+              ),
+              onPressed: () => UpdateService.checkForUpdate(context, autoPrompt: false),
+            ),
+            const SizedBox(height: 12),
 
             // 4. Sign Out Button
             OutlinedButton.icon(

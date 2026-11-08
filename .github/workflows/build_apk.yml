@@ -47,7 +47,8 @@ jobs:
               <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
               <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-              <!-- Storage Permissions for Device Local Audio Scanner & Cross-App Shared Database -->
+              <!-- Storage & Installation Permissions for Auto-Update & Media Scanner -->
+              <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
               <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
               <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
               <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
@@ -124,6 +125,7 @@ jobs:
           <paths xmlns:android="http://schemas.android.com/apk/res/android">
               <cache-path name="apk_cache" path="." />
               <external-cache-path name="ext_cache" path="." />
+              <files-path name="files" path="." />
               <external-path name="ext_files" path="." />
           </paths>
           EOF
@@ -177,6 +179,25 @@ jobs:
                               result.success(true)
                           } catch (e: Exception) {
                               result.error("SHARE_ERROR", e.localizedMessage, null)
+                          }
+                      } else if (call.method == "installApk") {
+                          try {
+                              val filePath = call.argument<String>("filePath") ?: throw IllegalArgumentException("filePath required")
+                              val file = File(filePath)
+                              val apkUri = FileProvider.getUriForFile(
+                                  this,
+                                  "${applicationContext.packageName}.fileprovider",
+                                  file
+                              )
+                              val installIntent = Intent(Intent.ACTION_VIEW).apply {
+                                  setDataAndType(apkUri, "application/vnd.android.package-archive")
+                                  addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                  addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                              }
+                              startActivity(installIntent)
+                              result.success(true)
+                          } catch (e: Exception) {
+                              result.error("INSTALL_ERROR", e.localizedMessage, null)
                           }
                       } else {
                           result.notImplemented()
@@ -252,6 +273,50 @@ jobs:
         run: |
           flutter build apk --release --no-tree-shake-icons
           cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/msixa-player-release.apk
+
+      - name: Deploy Live Update Package to Cloudflare R2
+        run: |
+          pip install boto3
+          python - << 'EOF'
+          import boto3, os, json
+
+          s3 = boto3.client(
+              's3',
+              endpoint_url='https://25622df2e6919b63cf30e7d06532d778.r2.cloudflarestorage.com',
+              aws_access_key_id='3857da30609fecfde1e88f56c842f7f1',
+              aws_secret_access_key='77ef640b75cc5d1858ef76bb88872d8baeed1c60f581d4ef0280e67a43dd4ddd',
+              region_name='auto'
+          )
+
+          apk_path = 'build/app/outputs/flutter-apk/msixa-player-release.apk'
+          if os.path.exists(apk_path):
+              size_mb = round(os.path.getsize(apk_path) / (1024 * 1024), 2)
+              print(f"Uploading {apk_path} ({size_mb} MB) to R2 update/msixa_player_latest.apk...")
+              s3.upload_file(
+                  apk_path,
+                  'msixa-music',
+                  'update/msixa_player_latest.apk',
+                  ExtraArgs={'ContentType': 'application/vnd.android.package-archive'}
+              )
+
+              run_num = int(os.environ.get('GITHUB_RUN_NUMBER', 1))
+              manifest = {
+                  'version_code': run_num,
+                  'version_name': f"1.0.{run_num}",
+                  'apk_url': 'https://pub-d4f2e58dc2594d0c8dc1f30bbae4344f.r2.dev/update/msixa_player_latest.apk',
+                  'file_size_mb': size_mb,
+                  'release_notes': 'Auto-Update: Realtime sync and platform enhancements!',
+                  'force_update': False
+              }
+              print(f"Deploying update manifest: {manifest}")
+              s3.put_object(
+                  Bucket='msixa-music',
+                  Key='update/version.json',
+                  Body=json.dumps(manifest),
+                  ContentType='application/json'
+              )
+              print("Cloudflare R2 OTA Auto-Update successfully deployed!")
+          EOF
 
       - name: Build Admin Control APK (Release)
         run: |

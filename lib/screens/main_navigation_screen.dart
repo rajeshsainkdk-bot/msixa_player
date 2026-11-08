@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/player_provider.dart';
 import '../theme/app_colors.dart';
 import '../widgets/mini_player.dart';
+import '../services/update_service.dart';
 import 'home_screen.dart';
 import 'search_screen.dart';
 import 'library_screen.dart';
@@ -17,6 +18,14 @@ class MainNavigationScreen extends StatefulWidget {
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      UpdateService.checkForUpdate(context, autoPrompt: true);
+    });
+  }
 
   final List<Widget> _screens = const [
     HomeScreen(),
