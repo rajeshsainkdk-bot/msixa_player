@@ -93,9 +93,10 @@ class _AdminRootViewState extends State<AdminRootView> {
 
     return Scaffold(
       backgroundColor: const Color(0xFF090D16),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(28),
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(28),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -199,7 +200,8 @@ class _AdminRootViewState extends State<AdminRootView> {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }
 

@@ -60,29 +60,31 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: LanguageService(),
-      builder: (context, _) {
-        final lang = LanguageService();
-        return Consumer<PlayerProvider>(
-          builder: (context, provider, child) {
-            final trending = provider.trendingSongs;
-            final heroSong = trending.isNotEmpty ? trending.first : null;
+    return SafeArea(
+      bottom: false,
+      child: ListenableBuilder(
+        listenable: LanguageService(),
+        builder: (context, _) {
+          final lang = LanguageService();
+          return Consumer<PlayerProvider>(
+            builder: (context, provider, child) {
+              final trending = provider.trendingSongs;
+              final heroSong = trending.isNotEmpty ? trending.first : null;
 
-            return RefreshIndicator(
-              color: AppColors.accentCyan,
-              backgroundColor: AppColors.surface,
-              onRefresh: () => provider.refreshCatalog(),
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.only(bottom: 120),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Top App Header with Language Switcher & Upload Song Button
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
-                      child: Row(
+              return RefreshIndicator(
+                color: AppColors.accentCyan,
+                backgroundColor: AppColors.surface,
+                onRefresh: () => provider.refreshCatalog(),
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.only(bottom: 120),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Top App Header with Language Switcher & Upload Song Button
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 10, 20, 16),
+                        child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Column(
@@ -657,8 +659,9 @@ class HomeScreen extends StatelessWidget {
       },
     );
       },
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildCategorySection(
     BuildContext context, {
