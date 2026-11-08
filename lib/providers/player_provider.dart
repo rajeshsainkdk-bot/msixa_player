@@ -313,6 +313,26 @@ class PlayerProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void removeSongFromPlaylist(String playlistId, String songId) {
+    final index = _customPlaylists.indexWhere((p) => p.id == playlistId);
+    if (index != -1) {
+      final pl = _customPlaylists[index];
+      final updatedSongs = pl.songs.where((s) => s.id != songId).toList();
+      _customPlaylists[index] = Playlist(
+        id: pl.id,
+        title: pl.title,
+        description: pl.description,
+        coverUrl: updatedSongs.isNotEmpty ? updatedSongs.first.coverUrl : pl.coverUrl,
+        songs: updatedSongs,
+      );
+      _storageService.saveCustomPlaylists(
+        _customPlaylists,
+        CloudBackendService().currentUser?.phoneNumber,
+      );
+      notifyListeners();
+    }
+  }
+
   // Search & Filtering
   Future<void> search(String query) async {
     if (query.trim().isEmpty) {

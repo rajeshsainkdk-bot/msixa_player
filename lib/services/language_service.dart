@@ -102,6 +102,17 @@ class LanguageService extends ChangeNotifier {
     'my_playlist_badge': {'hi': 'मेरी प्लेलिस्ट', 'en': 'My Playlist'},
     'playlist_name': {'hi': 'प्लेलिस्ट का नाम', 'en': 'Playlist Name'},
 
+    // Library Tabs
+    'tab_all_songs': {'hi': 'सभी गाने (All Songs)', 'en': 'All Songs'},
+    'tab_favorites': {'hi': 'पसंदीदा (Favorites)', 'en': 'Favorites'},
+    'tab_playlists': {'hi': 'प्लेलिस्ट्स (Playlists)', 'en': 'Playlists'},
+    'tab_device': {'hi': 'फ़ोन स्टोरेज (Device)', 'en': 'Device'},
+    'tab_recent': {'hi': 'हाल में सुने (Recent)', 'en': 'Recent'},
+    'all_tracks_title': {'hi': 'सभी उपलब्ध संगीत ट्रैक्स (All Tracks)', 'en': 'All Available Tracks'},
+    'no_songs_in_playlist': {'hi': 'इस प्लेलिस्ट में अभी कोई गाना नहीं है', 'en': 'No tracks in this playlist yet'},
+    'expand_view_songs': {'hi': 'गाने देखें', 'en': 'View Tracks'},
+    'collapse_songs': {'hi': 'छुपाएं', 'en': 'Hide Tracks'},
+
     // Profile & Settings Screen
     'profile_title': {'hi': 'प्रोफ़ाइल एवं सेटिंग्स', 'en': 'Profile & Settings'},
     'profile_subtitle': {'hi': 'श्रोता खाता विवरण व प्राथमिकताएं', 'en': 'Listener Account Details & Preferences'},
