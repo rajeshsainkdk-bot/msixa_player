@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:msixa_player/models/song.dart';
 import 'package:msixa_player/screens/admin/admin_dashboard_screen.dart';
 import 'package:msixa_player/services/cloud_backend_service.dart';
+import 'package:msixa_player/services/device_audio_service.dart';
 
 void main() {
   group('1. Song Model & SubCategory Tests', () {
@@ -98,9 +99,52 @@ void main() {
       expect(h4.category, isNotEmpty);
       expect(h4.subCategory, isNull);
     });
+
+    test('rootFolderPath relative detection works for nested subfolders', () {
+      const root = '/storage/emulated/0/Download/Folk Music';
+      const fileInSub = '/storage/emulated/0/Download/Folk Music/Marwadi Hits/song1.mp3';
+      const fileInRoot = '/storage/emulated/0/Download/Folk Music/intro.mp3';
+
+      final hSub = DetectedFolderHierarchy.fromPath(fileInSub, rootFolderPath: root);
+      expect(hSub.category, 'Folk Music');
+      expect(hSub.subCategory, 'Marwadi Hits');
+
+      final hRoot = DetectedFolderHierarchy.fromPath(fileInRoot, rootFolderPath: root);
+      expect(hRoot.category, 'Folk Music');
+      expect(hRoot.subCategory, isNull);
+    });
+
+    test('resolveSafPath correctly decodes Android SAF tree and raw URIs', () {
+      const safUri = 'content://com.android.externalstorage.documents/tree/primary%3AMusic%2FRajasthani';
+      final resolved = DetectedFolderHierarchy.resolveSafPath(safUri);
+      expect(resolved, '/storage/emulated/0/Music/Rajasthani');
+
+      const rawUri = 'content://com.android.providers.downloads.documents/tree/raw%3A%2Fstorage%2Femulated%2F0%2FDownload%2FBhakti';
+      final resolvedRaw = DetectedFolderHierarchy.resolveSafPath(rawUri);
+      expect(resolvedRaw, '/storage/emulated/0/Download/Bhakti');
+
+      const regularPath = '/storage/emulated/0/Music/Song.mp3';
+      expect(DetectedFolderHierarchy.resolveSafPath(regularPath), regularPath);
+    });
   });
 
-  group('3. Duplicate Detection Normalization Tests', () {
+  group('3. Device Songs Folder Location Display Tests', () {
+    test('extractFolderLocation strips root prefixes and displays clean folder directory', () {
+      const p1 = '/storage/emulated/0/Download/Rajasthani/Marwadi/choudhary.mp3';
+      expect(DeviceAudioService.extractFolderLocation(p1), 'Download/Rajasthani/Marwadi');
+
+      const p2 = '/storage/emulated/0/Music/Bhakti/song.mp3';
+      expect(DeviceAudioService.extractFolderLocation(p2), 'Music/Bhakti');
+
+      const p3 = '/storage/emulated/0/song.mp3';
+      expect(DeviceAudioService.extractFolderLocation(p3), 'Internal Storage');
+
+      const p4 = r'C:\Users\rajesh\Music\Folk\track.mp3';
+      expect(DeviceAudioService.extractFolderLocation(p4), contains('Folk'));
+    });
+  });
+
+  group('4. Duplicate Detection Normalization Tests', () {
     test('normalizes titles ignoring extensions, case, and special characters', () {
       final norm1 = CloudBackendService.normalizeTitle('Choudhary (Official Video).mp3');
       final norm2 = CloudBackendService.normalizeTitle('choudhary [HD Audio]');
@@ -114,7 +158,7 @@ void main() {
     });
   });
 
-  group('4. Instant Song Deletion & Purge Tests', () {
+  group('5. Instant Song Deletion & Purge Tests', () {
     test('Deleted songs are strictly excluded from catalog and lists', () {
       final songList = [
         Song(

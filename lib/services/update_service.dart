@@ -40,6 +40,32 @@ class UpdateService {
     if (autoPrompt && _hasCheckedThisSession) return;
     if (autoPrompt) _hasCheckedThisSession = true;
 
+    // 1. Show immediate progress feedback for manual button click
+    if (!autoPrompt && context.mounted) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF00E5FF)),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                isAdmin ? '🔍 Msixa Admin अपडेट चेक किया जा रहा है...' : '🔍 अपडेट चेक किया जा रहा है...',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              ),
+            ],
+          ),
+          backgroundColor: const Color(0xFF131B2C),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
+
     try {
       final targetManifest = isAdmin ? adminManifestUrl : manifestUrl;
       final ts = DateTime.now().millisecondsSinceEpoch;
@@ -54,7 +80,8 @@ class UpdateService {
 
       if (resp.statusCode != 200) {
         if (!autoPrompt && context.mounted) {
-          _showToast(context, 'अपडेट सर्वर से कनेक्ट नहीं हो सका (HTTP ${resp.statusCode})');
+          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          _showToast(context, '⚠️ अपडेट सर्वर से कनेक्ट नहीं हो सका (HTTP ${resp.statusCode})');
         }
         return;
       }
@@ -93,6 +120,7 @@ class UpdateService {
       if (remoteCode > installedCode && apkUrl.isNotEmpty) {
         await prefs.setInt(prefKeyPrompt, ts);
         if (context.mounted) {
+          ScaffoldMessenger.of(context).hideCurrentSnackBar();
           _showUpdateDialog(
             context,
             remoteName: remoteName,
@@ -106,14 +134,91 @@ class UpdateService {
         }
       } else {
         if (!autoPrompt && context.mounted) {
-          _showToast(context, '🎉 आप पहले से नवीनतम वर्ज़न (v$installedName) पर हैं!');
+          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          _showUpToDateDialog(
+            context,
+            installedName: installedName,
+            installedCode: installedCode,
+            isAdmin: isAdmin,
+          );
         }
       }
     } catch (e) {
       if (!autoPrompt && context.mounted) {
-        _showToast(context, 'अपडेट चेक करने में त्रुटि: $e');
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        _showToast(context, '⚠️ अपडेट चेक करने में त्रुटि: $e');
       }
     }
+  }
+
+  static void _showUpToDateDialog(
+    BuildContext context, {
+    required String installedName,
+    required int installedCode,
+    bool isAdmin = false,
+  }) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF131B2C),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: Color(0xFF00E5FF), width: 1.5),
+        ),
+        title: Row(
+          children: const [
+            Icon(Icons.check_circle_rounded, color: Color(0xFF00E5FF), size: 26),
+            SizedBox(width: 10),
+            Text('ऐप अप-टू-डेट है!', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '🎉 ${isAdmin ? "Msixa Player Admin" : "Msixa Player"} पहले से नवीनतम वर्ज़न पर चल रहा है!',
+              style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E293B),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.white12),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.verified_rounded, color: Color(0xFF00E5FF), size: 18),
+                  const SizedBox(width: 8),
+                  Text(
+                    'वर्ज़न: v$installedName (Build $installedCode)',
+                    style: const TextStyle(color: Color(0xFF00E5FF), fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              'क्लाउड पर कोई नया अपडेट पेंडिंग नहीं है। आपका ऐप पूरी तरह से अप-टू-डेट है।',
+              style: TextStyle(color: Colors.white70, fontSize: 12, height: 1.4),
+            ),
+          ],
+        ),
+        actions: [
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF00E5FF),
+              foregroundColor: Colors.black,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('ठीक है (OK)', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
   }
 
   static void _showToast(BuildContext context, String message) {

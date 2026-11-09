@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:on_audio_query/on_audio_query.dart';
 import '../../services/cloud_backend_service.dart';
 import '../../services/language_service.dart';
 import '../../services/r2_storage_service.dart';
@@ -21,8 +22,30 @@ class DetectedFolderHierarchy {
 
   const DetectedFolderHierarchy({required this.category, this.subCategory});
 
-  static DetectedFolderHierarchy fromPath(String filePath) {
+  static DetectedFolderHierarchy fromPath(String filePath, {String? rootFolderPath}) {
     final cleanPath = filePath.replaceAll(r'\', '/');
+
+    // 1. If rootFolderPath was picked, use relative folder structure
+    if (rootFolderPath != null && rootFolderPath.trim().isNotEmpty) {
+      final cleanRoot = rootFolderPath.replaceAll(r'\', '/').replaceAll(RegExp(r'/+$'), '');
+      if (cleanPath.startsWith(cleanRoot)) {
+        final relative = cleanPath.substring(cleanRoot.length).replaceAll(RegExp(r'^/+'), '');
+        final relParts = relative.split('/').where((p) => p.trim().isNotEmpty).toList();
+        final rootParts = cleanRoot.split('/').where((p) => p.trim().isNotEmpty).toList();
+        final rootFolderName = rootParts.isNotEmpty ? rootParts.last : 'Rajasthani';
+
+        if (relParts.length <= 1) {
+          // File directly in root folder: Category = rootFolderName, SubCategory = null
+          return DetectedFolderHierarchy(category: rootFolderName, subCategory: null);
+        } else {
+          // File in subfolder inside root folder: Category = rootFolderName, SubCategory = immediate subfolder
+          final subFolder = relParts.first;
+          return DetectedFolderHierarchy(category: rootFolderName, subCategory: subFolder);
+        }
+      }
+    }
+
+    // 2. Generic path inspection
     final parts = cleanPath.split('/').where((p) => p.trim().isNotEmpty).toList();
     if (parts.length < 2) {
       return const DetectedFolderHierarchy(category: 'Rajasthani');
@@ -47,6 +70,72 @@ class DetectedFolderHierarchy {
         subCategory: null,
       );
     }
+  }
+
+  /// Resolves Android SAF (content://) tree URIs to standard device storage paths
+  static String resolveSafPath(String pathOrUri) {
+    if (!pathOrUri.startsWith('content://')) return pathOrUri;
+    try {
+      final decoded = Uri.decodeFull(pathOrUri);
+      if (decoded.contains('primary:')) {
+        final sub = decoded.split('primary:').last;
+        return '/storage/emulated/0/$sub';
+      } else if (decoded.contains('raw:')) {
+        return decoded.split('raw:').last;
+      } else {
+        final match = RegExp(r'tree\/([A-Za-z0-9\-]+):(.*)').firstMatch(decoded);
+        if (match != null) {
+          return '/storage/${match.group(1)}/${match.group(2)}';
+        }
+      }
+    } catch (e) {
+      debugPrint('SAF resolve error: $e');
+    }
+    return pathOrUri;
+  }
+
+  /// BFS queue-based safe recursive directory scanner that traverses all subfolders
+  static Future<List<PlatformFile>> scanAudioFilesFromDirectory(String pathOrUri) async {
+    final rawPath = resolveSafPath(pathOrUri);
+    final rootDir = Directory(rawPath);
+    if (!rootDir.existsSync()) {
+      return [];
+    }
+
+    final List<PlatformFile> found = [];
+    final List<Directory> queue = [rootDir];
+    final Set<String> visited = {};
+    const audioExts = {'mp3', 'm4a', 'wav', 'aac', 'flac', 'ogg'};
+
+    while (queue.isNotEmpty) {
+      final current = queue.removeAt(0);
+      if (visited.contains(current.path)) continue;
+      visited.add(current.path);
+
+      try {
+        final entries = current.listSync(followLinks: false);
+        for (final e in entries) {
+          if (e is File) {
+            final ext = e.path.split('.').last.toLowerCase();
+            if (audioExts.contains(ext)) {
+              try {
+                final len = e.lengthSync();
+                final nm = e.path.split(RegExp(r'[\\/]')).last;
+                found.add(PlatformFile(path: e.path, name: nm, size: len));
+              } catch (_) {}
+            }
+          } else if (e is Directory) {
+            final name = e.path.split(RegExp(r'[\\/]')).last;
+            if (!name.startsWith('.')) {
+              queue.add(e);
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('Skip dir scan error for ${current.path}: $e');
+      }
+    }
+    return found;
   }
 }
 
@@ -205,8 +294,169 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
     if (await canLaunchUrl(uri)) await launchUrl(uri);
   }
 
-  static DetectedFolderHierarchy detectFolderHierarchy(String filePath) =>
-      DetectedFolderHierarchy.fromPath(filePath);
+  static DetectedFolderHierarchy detectFolderHierarchy(String filePath, {String? rootFolderPath}) =>
+      DetectedFolderHierarchy.fromPath(filePath, rootFolderPath: rootFolderPath);
+
+  /// Shows an in-app visual dialog with all real folders containing songs on the device
+  Future<void> _showDeviceFolderPicker(
+    BuildContext context, {
+    required Function(List<PlatformFile> files, String folderName, String folderPath) onFolderSelected,
+  }) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (c) => const Center(
+        child: CircularProgressIndicator(color: Color(0xFFFFB300)),
+      ),
+    );
+
+    final Map<String, List<PlatformFile>> folderMap = {};
+    try {
+      final audioQuery = OnAudioQuery();
+      final songs = await audioQuery.querySongs(
+        sortType: SongSortType.TITLE,
+        orderType: OrderType.ASC_OR_SMALLER,
+        uriType: UriType.EXTERNAL,
+        ignoreCase: true,
+      );
+
+      for (final s in songs) {
+        final path = s.data;
+        if (path.isEmpty) continue;
+        final nm = path.split(RegExp(r'[\\/]')).last;
+        final clean = path.replaceAll(r'\', '/');
+        final lastSlash = clean.lastIndexOf('/');
+        if (lastSlash == -1) continue;
+        final parent = clean.substring(0, lastSlash);
+        final pf = PlatformFile(path: path, name: nm, size: s.size);
+        folderMap.putIfAbsent(parent, () => []).add(pf);
+      }
+    } catch (e) {
+      debugPrint('Error querying audio folders: $e');
+    }
+
+    if (context.mounted) Navigator.pop(context);
+
+    if (folderMap.isEmpty) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('डिवाइस पर कोई ऑडियो फ़ोल्डर नहीं मिला। "सिस्टम फ़ोल्डर" या "गाने चुनें" आज़माएं।')),
+        );
+      }
+      return;
+    }
+
+    final sortedFolders = folderMap.keys.toList()
+      ..sort((a, b) => (folderMap[b]?.length ?? 0).compareTo(folderMap[a]?.length ?? 0));
+
+    if (!context.mounted) return;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF131A2A),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      isScrollControlled: true,
+      builder: (bCtx) => DraggableScrollableSheet(
+        initialChildSize: 0.65,
+        minChildSize: 0.4,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (ctx, scrollCtrl) => Column(
+          children: [
+            Container(
+              margin: const EdgeInsets.symmetric(vertical: 10),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.folder_special_rounded, color: Color(0xFFFFB300), size: 22),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Text(
+                      'डिवाइस पर मिले गानों वाले फ़ोल्डर',
+                      style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  Text(
+                    '${sortedFolders.length} फ़ोल्डर',
+                    style: const TextStyle(color: Colors.grey, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(color: Colors.white12),
+            Expanded(
+              child: ListView.separated(
+                controller: scrollCtrl,
+                itemCount: sortedFolders.length,
+                separatorBuilder: (_, __) => const Divider(color: Colors.white10, height: 1),
+                itemBuilder: (ctx, i) {
+                  final folderPath = sortedFolders[i];
+                  final cleanPath = folderPath.replaceAll(r'\', '/');
+                  final folderName = cleanPath.split('/').lastWhere((s) => s.isNotEmpty, orElse: () => 'Folder');
+
+                  final List<PlatformFile> allInFolderAndSub = [];
+                  for (final entry in folderMap.entries) {
+                    if (entry.key == folderPath || entry.key.startsWith('$folderPath/')) {
+                      allInFolderAndSub.addAll(entry.value);
+                    }
+                  }
+
+                  final rel = cleanPath
+                      .replaceFirst(RegExp(r'^/storage/emulated/[0-9]+/?'), '')
+                      .replaceFirst(RegExp(r'^/storage/[^/]+/?'), '')
+                      .replaceFirst(RegExp(r'^[A-Za-z]:/[^/]+/[^/]+/?'), '');
+
+                  return ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFB300).withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.folder_rounded, color: Color(0xFFFFB300), size: 22),
+                    ),
+                    title: Text(
+                      folderName,
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                    ),
+                    subtitle: Text(
+                      rel.isNotEmpty ? rel : cleanPath,
+                      style: const TextStyle(color: Colors.grey, fontSize: 11),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    trailing: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF00E5FF).withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFF00E5FF).withOpacity(0.3)),
+                      ),
+                      child: Text(
+                        '${allInFolderAndSub.length} गाने',
+                        style: const TextStyle(color: Color(0xFF00E5FF), fontSize: 11, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    onTap: () {
+                      Navigator.pop(bCtx);
+                      onFolderSelected(allInFolderAndSub, folderName, folderPath);
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   void _showBulkUploadDialog({String? prefillGenre, String? prefillSubCategory}) {
     List<PlatformFile> pickedFiles = [];
@@ -222,17 +472,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
     final subCategoryCtrl = TextEditingController(text: prefillSubCategory ?? '');
     bool createPlaylistWithFolder = true;
 
-    void updateFilesHierarchy(List<PlatformFile> files) {
+    void updateFilesHierarchy(List<PlatformFile> files, {String? rootFolderPath}) {
       pickedFiles = files;
       for (final f in pickedFiles) {
         if (f.path != null) {
+          final detected = detectFolderHierarchy(f.path!, rootFolderPath: rootFolderPath);
           if (prefillGenre != null) {
             fileHierarchyMap[f.path!] = DetectedFolderHierarchy(
               category: prefillGenre,
-              subCategory: prefillSubCategory ?? (subCategoryCtrl.text.trim().isNotEmpty ? subCategoryCtrl.text.trim() : null),
+              subCategory: prefillSubCategory ?? detected.subCategory ?? (subCategoryCtrl.text.trim().isNotEmpty ? subCategoryCtrl.text.trim() : null),
             );
           } else {
-            fileHierarchyMap[f.path!] = detectFolderHierarchy(f.path!);
+            fileHierarchyMap[f.path!] = detected;
           }
         }
       }
@@ -245,9 +496,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
             subCategoryCtrl.text = fh.subCategory!;
           }
         }
-        final parentDir = File(pickedFiles.first.path!).parent;
-        final folderName = parentDir.path.split(RegExp(r'[\\/]')).lastWhere((s) => s.isNotEmpty, orElse: () => 'Bulk Playlist');
-        playlistTitleCtrl.text = folderName;
+        if (rootFolderPath != null && rootFolderPath.isNotEmpty) {
+          final folderName = rootFolderPath.replaceAll(r'\', '/').split('/').lastWhere((s) => s.isNotEmpty, orElse: () => 'Bulk Playlist');
+          playlistTitleCtrl.text = folderName;
+        } else {
+          final parentDir = File(pickedFiles.first.path!).parent;
+          final folderName = parentDir.path.split(RegExp(r'[\\/]')).lastWhere((s) => s.isNotEmpty, orElse: () => 'Bulk Playlist');
+          playlistTitleCtrl.text = folderName;
+        }
       }
     }
 
@@ -286,52 +542,73 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                   if (!isUploading) ...[
                     Row(
                       children: [
-                        // Button 1: Pick Directory
+                        // Button 1: Device Folders Explorer (100% Reliable In-App)
                         Expanded(
                           child: ElevatedButton.icon(
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF1E293B),
                               foregroundColor: const Color(0xFFFFB300),
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 11),
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(10),
-                                side: BorderSide(color: const Color(0xFFFFB300).withOpacity(0.5)),
+                                side: BorderSide(color: const Color(0xFFFFB300).withOpacity(0.6)),
                               ),
                             ),
-                            icon: const Icon(Icons.drive_folder_upload_rounded, size: 18),
+                            icon: const Icon(Icons.folder_special_rounded, size: 15),
                             label: const Text(
-                              '📁 पूरा फ़ोल्डर चुनें',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+                              '📁 डिवाइस फ़ोल्डर',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10),
+                            ),
+                            onPressed: () {
+                              _showDeviceFolderPicker(
+                                context,
+                                onFolderSelected: (files, folderName, folderPath) {
+                                  setDialogState(() {
+                                    updateFilesHierarchy(files, rootFolderPath: folderPath);
+                                  });
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('✅ फ़ोल्डर "$folderName" से ${files.length} गाने लोड हुए!'),
+                                      backgroundColor: const Color(0xFF1E293B),
+                                    ),
+                                  );
+                                },
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+
+                        // Button 2: System SAF Folder Picker
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF1E293B),
+                              foregroundColor: const Color(0xFFFFB300),
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                side: BorderSide(color: Colors.white24),
+                              ),
+                            ),
+                            icon: const Icon(Icons.drive_folder_upload_rounded, size: 15),
+                            label: const Text(
+                              '📂 सिस्टम फ़ोल्डर',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10),
                             ),
                             onPressed: () async {
                               try {
                                 final dirPath = await FilePicker.platform.getDirectoryPath();
                                 if (dirPath != null) {
-                                  final dir = Directory(dirPath);
-                                  final List<PlatformFile> found = [];
-                                  try {
-                                    final entities = dir.listSync(recursive: true);
-                                    for (final e in entities) {
-                                      if (e is File) {
-                                        final ext = e.path.split('.').last.toLowerCase();
-                                        if (['mp3', 'm4a', 'wav'].contains(ext)) {
-                                          final len = await e.length();
-                                          final nm = e.path.split(RegExp(r'[\\/]')).last;
-                                          found.add(PlatformFile(path: e.path, name: nm, size: len));
-                                        }
-                                      }
-                                    }
-                                  } catch (dirErr) {
-                                    debugPrint('Directory scan error: $dirErr');
-                                  }
-
+                                  final found = await DetectedFolderHierarchy.scanAudioFilesFromDirectory(dirPath);
                                   if (found.isNotEmpty) {
                                     setDialogState(() {
-                                      updateFilesHierarchy(found);
+                                      final rawPath = DetectedFolderHierarchy.resolveSafPath(dirPath);
+                                      updateFilesHierarchy(found, rootFolderPath: rawPath);
                                     });
                                   } else {
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('चयनित फ़ोल्डर में कोई MP3/M4A गाना नहीं मिला।')),
+                                      const SnackBar(content: Text('चयनित फ़ोल्डर में कोई गाना नहीं मिला। "डिवाइस फ़ोल्डर" आज़माएं।')),
                                     );
                                   }
                                 }
@@ -341,24 +618,24 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                             },
                           ),
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 6),
 
-                        // Button 2: Pick Multiple MP3 Files
+                        // Button 3: Multi-Select Songs
                         Expanded(
                           child: ElevatedButton.icon(
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF1E293B),
                               foregroundColor: const Color(0xFF00E5FF),
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 11),
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(10),
                                 side: BorderSide(color: const Color(0xFF00E5FF).withOpacity(0.5)),
                               ),
                             ),
-                            icon: const Icon(Icons.file_open_rounded, size: 18),
+                            icon: const Icon(Icons.file_open_rounded, size: 15),
                             label: Text(
-                              pickedFiles.isEmpty ? '🎵 गाने चुनें' : '🎵 बदलें (${pickedFiles.length})',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+                              pickedFiles.isEmpty ? '🎵 गाने चुनें' : '🎵 (${pickedFiles.length})',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 10),
                             ),
                             onPressed: () async {
                               try {

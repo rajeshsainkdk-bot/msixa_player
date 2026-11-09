@@ -23,6 +23,24 @@ class DeviceAudioService {
     return true;
   }
 
+  /// Extracts the readable folder directory path where a song is stored on device
+  static String extractFolderLocation(String fullPath) {
+    if (fullPath.isEmpty) return 'Phone Storage';
+    final clean = fullPath.replaceAll(r'\', '/');
+    final lastSlash = clean.lastIndexOf('/');
+    if (lastSlash == -1) return 'Phone Storage';
+    final dirPath = clean.substring(0, lastSlash);
+
+    // Strip common storage root prefixes like /storage/emulated/0/
+    final rel = dirPath
+        .replaceFirst(RegExp(r'^/storage/emulated/[0-9]+/?'), '')
+        .replaceFirst(RegExp(r'^/storage/[^/]+/?'), '')
+        .replaceFirst(RegExp(r'^[A-Za-z]:/[^/]+/[^/]+/?'), '');
+
+    if (rel.trim().isEmpty) return 'Internal Storage';
+    return rel.trim();
+  }
+
   /// Checks if permission is already granted
   Future<bool> hasPermission() async {
     if (Platform.isAndroid) {
@@ -74,18 +92,24 @@ class DeviceAudioService {
         }
         return true;
       }).map((s) {
+        final folderLoc = extractFolderLocation(s.data);
+        final artistDisplay = (s.artist != null && s.artist != '<unknown>' && s.artist!.trim().isNotEmpty && s.artist != 'Device Music')
+            ? '${s.artist!} • 📁 $folderLoc'
+            : '📁 $folderLoc';
+
         return Song(
           id: 'device_${s.id}',
           title: s.title.isNotEmpty ? s.title : 'Unknown Track',
-          artist: (s.artist != null && s.artist != '<unknown>') ? s.artist! : 'Device Music',
-          album: (s.album != null && s.album != '<unknown>') ? s.album! : 'Phone Storage',
+          artist: artistDisplay,
+          album: (s.album != null && s.album != '<unknown>') ? s.album! : folderLoc,
           duration: (s.duration ?? 0) ~/ 1000,
           streamUrl: s.uri ?? s.data,
           coverUrl: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&q=80',
           genre: 'Offline',
+          subCategory: folderLoc,
           license: 'Personal Offline Audio',
           licenseUrl: 'local',
-          source: 'Phone Storage (Offline)',
+          source: 'Phone Storage ($folderLoc)',
         );
       }).toList();
     } catch (_) {
