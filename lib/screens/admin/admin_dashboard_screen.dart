@@ -178,6 +178,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
   Map<String, dynamic>? _storageStats;
   bool _isLoadingStorageStats = false;
   bool _adminGroupByCategory = true;
+  bool _isMultiSelectMode = false;
+  final Set<String> _selectedSongIds = {};
 
   @override
   void initState() {
@@ -1866,8 +1868,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildMetricCard({
     required String title,
@@ -2265,6 +2268,210 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
     );
   }
 
+  void _toggleMultiSelectMode() {
+    setState(() {
+      _isMultiSelectMode = !_isMultiSelectMode;
+      if (!_isMultiSelectMode) {
+        _selectedSongIds.clear();
+      }
+    });
+  }
+
+  void _toggleSongSelection(String songId) {
+    setState(() {
+      if (_selectedSongIds.contains(songId)) {
+        _selectedSongIds.remove(songId);
+      } else {
+        _selectedSongIds.add(songId);
+      }
+    });
+  }
+
+  void _selectAllSongs(List<Song> songs) {
+    setState(() {
+      _selectedSongIds.addAll(songs.map((s) => s.id));
+    });
+  }
+
+  void _deselectAllSongs() {
+    setState(() {
+      _selectedSongIds.clear();
+    });
+  }
+
+  void _toggleFolderSelection(List<Song> folderSongs) {
+    setState(() {
+      final ids = folderSongs.map((s) => s.id).toSet();
+      final allSelected = ids.isNotEmpty && ids.every(_selectedSongIds.contains);
+      if (allSelected) {
+        _selectedSongIds.removeAll(ids);
+      } else {
+        _selectedSongIds.addAll(ids);
+        _isMultiSelectMode = true;
+      }
+    });
+  }
+
+  Future<void> _confirmDeleteSelectedSongs() async {
+    if (_selectedSongIds.isEmpty) return;
+    final count = _selectedSongIds.length;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF131A2A),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.delete_sweep_rounded, color: Colors.redAccent, size: 24),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                _lang.isHindi ? 'चुने हुए $count गाने हटाएं?' : 'Delete $count Selected Songs?',
+                style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          _lang.isHindi
+              ? 'क्या आप सचमुच चुने गए $count गानों को हमेशा के लिए हटाना चाहते हैं?'
+              : 'Are you sure you want to permanently delete $count selected songs?',
+          style: const TextStyle(color: Colors.white70, fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(_lang.t('cancel'), style: const TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFDC2626), foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(_lang.isHindi ? 'हाँ, हटाएं' : 'Yes, Delete', style: const TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      final countDeleted = _selectedSongIds.length;
+      await _backend.deleteSongsBatch(_selectedSongIds);
+      setState(() {
+        _selectedSongIds.clear();
+        _isMultiSelectMode = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_lang.isHindi ? '✅ $countDeleted गाने हटा दिए गए!' : '✅ $countDeleted songs deleted!'),
+            backgroundColor: const Color(0xFFDC2626),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _confirmDeleteCategory(String category, int count) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF131A2A),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.folder_delete_rounded, color: Colors.redAccent, size: 24),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                _lang.isHindi ? 'पूरी श्रेणी हटाएं: $category' : 'Delete Category: $category',
+                style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          _lang.isHindi
+              ? 'क्या आप श्रेणी "$category" के सभी $count गाने हटाना चाहते हैं? यह सभी गाने स्थायी रूप से हटा देगा।'
+              : 'Are you sure you want to permanently delete all $count songs in "$category"?',
+          style: const TextStyle(color: Colors.white70, fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(_lang.t('cancel'), style: const TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFDC2626), foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(_lang.isHindi ? 'हाँ, श्रेणी हटाएं' : 'Yes, Delete Category', style: const TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      final deleted = await _backend.deleteCategorySongs(category);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_lang.isHindi ? '✅ श्रेणी "$category" ($deleted गाने) हटा दी गई!' : '✅ Category "$category" ($deleted songs) deleted!'),
+            backgroundColor: const Color(0xFFDC2626),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _confirmDeleteSubCategory(String category, String subCategory, int count) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF131A2A),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.folder_delete_rounded, color: Colors.redAccent, size: 24),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                _lang.isHindi ? 'सब-फ़ोल्डर हटाएं: $subCategory' : 'Delete Sub-Folder: $subCategory',
+                style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          _lang.isHindi
+              ? 'क्या आप "$category › $subCategory" के सभी $count गाने हटाना चाहते हैं?'
+              : 'Are you sure you want to permanently delete all $count songs in "$category › $subCategory"?',
+          style: const TextStyle(color: Colors.white70, fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(_lang.t('cancel'), style: const TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFDC2626), foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(_lang.isHindi ? 'हाँ, हटाएं' : 'Yes, Delete Sub-Folder', style: const TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      final deleted = await _backend.deleteCategorySongs(category, subCategory: subCategory);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_lang.isHindi ? '✅ सब-फ़ोल्डर "$subCategory" ($deleted गाने) हटा दिया गया!' : '✅ Sub-Folder "$subCategory" ($deleted songs) deleted!'),
+            backgroundColor: const Color(0xFFDC2626),
+          ),
+        );
+      }
+    }
+  }
+
   // TAB 3: All Live Songs (with Add, Edit, and Delete)
   Widget _buildLiveSongsTab(List<Song> songs) {
     return Column(
@@ -2313,6 +2520,27 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                       ],
                     ),
                   ),
+                ),
+                const SizedBox(width: 8),
+
+                // Multi-Select Toggle Button
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _isMultiSelectMode ? const Color(0xFF6366F1) : Colors.white10,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    elevation: 0,
+                    side: BorderSide(color: _isMultiSelectMode ? const Color(0xFF818CF8) : Colors.white24),
+                  ),
+                  icon: Icon(_isMultiSelectMode ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded, size: 16),
+                  label: Text(
+                    _isMultiSelectMode
+                        ? (_lang.isHindi ? 'सेलेक्ट बंद (${_selectedSongIds.length})' : 'Exit Select (${_selectedSongIds.length})')
+                        : (_lang.isHindi ? 'मल्टी-सेलेक्ट' : 'Multi-Select'),
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                  ),
+                  onPressed: _toggleMultiSelectMode,
                 ),
                 const SizedBox(width: 8),
 
@@ -2437,6 +2665,81 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
           ),
         ),
 
+        // Multi-Select Action Banner
+        if (_isMultiSelectMode)
+          Container(
+            margin: const EdgeInsets.fromLTRB(10, 6, 10, 4),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [const Color(0xFF6366F1).withOpacity(0.25), const Color(0xFF0F172A)],
+              ),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFF6366F1).withOpacity(0.5)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.check_box_outlined, color: Color(0xFF818CF8), size: 18),
+                const SizedBox(width: 8),
+                Text(
+                  _lang.isHindi
+                      ? '${_selectedSongIds.length} / ${songs.length} चुने गए'
+                      : '${_selectedSongIds.length} / ${songs.length} selected',
+                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                ),
+                const Spacer(),
+                // Select All / Deselect All
+                TextButton(
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  onPressed: () {
+                    if (_selectedSongIds.length == songs.length) {
+                      _deselectAllSongs();
+                    } else {
+                      _selectAllSongs(songs);
+                    }
+                  },
+                  child: Text(
+                    _selectedSongIds.length == songs.length
+                        ? (_lang.isHindi ? 'सभी हटाएं' : 'Deselect All')
+                        : (_lang.isHindi ? 'सभी चुनें' : 'Select All'),
+                    style: const TextStyle(color: Color(0xFF818CF8), fontSize: 11, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Delete Selected Button
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _selectedSongIds.isNotEmpty ? const Color(0xFFDC2626) : Colors.grey.shade800,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                  ),
+                  icon: const Icon(Icons.delete_forever_rounded, size: 14),
+                  label: Text(
+                    _lang.isHindi ? 'हटाएं (${_selectedSongIds.length})' : 'Delete (${_selectedSongIds.length})',
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                  ),
+                  onPressed: _selectedSongIds.isEmpty ? null : _confirmDeleteSelectedSongs,
+                ),
+                const SizedBox(width: 8),
+                // Close button
+                IconButton(
+                  constraints: const BoxConstraints(),
+                  padding: const EdgeInsets.all(4),
+                  icon: const Icon(Icons.close_rounded, color: Colors.white60, size: 18),
+                  tooltip: _lang.t('cancel'),
+                  onPressed: _toggleMultiSelectMode,
+                ),
+              ],
+            ),
+          ),
+
         Expanded(
           child: songs.isEmpty
               ? Center(child: Text(_lang.t('no_pending_songs'), style: const TextStyle(color: Colors.grey)))
@@ -2509,8 +2812,24 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  if (_isMultiSelectMode)
+                    IconButton(
+                      constraints: const BoxConstraints(),
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      icon: Icon(
+                        catSongs.isNotEmpty && catSongs.every((s) => _selectedSongIds.contains(s.id))
+                            ? Icons.check_box_rounded
+                            : catSongs.any((s) => _selectedSongIds.contains(s.id))
+                                ? Icons.indeterminate_check_box_rounded
+                                : Icons.check_box_outline_blank_rounded,
+                        color: const Color(0xFF818CF8),
+                        size: 20,
+                      ),
+                      tooltip: 'पूरी श्रेणी चुनें/हटाएं',
+                      onPressed: () => _toggleFolderSelection(catSongs),
+                    ),
                   PopupMenuButton<String>(
-                    tooltip: 'इस कैटेगरी में नया गाना अपलोड करें',
+                    tooltip: 'श्रेणी / फ़ोल्डर विकल्प',
                     icon: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
@@ -2521,10 +2840,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: const [
-                          Icon(Icons.add_circle_outline_rounded, color: Color(0xFFFFB300), size: 13),
-                          SizedBox(width: 4),
+                          Icon(Icons.more_vert_rounded, color: Color(0xFFFFB300), size: 14),
+                          SizedBox(width: 2),
                           Text(
-                            '+ अपलोड',
+                            'विकल्प',
                             style: TextStyle(color: Color(0xFFFFB300), fontSize: 10, fontWeight: FontWeight.bold),
                           ),
                         ],
@@ -2534,8 +2853,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                     onSelected: (val) {
                       if (val == 'single') {
                         _showAddSongDialog(prefillGenre: category);
-                      } else {
+                      } else if (val == 'bulk') {
                         _showBulkUploadDialog(prefillGenre: category);
+                      } else if (val == 'select_folder') {
+                        _toggleFolderSelection(catSongs);
+                      } else if (val == 'delete_category') {
+                        _confirmDeleteCategory(category, catSongs.length);
                       }
                     },
                     itemBuilder: (ctx) => [
@@ -2556,6 +2879,38 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                             Icon(Icons.drive_folder_upload_rounded, color: Color(0xFF00E5FF), size: 16),
                             SizedBox(width: 8),
                             Text('📁 बल्क / फ़ोल्डर अपलोड', style: TextStyle(color: Colors.white, fontSize: 12)),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuDivider(height: 8),
+                      PopupMenuItem(
+                        value: 'select_folder',
+                        child: Row(
+                          children: [
+                            Icon(
+                              catSongs.isNotEmpty && catSongs.every((s) => _selectedSongIds.contains(s.id))
+                                  ? Icons.check_box_rounded
+                                  : Icons.check_box_outline_blank_rounded,
+                              color: const Color(0xFF818CF8),
+                              size: 16,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              catSongs.isNotEmpty && catSongs.every((s) => _selectedSongIds.contains(s.id))
+                                  ? 'श्रेणी अन-सेलेक्ट करें'
+                                  : 'पूरी श्रेणी चुनें (Multi-Select)',
+                              style: const TextStyle(color: Colors.white, fontSize: 12),
+                            ),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'delete_category',
+                        child: Row(
+                          children: const [
+                            Icon(Icons.delete_forever_rounded, color: Color(0xFFEF4444), size: 16),
+                            SizedBox(width: 8),
+                            Text('🗑️ पूरी श्रेणी/फ़ोल्डर हटाएं', style: TextStyle(color: Color(0xFFEF4444), fontSize: 12, fontWeight: FontWeight.bold)),
                           ],
                         ),
                       ),
@@ -2603,8 +2958,24 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
+                              if (_isMultiSelectMode)
+                                IconButton(
+                                  constraints: const BoxConstraints(),
+                                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                                  icon: Icon(
+                                    subSongs.isNotEmpty && subSongs.every((s) => _selectedSongIds.contains(s.id))
+                                        ? Icons.check_box_rounded
+                                        : subSongs.any((s) => _selectedSongIds.contains(s.id))
+                                            ? Icons.indeterminate_check_box_rounded
+                                            : Icons.check_box_outline_blank_rounded,
+                                    color: const Color(0xFF818CF8),
+                                    size: 18,
+                                  ),
+                                  tooltip: 'सब-फ़ोल्डर चुनें/हटाएं',
+                                  onPressed: () => _toggleFolderSelection(subSongs),
+                                ),
                               PopupMenuButton<String>(
-                                tooltip: 'इस सब-कैटेगरी में अपलोड करें',
+                                tooltip: 'इस सब-कैटेगरी में विकल्प',
                                 icon: Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                                   decoration: BoxDecoration(
@@ -2615,10 +2986,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: const [
-                                      Icon(Icons.add_rounded, color: Color(0xFF00E5FF), size: 12),
+                                      Icon(Icons.more_vert_rounded, color: Color(0xFF00E5FF), size: 12),
                                       SizedBox(width: 2),
                                       Text(
-                                        '+ अपलोड',
+                                        'विकल्प',
                                         style: TextStyle(color: Color(0xFF00E5FF), fontSize: 9, fontWeight: FontWeight.bold),
                                       ),
                                     ],
@@ -2628,8 +2999,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                                 onSelected: (val) {
                                   if (val == 'single') {
                                     _showAddSongDialog(prefillGenre: category, prefillSubCategory: subCat);
-                                  } else {
+                                  } else if (val == 'bulk') {
                                     _showBulkUploadDialog(prefillGenre: category, prefillSubCategory: subCat);
+                                  } else if (val == 'select_subfolder') {
+                                    _toggleFolderSelection(subSongs);
+                                  } else if (val == 'delete_subcategory') {
+                                    _confirmDeleteSubCategory(category, subCat, subSongs.length);
                                   }
                                 },
                                 itemBuilder: (ctx) => [
@@ -2649,7 +3024,39 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                                       children: const [
                                         Icon(Icons.drive_folder_upload_rounded, color: Color(0xFF00E5FF), size: 14),
                                         SizedBox(width: 6),
-                                        Text('📁 बल्क / फ़ोल्डर अपलोड', style: TextStyle(color: Colors.white, fontSize: 11)),
+                                        Text('📁 बल्क अपलोड', style: TextStyle(color: Colors.white, fontSize: 11)),
+                                      ],
+                                    ),
+                                  ),
+                                  const PopupMenuDivider(height: 6),
+                                  PopupMenuItem(
+                                    value: 'select_subfolder',
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          subSongs.isNotEmpty && subSongs.every((s) => _selectedSongIds.contains(s.id))
+                                              ? Icons.check_box_rounded
+                                              : Icons.check_box_outline_blank_rounded,
+                                          color: const Color(0xFF818CF8),
+                                          size: 14,
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          subSongs.isNotEmpty && subSongs.every((s) => _selectedSongIds.contains(s.id))
+                                              ? 'अन-सेलेक्ट करें'
+                                              : 'सब-फ़ोल्डर चुनें',
+                                          style: const TextStyle(color: Colors.white, fontSize: 11),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  PopupMenuItem(
+                                    value: 'delete_subcategory',
+                                    child: Row(
+                                      children: const [
+                                        Icon(Icons.delete_forever_rounded, color: Color(0xFFEF4444), size: 14),
+                                        SizedBox(width: 6),
+                                        Text('🗑️ यह सब-फ़ोल्डर हटाएं', style: TextStyle(color: Color(0xFFEF4444), fontSize: 11, fontWeight: FontWeight.bold)),
                                       ],
                                     ),
                                   ),
@@ -2687,28 +3094,61 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
 
   Widget _buildAdminSongCard(Song s) {
     final isThisPlaying = _currentlyPlayingSongId == s.id && _isPlaying;
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: const Color(0xFF131B2C),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isThisPlaying ? const Color(0xFFFFB300) : Colors.white10,
-        ),
-      ),
-      child: Row(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: Image.network(
-              s.coverUrl,
-              width: 44,
-              height: 44,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Container(width: 44, height: 44, color: Colors.grey.shade800),
-            ),
+    final isSelected = _selectedSongIds.contains(s.id);
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: _isMultiSelectMode ? () => _toggleSongSelection(s.id) : null,
+      onLongPress: () {
+        if (!_isMultiSelectMode) {
+          setState(() {
+            _isMultiSelectMode = true;
+            _selectedSongIds.add(s.id);
+          });
+        }
+      },
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF6366F1).withOpacity(0.18) : const Color(0xFF131B2C),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected
+                ? const Color(0xFF818CF8)
+                : isThisPlaying
+                    ? const Color(0xFFFFB300)
+                    : Colors.white10,
+            width: isSelected ? 1.5 : 1.0,
           ),
+        ),
+        child: Row(
+          children: [
+            if (_isMultiSelectMode)
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: Checkbox(
+                    value: isSelected,
+                    activeColor: const Color(0xFF6366F1),
+                    checkColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                    onChanged: (_) => _toggleSongSelection(s.id),
+                  ),
+                ),
+              ),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.network(
+                s.coverUrl,
+                width: 44,
+                height: 44,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(width: 44, height: 44, color: Colors.grey.shade800),
+              ),
+            ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -2797,6 +3237,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 }

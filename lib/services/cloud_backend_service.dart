@@ -745,6 +745,31 @@ class CloudBackendService extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Delete multiple songs by IDs in batch (Permanent purge)
+  Future<void> deleteSongsBatch(Iterable<String> songIds) async {
+    final idSet = songIds.toSet();
+    if (idSet.isEmpty) return;
+    _deletedSongIds.addAll(idSet);
+    _communitySongs.removeWhere((s) => idSet.contains(s.id));
+    await _persistDeletedSongs();
+    await _persistSongs();
+    notifyListeners();
+  }
+
+  /// Delete all songs belonging to a specific Category and optionally SubCategory
+  Future<int> deleteCategorySongs(String category, {String? subCategory}) async {
+    final toDelete = <String>[];
+    for (final s in approvedSongs) {
+      if (s.genre.trim().toLowerCase() == category.trim().toLowerCase()) {
+        if (subCategory == null || s.subCategory?.trim().toLowerCase() == subCategory.trim().toLowerCase()) {
+          toDelete.add(s.id);
+        }
+      }
+    }
+    await deleteSongsBatch(toDelete);
+    return toDelete.length;
+  }
+
   /// Delete ALL approved songs from platform (Permanent purge, won't restore on reopen)
   Future<void> deleteAllApprovedSongs() async {
     for (final s in _communitySongs) {

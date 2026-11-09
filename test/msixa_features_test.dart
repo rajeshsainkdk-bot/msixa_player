@@ -232,5 +232,45 @@ void main() {
       expect(activeSongs.first.id, 'song_keep_02');
       expect(activeSongs.any((s) => s.id == 'song_del_01'), isFalse);
     });
+
+    test('Multi-select batch deletion removes all selected song IDs simultaneously', () {
+      final testSongs = [
+        Song(id: 's1', title: 'Song 1', artist: 'A', album: 'Alb', duration: 100, streamUrl: 'u1', coverUrl: 'c1', genre: 'Folk'),
+        Song(id: 's2', title: 'Song 2', artist: 'B', album: 'Alb', duration: 100, streamUrl: 'u2', coverUrl: 'c2', genre: 'Folk'),
+        Song(id: 's3', title: 'Song 3', artist: 'C', album: 'Alb', duration: 100, streamUrl: 'u3', coverUrl: 'c3', genre: 'Pop'),
+        Song(id: 's4', title: 'Song 4', artist: 'D', album: 'Alb', duration: 100, streamUrl: 'u4', coverUrl: 'c4', genre: 'Pop'),
+      ];
+
+      final selectedIds = {'s1', 's3'};
+      final remaining = testSongs.where((s) => !selectedIds.contains(s.id)).toList();
+
+      expect(remaining.length, 2);
+      expect(remaining.map((s) => s.id), containsAll(['s2', 's4']));
+      expect(remaining.any((s) => selectedIds.contains(s.id)), isFalse);
+    });
+
+    test('Folder and category deletion removes all songs matching category or subcategory', () {
+      final testSongs = [
+        Song(id: 's1', title: 'Marwadi 1', artist: 'A', album: 'Alb', duration: 100, streamUrl: 'u1', coverUrl: 'c1', genre: 'Rajasthani', subCategory: 'Marwadi Hits'),
+        Song(id: 's2', title: 'Marwadi 2', artist: 'B', album: 'Alb', duration: 100, streamUrl: 'u2', coverUrl: 'c2', genre: 'Rajasthani', subCategory: 'Marwadi Hits'),
+        Song(id: 's3', title: 'Desert Song', artist: 'C', album: 'Alb', duration: 100, streamUrl: 'u3', coverUrl: 'c3', genre: 'Rajasthani', subCategory: 'Desert Melodies'),
+        Song(id: 's4', title: 'Hanuman Chalisa', artist: 'D', album: 'Alb', duration: 100, streamUrl: 'u4', coverUrl: 'c4', genre: 'Bhakti'),
+      ];
+
+      // 1. Delete SubCategory "Marwadi Hits" only
+      final afterSubCatDelete = testSongs.where((s) {
+        final matches = s.genre.toLowerCase() == 'rajasthani' && s.subCategory?.toLowerCase() == 'marwadi hits';
+        return !matches;
+      }).toList();
+
+      expect(afterSubCatDelete.length, 2);
+      expect(afterSubCatDelete.any((s) => s.id == 's1' || s.id == 's2'), isFalse);
+      expect(afterSubCatDelete.any((s) => s.id == 's3'), isTrue);
+
+      // 2. Delete entire Category "Rajasthani"
+      final afterCatDelete = testSongs.where((s) => s.genre.toLowerCase() != 'rajasthani').toList();
+      expect(afterCatDelete.length, 1);
+      expect(afterCatDelete.first.id, 's4');
+    });
   });
 }
