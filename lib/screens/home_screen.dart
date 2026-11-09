@@ -161,34 +161,6 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                           Row(
                             children: [
-                              // Language Switcher Toggle Pill
-                              InkWell(
-                                onTap: () => lang.toggleLanguage(),
-                                borderRadius: BorderRadius.circular(14),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                                  margin: const EdgeInsets.only(right: 8),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF131A2A),
-                                    borderRadius: BorderRadius.circular(14),
-                                    border: Border.all(color: const Color(0xFF00E5FF).withOpacity(0.35)),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      const Icon(Icons.language_rounded, color: Color(0xFF00E5FF), size: 14),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        lang.displayLabel,
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
                               // Upload Song Button
                               GestureDetector(
                                 onTap: () {

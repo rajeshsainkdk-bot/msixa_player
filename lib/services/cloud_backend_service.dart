@@ -486,18 +486,93 @@ class CloudBackendService extends ChangeNotifier {
   // SONG UPLOAD & DUPLICATE DETECTION
   // ==========================================
 
+  /// Formats raw filenames or dirty track titles into beautiful, clean, smart song titles:
+  /// - Strips leading track numbers (e.g. "01 - ", "02. ", "1_")
+  /// - Strips file extensions (.mp3, .m4a, .wav, etc.)
+  /// - Strips parenthesized/bracketed tags [HD], (Official Video), (Lyrics), (Audio), etc.
+  /// - Strips trailing numerics or duplicate attempt numbers (e.g. "Song 1", "Song_02", "Song (2)")
+  /// - Converts underscores, hyphens, and multiple spaces to single spaces
+  /// - Capitalizes words nicely in Title Case (preserving Devanagari)
+  static String formatSmartTitle(String rawTitle) {
+    if (rawTitle.trim().isEmpty) return 'Unknown Title';
+
+    var title = rawTitle.trim();
+
+    // 1. Remove file extensions (.mp3, .m4a, .wav, .aac, .flac, .ogg)
+    title = title.replaceAll(RegExp(r'\.[a-zA-Z0-9]{2,5}$'), '');
+
+    // 2. Remove parenthesized & bracketed tags like (Official Video), [HD Audio], (Lyrics), (Audio), etc.
+    title = title.replaceAll(RegExp(r'[\(\[\{].*?[\)\]\}]'), ' ');
+
+    // 3. Remove leading track numbering (e.g. "01 - ", "02. ", "1_ ", "01 ")
+    title = title.replaceFirst(RegExp(r'^[0-9]+[\s\-_.]+'), '');
+
+    // 4. Remove common online tags and noise words
+    title = title.replaceAll(
+      RegExp(r'\b(official\s+video|official\s+audio|full\s+song|lyrics|lyric\s+video|hd\s+video|320kbps|128kbps|slowed\s+reverb|remix)\b', caseSensitive: false),
+      '',
+    );
+
+    // 5. Replace underscores, hyphens, and weird symbols with spaces
+    title = title.replaceAll(RegExp(r'[_~*+=\\|/\^%$#@!]+'), ' ');
+    title = title.replaceAll(RegExp(r'\s*-\s*'), ' ');
+
+    // 6. Remove trailing numbers/numeric suffixes (e.g. "Song 1", "Song 2", "Song 01", "Song 2024")
+    title = title.replaceFirst(RegExp(r'[\s\-_]+[0-9]+$'), '');
+
+    // 7. Collapse multiple spaces and trim
+    title = title.replaceAll(RegExp(r'\s+'), ' ').trim();
+
+    if (title.isEmpty) {
+      final cleanOrig = rawTitle.replaceAll(RegExp(r'\.[a-zA-Z0-9]+$'), '').replaceAll('_', ' ').trim();
+      return cleanOrig.isNotEmpty ? cleanOrig : 'Msixa Track';
+    }
+
+    // 8. Capitalize Words (Title Case) for Latin words, preserving Hindi/Devanagari
+    return title.split(' ').map((word) {
+      if (word.isEmpty) return '';
+      if (RegExp(r'^[a-zA-Z]').hasMatch(word)) {
+        return word[0].toUpperCase() + (word.length > 1 ? word.substring(1).toLowerCase() : '');
+      }
+      return word;
+    }).join(' ');
+  }
+
   /// Normalizes a song title for strict duplicate detection:
   /// - Strips file extensions (.mp3, .m4a, .wav)
   /// - Strips parenthesized / bracketed tags [Audio], (Official Video), (Lofi)
+  /// - Strips noise words: official, video, audio, song, lyrics, remix, lofi, hd, 4k
+  /// - Strips leading track numbers (e.g. "01 - song" -> "song")
   /// - Removes all symbols, spaces, hyphens, underscores
+  /// - Crucially: Strips trailing numbers used to bypass duplicates (e.g. "song 1", "song_02", "song 2024" -> "song")
   /// - Lowercases everything
   static String normalizeTitle(String title) {
-    return title
-        .toLowerCase()
-        .replaceAll(RegExp(r'\.[a-zA-Z0-9]+$'), '')
-        .replaceAll(RegExp(r'[\(\[\{].*?[\)\]\}]'), '')
-        .replaceAll(RegExp(r'[^a-z0-9\u0900-\u097F]'), '')
-        .trim();
+    var s = title.toLowerCase();
+
+    // 1. Remove file extensions
+    s = s.replaceAll(RegExp(r'\.[a-zA-Z0-9]{2,5}$'), '');
+
+    // 2. Remove brackets and parentheses content
+    s = s.replaceAll(RegExp(r'[\(\[\{].*?[\)\]\}]'), '');
+
+    // 3. Remove common tags and noise words
+    s = s.replaceAll(
+      RegExp(r'\b(official|video|audio|song|lyrics|remix|lofi|hd|320kbps|128kbps|mp3|wav|full)\b'),
+      '',
+    );
+
+    // 4. Remove leading numbers (e.g. "01 - song" -> "song")
+    s = s.replaceFirst(RegExp(r'^[0-9]+[\s\-_.]*'), '');
+
+    // 5. Remove all non-alphanumeric (except Devanagari)
+    s = s.replaceAll(RegExp(r'[^a-z0-9\u0900-\u097F]'), '');
+
+    // 6. Crucial: Remove trailing numbers added to attempt duplicates (e.g. "choudhary1", "choudhary02", "choudhary2024")
+    if (RegExp(r'[a-z\u0900-\u097F]').hasMatch(s)) {
+      s = s.replaceFirst(RegExp(r'[0-9]+$'), '');
+    }
+
+    return s.trim();
   }
 
   /// Check if a song already exists in catalog or community songs (ignoring deleted songs)

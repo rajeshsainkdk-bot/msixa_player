@@ -124,10 +124,9 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
           _pickedFileSize = size;
           _errorMessage = null;
 
-          // Auto-fill title from filename if empty
+          // Auto-fill smart clean title from filename if empty
           if (_titleCtrl.text.isEmpty) {
-            final cleanName = name.replaceAll(RegExp(r'\.[a-zA-Z0-9]+$'), '').replaceAll('_', ' ');
-            _titleCtrl.text = cleanName;
+            _titleCtrl.text = CloudBackendService.formatSmartTitle(name);
           }
         });
       }
@@ -137,7 +136,7 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
   }
 
   Future<void> _submitSong() async {
-    final title = _titleCtrl.text.trim();
+    final title = CloudBackendService.formatSmartTitle(_titleCtrl.text.trim());
     final artist = _artistCtrl.text.trim();
     final album = _albumCtrl.text.trim();
     final cover = _coverUrlCtrl.text.trim();

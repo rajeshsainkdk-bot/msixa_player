@@ -144,7 +144,7 @@ void main() {
     });
   });
 
-  group('4. Duplicate Detection Normalization Tests', () {
+  group('4. Duplicate Detection & Smart Title Normalization Tests', () {
     test('normalizes titles ignoring extensions, case, and special characters', () {
       final norm1 = CloudBackendService.normalizeTitle('Choudhary (Official Video).mp3');
       final norm2 = CloudBackendService.normalizeTitle('choudhary [HD Audio]');
@@ -155,6 +155,46 @@ void main() {
       expect(norm3, 'choudhary');
       expect(norm1, equals(norm2));
       expect(norm2, equals(norm3));
+    });
+
+    test('normalizeTitle strips trailing numbers added to attempt duplicate uploads', () {
+      final base = CloudBackendService.normalizeTitle('Choudhary');
+      final dup1 = CloudBackendService.normalizeTitle('Choudhary 1');
+      final dup2 = CloudBackendService.normalizeTitle('Choudhary 2');
+      final dup3 = CloudBackendService.normalizeTitle('Choudhary_01');
+      final dup4 = CloudBackendService.normalizeTitle('Choudhary (1)');
+      final dup5 = CloudBackendService.normalizeTitle('Choudhary 2024');
+      final dup6 = CloudBackendService.normalizeTitle('01 - Choudhary.mp3');
+
+      expect(base, 'choudhary');
+      expect(dup1, base);
+      expect(dup2, base);
+      expect(dup3, base);
+      expect(dup4, base);
+      expect(dup5, base);
+      expect(dup6, base);
+    });
+
+    test('formatSmartTitle cleans raw filenames into professional human-readable titles', () {
+      expect(
+        CloudBackendService.formatSmartTitle('01 - choudhary (official video)_2024.mp3'),
+        'Choudhary',
+      );
+
+      expect(
+        CloudBackendService.formatSmartTitle('radhe_krishna_bhajan_02.mp3'),
+        'Radhe Krishna Bhajan',
+      );
+
+      expect(
+        CloudBackendService.formatSmartTitle('teri mitti tribute (hd audio) [lyrics] 1.mp3'),
+        'Teri Mitti Tribute',
+      );
+
+      expect(
+        CloudBackendService.formatSmartTitle('हनुमान चालीसा (Official Video) 1'),
+        'हनुमान चालीसा',
+      );
     });
   });
 

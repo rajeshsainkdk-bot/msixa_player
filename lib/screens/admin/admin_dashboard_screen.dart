@@ -772,8 +772,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                           final isCurrent = isUploading && currentIndex == idx;
                           final isDone = isUploading && idx < currentIndex;
                           final mb = (f.size / (1024 * 1024)).toStringAsFixed(1);
-                          final cleanName = f.name.replaceAll(RegExp(r'\.[a-zA-Z0-9]+$'), '').replaceAll('_', ' ');
-                          final isDup = _backend.checkDuplicateSong(title: cleanName, artist: '') != null;
+                          final smartTitle = CloudBackendService.formatSmartTitle(f.name);
+                          final isDup = _backend.checkDuplicateSong(title: smartTitle, artist: '') != null;
                           final h = fileHierarchyMap[f.path] ?? (prefillGenre != null
                               ? DetectedFolderHierarchy(category: prefillGenre, subCategory: prefillSubCategory)
                               : detectFolderHierarchy(f.path ?? ''));
@@ -801,12 +801,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        f.name,
+                                        smartTitle,
                                         style: TextStyle(
                                           color: isCurrent
                                               ? const Color(0xFF00E5FF)
                                               : (isDup ? Colors.amberAccent : Colors.white70),
                                           fontSize: 11,
+                                          fontWeight: FontWeight.bold,
                                         ),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
@@ -912,29 +913,29 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                       final pf = pickedFiles[i];
                       if (pf.path == null) continue;
 
-                      final cleanName = pf.name.replaceAll(RegExp(r'\.[a-zA-Z0-9]+$'), '').replaceAll('_', ' ');
+                      final smartTitle = CloudBackendService.formatSmartTitle(pf.name);
 
                       // Strict Duplicate Check: Skip if already in catalog or in current upload batch
-                      final duplicate = _backend.checkDuplicateSong(title: cleanName, artist: '');
-                      final isBatchDup = batchUploadedTitles.contains(CloudBackendService.normalizeTitle(cleanName));
+                      final duplicate = _backend.checkDuplicateSong(title: smartTitle, artist: '');
+                      final isBatchDup = batchUploadedTitles.contains(CloudBackendService.normalizeTitle(smartTitle));
 
                       if (duplicate != null || isBatchDup) {
                         skippedCount++;
                         setDialogState(() {
                           currentIndex = i;
                           currentTrackProgress = 1.0;
-                          statusMessage = '⚠️ स्किप किया (Duplicate): $cleanName (पहले से मौजूद)';
+                          statusMessage = '⚠️ स्किप किया (Duplicate): $smartTitle (पहले से मौजूद)';
                         });
                         await Future.delayed(const Duration(milliseconds: 250));
                         continue;
                       }
 
-                      batchUploadedTitles.add(CloudBackendService.normalizeTitle(cleanName));
+                      batchUploadedTitles.add(CloudBackendService.normalizeTitle(smartTitle));
 
                       setDialogState(() {
                         currentIndex = i;
                         currentTrackProgress = 0.1;
-                        statusMessage = 'अपलोड हो रहा है (${i + 1}/${pickedFiles.length}): $cleanName...';
+                        statusMessage = 'अपलोड हो रहा है (${i + 1}/${pickedFiles.length}): $smartTitle...';
                       });
 
                       try {
@@ -954,7 +955,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                           final targetSubCategory = prefillSubCategory ?? (h.subCategory ?? (subCategoryCtrl.text.trim().isNotEmpty ? subCategoryCtrl.text.trim() : null));
 
                           final newSong = await _backend.addAdminSong(
-                            title: cleanName,
+                            title: smartTitle,
                             artist: 'Various Artists',
                             album: playlistTitleCtrl.text.trim().isNotEmpty ? playlistTitleCtrl.text.trim() : 'Msixa Cloud Hits',
                             genre: targetCategory,
@@ -1093,9 +1094,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                                   if (cloudUrl != null) {
                                     audioCtrl.text = cloudUrl;
                                     if (titleCtrl.text.isEmpty) {
-                                      titleCtrl.text = result.files.single.name
-                                          .replaceAll(RegExp(r'\.[a-zA-Z0-9]+$'), '')
-                                          .replaceAll('_', ' ');
+                                      titleCtrl.text = CloudBackendService.formatSmartTitle(result.files.single.name);
                                     }
                                   }
                                 });
@@ -1140,7 +1139,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFFB300), foregroundColor: Colors.black),
               onPressed: () async {
-                final title = titleCtrl.text.trim();
+                final title = CloudBackendService.formatSmartTitle(titleCtrl.text.trim());
                 final artist = artistCtrl.text.trim();
                 if (title.isEmpty || artist.isEmpty) return;
 
