@@ -124,3 +124,4 @@ class DetectedFolderHierarchy {
     return found;
   }
 }
+

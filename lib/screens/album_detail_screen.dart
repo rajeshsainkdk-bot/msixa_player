@@ -220,7 +220,7 @@ class AlbumDetailScreen extends StatelessWidget {
 
                   return SongListTile(
                     song: song,
-                    isPlaying: isCurrent && provider.isPlaying,
+                    isCurrent: isCurrent,
                     onTap: () => provider.playSong(song, queueContext: album.songs),
                   );
                 },
