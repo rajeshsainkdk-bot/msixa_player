@@ -344,3 +344,4 @@ class AiMusicService {
     return fallback.isNotEmpty ? fallback : 'All Indian';
   }
 }
+

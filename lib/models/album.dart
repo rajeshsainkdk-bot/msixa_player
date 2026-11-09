@@ -35,3 +35,4 @@ class Album {
     return '${minutes} mins';
   }
 }
+

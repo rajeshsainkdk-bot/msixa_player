@@ -1,11 +1,12 @@
 import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:msixa_player/models/song.dart';
-import 'package:msixa_player/screens/admin/admin_dashboard_screen.dart';
+import 'package:msixa_player/models/folder_hierarchy.dart';
 import 'package:msixa_player/services/cloud_backend_service.dart';
 import 'package:msixa_player/services/device_audio_service.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   group('1. Song Model & SubCategory Tests', () {
     test('Song model supports subCategory properly in toJson and fromJson', () {
       final song = Song(

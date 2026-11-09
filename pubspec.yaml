@@ -1,7 +1,7 @@
 name: msixa_player
 description: "Msixa Player - Dark Premium Online & Offline MP3 Music Player for Android with Indian Songs & Local Device Storage Scanner."
 publish_to: 'none'
-version: 1.0.61+61
+version: 1.0.64+64
 
 environment:
   sdk: '>=3.0.0 <4.0.0'

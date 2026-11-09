@@ -21,3 +21,4 @@ class Artist {
 
   String get genreSummary => genres.isNotEmpty ? genres.join(', ') : 'All Indian Music';
 }
+

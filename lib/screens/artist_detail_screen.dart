@@ -218,3 +218,4 @@ class ArtistDetailScreen extends StatelessWidget {
     );
   }
 }
+
