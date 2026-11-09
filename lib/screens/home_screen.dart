@@ -21,6 +21,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final Set<String> _expandedCategories = {};
+  final Map<String, String> _selectedSubCategories = {};
 
   static const List<Map<String, dynamic>> _genres = [
     {
@@ -630,6 +631,33 @@ class _HomeScreenState extends State<HomeScreen> {
                   songs: trending.where((s) => s.genre == 'DJ Remix').toList(),
                 ),
 
+                // ==========================================
+                // DYNAMIC CATEGORIES ADDED BY ADMIN / COMMUNITY
+                // ==========================================
+                ...(() {
+                  final knownGenres = {
+                    'bhakti', 'punjabi', 'sufi', 'bollywood', 'indie pop',
+                    'spiritual', 'desi lo-fi', 'ghazal', 'rajasthani', 'haryanvi', 'dj remix'
+                  };
+                  final dynamicGenres = <String>{};
+                  for (final s in trending) {
+                    final g = s.genre.trim();
+                    if (g.isNotEmpty && !knownGenres.contains(g.toLowerCase())) {
+                      dynamicGenres.add(g);
+                    }
+                  }
+                  return dynamicGenres.map((genre) {
+                    final genreSongs = trending.where((s) => s.genre.trim().toLowerCase() == genre.toLowerCase()).toList();
+                    return _buildCategorySection(
+                      context,
+                      title: '📁 $genre Songs',
+                      genreKey: genre,
+                      provider: provider,
+                      songs: genreSongs,
+                    );
+                  }).toList();
+                })(),
+
                 const SizedBox(height: 20),
 
                 // Genres / Moods Carousel
@@ -750,6 +778,19 @@ class _HomeScreenState extends State<HomeScreen> {
     final isExpanded = _expandedCategories.contains(genreKey);
     final lang = LanguageService();
 
+    final subCategories = <String>{};
+    for (final s in songs) {
+      final sub = s.subCategory?.trim();
+      if (sub != null && sub.isNotEmpty && sub.toLowerCase() != genreKey.toLowerCase()) {
+        subCategories.add(sub);
+      }
+    }
+
+    final selectedSub = _selectedSubCategories[genreKey] ?? 'All';
+    final displayedSongs = (selectedSub == 'All')
+        ? songs
+        : songs.where((s) => s.subCategory?.trim() == selectedSub).toList();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -821,22 +862,78 @@ class _HomeScreenState extends State<HomeScreen> {
               },
             ),
           )
-        else
+        else ...[
+          if (subCategories.isNotEmpty)
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+              child: Row(
+                children: [
+                  _buildSubCategoryChip(
+                    label: '${lang.isHindi ? "सभी" : "All"} (${songs.length})',
+                    isSelected: selectedSub == 'All',
+                    onTap: () => setState(() => _selectedSubCategories[genreKey] = 'All'),
+                  ),
+                  const SizedBox(width: 8),
+                  ...subCategories.map((sub) {
+                    final count = songs.where((s) => s.subCategory?.trim() == sub).length;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: _buildSubCategoryChip(
+                        label: '📁 $sub ($count)',
+                        isSelected: selectedSub == sub,
+                        onTap: () => setState(() => _selectedSubCategories[genreKey] = sub),
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            ),
           ListView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: songs.length,
+            itemCount: displayedSongs.length,
             itemBuilder: (context, index) {
-              final song = songs[index];
+              final song = displayedSongs[index];
               return SongListTile(
                 song: song,
                 isCurrent: provider.currentSong?.id == song.id,
-                onTap: () => provider.playSong(song, queueContext: songs),
+                onTap: () => provider.playSong(song, queueContext: displayedSongs),
               );
             },
           ),
+        ],
       ],
+    );
+  }
+
+  Widget _buildSubCategoryChip({
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.accentCyan.withOpacity(0.2) : AppColors.card,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected ? AppColors.accentCyan : Colors.white.withOpacity(0.12),
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? AppColors.accentCyan : AppColors.textSecondary,
+            fontSize: 11,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
+      ),
     );
   }
 

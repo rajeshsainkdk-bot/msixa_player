@@ -23,6 +23,7 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
   final _titleCtrl = TextEditingController();
   final _artistCtrl = TextEditingController();
   final _albumCtrl = TextEditingController();
+  final _subCategoryCtrl = TextEditingController();
   final _coverUrlCtrl = TextEditingController();
 
   // Mode: 0 = Single Song, 1 = Folder Upload with Auto Playlist
@@ -81,6 +82,7 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
     _titleCtrl.dispose();
     _artistCtrl.dispose();
     _albumCtrl.dispose();
+    _subCategoryCtrl.dispose();
     _coverUrlCtrl.dispose();
     _folderPlaylistNameCtrl.dispose();
     _folderArtistCtrl.dispose();
@@ -201,6 +203,7 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
         artist: artist,
         album: album.isEmpty ? 'Community Music' : album,
         genre: _selectedGenre,
+        subCategory: _subCategoryCtrl.text.trim().isNotEmpty ? _subCategoryCtrl.text.trim() : null,
         audioPath: finalAudioUrl,
         coverUrl: cover.isNotEmpty ? cover : null,
       );
@@ -563,64 +566,85 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Mode Selector: Single Song vs Folder / Playlist Upload
-            Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: const Color(0xFF131A2A),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white.withOpacity(0.08)),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: _isUploading ? null : () => setState(() => _uploadMode = 0),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        decoration: BoxDecoration(
-                          color: _uploadMode == 0 ? const Color(0xFF00E5FF) : Colors.transparent,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Center(
-                          child: Text(
-                            _lang.isHindi ? '🎵 एक गाना' : '🎵 Single Song',
-                            style: TextStyle(
-                              color: _uploadMode == 0 ? Colors.black : Colors.white70,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
+            // Mode Selector: Admin can choose Single or Folder; Users are restricted to Single Song only
+            if (_backend.isAdmin) ...[
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF131A2A),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white.withOpacity(0.08)),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: _isUploading ? null : () => setState(() => _uploadMode = 0),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: _uploadMode == 0 ? const Color(0xFF00E5FF) : Colors.transparent,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Center(
+                            child: Text(
+                              _lang.isHindi ? '🎵 एक गाना' : '🎵 Single Song',
+                              style: TextStyle(
+                                color: _uploadMode == 0 ? Colors.black : Colors.white70,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
                             ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: _isUploading ? null : () => setState(() => _uploadMode = 1),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        decoration: BoxDecoration(
-                          color: _uploadMode == 1 ? const Color(0xFF00E5FF) : Colors.transparent,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Center(
-                          child: Text(
-                            _lang.isHindi ? '📁 फ़ोल्डर / प्लेलिस्ट' : '📁 Folder / Playlist',
-                            style: TextStyle(
-                              color: _uploadMode == 1 ? Colors.black : Colors.white70,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: _isUploading ? null : () => setState(() => _uploadMode = 1),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: _uploadMode == 1 ? const Color(0xFF00E5FF) : Colors.transparent,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Center(
+                            child: Text(
+                              _lang.isHindi ? '📁 फ़ोल्डर / प्लेलिस्ट (Admin)' : '📁 Folder / Playlist (Admin)',
+                              style: TextStyle(
+                                color: _uploadMode == 1 ? Colors.black : Colors.white70,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
                             ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
+            ] else ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF131A2A),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF00E5FF).withOpacity(0.2)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.music_note_rounded, color: Color(0xFF00E5FF), size: 18),
+                    const SizedBox(width: 8),
+                    Text(
+                      _lang.isHindi ? '🎵 एकल गाना अपलोड (One by One)' : '🎵 Single Song Upload (One by One)',
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 20),
 
             if (_uploadMode == 1)
@@ -825,6 +849,14 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
                   },
                 ),
               ),
+            ),
+            const SizedBox(height: 14),
+
+            // Sub-Category Field
+            _buildTextField(
+              controller: _subCategoryCtrl,
+              label: _lang.isHindi ? 'उप-श्रेणी (Sub-Category - Optional)' : 'Sub-Category (Optional)',
+              hint: _lang.isHindi ? 'उदा. Marwadi Hits, Folk, 90s Hits' : 'e.g. Marwadi Hits, Folk, 90s Hits',
             ),
             const SizedBox(height: 14),
 

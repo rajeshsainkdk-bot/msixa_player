@@ -541,6 +541,7 @@ class CloudBackendService extends ChangeNotifier {
     required String artist,
     required String album,
     required String genre,
+    String? subCategory,
     required String audioPath,
     String? coverUrl,
   }) async {
@@ -561,6 +562,7 @@ class CloudBackendService extends ChangeNotifier {
           ? coverUrl!.trim()
           : 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&q=80',
       genre: genre.trim().isEmpty ? 'Desi Chill' : genre.trim(),
+      subCategory: subCategory?.trim(),
       status: 'pending', // Requires admin approval!
       uploadedBy: _currentUser?.uid ?? 'guest',
       uploaderName: _currentUser?.fullName ?? 'Anonymous Listener',
@@ -584,6 +586,7 @@ class CloudBackendService extends ChangeNotifier {
     required String artist,
     String? album,
     required String genre,
+    String? subCategory,
     required String audioPath,
     String? coverUrl,
   }) async {
@@ -604,6 +607,7 @@ class CloudBackendService extends ChangeNotifier {
           ? coverUrl!.trim()
           : 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&q=80',
       genre: genre.trim().isEmpty ? 'Bollywood' : genre.trim(),
+      subCategory: subCategory?.trim(),
       status: 'approved', // Live immediately!
       uploadedBy: 'admin',
       uploaderName: 'Msixa Super Admin',
@@ -624,6 +628,7 @@ class CloudBackendService extends ChangeNotifier {
     required String artist,
     required String album,
     required String genre,
+    String? subCategory,
     required String streamUrl,
     String? coverUrl,
   }) async {
@@ -635,6 +640,7 @@ class CloudBackendService extends ChangeNotifier {
         artist: artist.trim(),
         album: album.trim(),
         genre: genre.trim(),
+        subCategory: subCategory?.trim(),
         streamUrl: streamUrl.trim(),
         coverUrl: coverUrl?.trim().isNotEmpty == true ? coverUrl!.trim() : existing.coverUrl,
       );

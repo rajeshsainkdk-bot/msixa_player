@@ -313,18 +313,110 @@ class _LibraryScreenState extends State<LibraryScreen>
               ),
               children: [
                 const Divider(color: Colors.white10, height: 1),
-                ListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: songs.length,
-                  itemBuilder: (context, songIdx) {
-                    final song = songs[songIdx];
-                    final isCurrent = provider.currentSong?.id == song.id;
+                Builder(
+                  builder: (context) {
+                    final Map<String, List<Song>> subMap = {};
+                    final List<Song> directSongs = [];
 
-                    return SongListTile(
-                      song: song,
-                      isCurrent: isCurrent,
-                      onTap: () => provider.playSong(song, queueContext: songs),
+                    for (final s in songs) {
+                      final sub = s.subCategory?.trim();
+                      if (sub != null && sub.isNotEmpty && sub.toLowerCase() != category.toLowerCase()) {
+                        subMap.putIfAbsent(sub, () => []).add(s);
+                      } else {
+                        directSongs.add(s);
+                      }
+                    }
+
+                    if (subMap.isEmpty) {
+                      return ListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: songs.length,
+                        itemBuilder: (context, songIdx) {
+                          final song = songs[songIdx];
+                          final isCurrent = provider.currentSong?.id == song.id;
+
+                          return SongListTile(
+                            song: song,
+                            isCurrent: isCurrent,
+                            onTap: () => provider.playSong(song, queueContext: songs),
+                          );
+                        },
+                      );
+                    }
+
+                    // Nested Subcategory Accordions
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        ...subMap.entries.map((entry) {
+                          final subCat = entry.key;
+                          final subSongs = entry.value;
+
+                          return Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppColors.surface.withOpacity(0.4),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.white.withOpacity(0.04)),
+                            ),
+                            child: Theme(
+                              data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                              child: ExpansionTile(
+                                initiallyExpanded: false,
+                                tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                                leading: Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.accentCyan.withOpacity(0.12),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.folder_copy_rounded, color: AppColors.accentCyan, size: 16),
+                                ),
+                                title: Text(
+                                  subCat,
+                                  style: const TextStyle(
+                                    color: AppColors.textPrimary,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  '${subSongs.length} ${lang.isHindi ? "गाने" : "Tracks"}',
+                                  style: const TextStyle(color: AppColors.textMuted, fontSize: 10),
+                                ),
+                                trailing: IconButton(
+                                  icon: const Icon(Icons.play_circle_outline_rounded, color: AppColors.accentCyan, size: 24),
+                                  onPressed: () => provider.playSong(subSongs.first, queueContext: subSongs),
+                                ),
+                                children: subSongs.map((s) {
+                                  return SongListTile(
+                                    song: s,
+                                    isCurrent: provider.currentSong?.id == s.id,
+                                    onTap: () => provider.playSong(s, queueContext: subSongs),
+                                  );
+                                }).toList(),
+                              ),
+                            ),
+                          );
+                        }),
+                        if (directSongs.isNotEmpty) ...[
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+                            child: Text(
+                              lang.isHindi ? '🎵 मुख्य ट्रैक्स' : '🎵 Main Tracks',
+                              style: const TextStyle(color: AppColors.textSecondary, fontSize: 11, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          ...directSongs.map((s) {
+                            return SongListTile(
+                              song: s,
+                              isCurrent: provider.currentSong?.id == s.id,
+                              onTap: () => provider.playSong(s, queueContext: directSongs),
+                            );
+                          }),
+                        ],
+                      ],
                     );
                   },
                 ),

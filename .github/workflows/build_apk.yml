@@ -452,6 +452,9 @@ jobs:
       - name: Get Dependencies
         run: flutter pub get
 
+      - name: Run Test Suite
+        run: flutter test
+
       - name: Build User APK (Release)
         run: |
           flutter build apk --release --build-name=1.0.${{ github.run_number }} --build-number=${{ github.run_number }} --no-tree-shake-icons

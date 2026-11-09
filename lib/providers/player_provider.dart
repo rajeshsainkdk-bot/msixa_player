@@ -38,8 +38,9 @@ class PlayerProvider extends ChangeNotifier {
   bool _isPlaying = false;
   bool _isBuffering = false;
 
-  // Sleep Timer
+  // Sleep Timer & Cloud Sync
   Timer? _sleepTimer;
+  Timer? _cloudSyncTimer;
   int _sleepMinutesRemaining = 0;
 
   // Equalizer
@@ -81,6 +82,11 @@ class PlayerProvider extends ChangeNotifier {
     _init();
     // Realtime synchronization: listen to CloudBackendService so admin additions & deletions update user player immediately
     CloudBackendService().addListener(_onBackendCatalogUpdated);
+
+    // Periodic cloud poll every 3 seconds so User app instantly detects song deletion / new uploads from Admin app
+    _cloudSyncTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      CloudBackendService().syncSharedData();
+    });
   }
 
   void _onBackendCatalogUpdated() {
@@ -160,9 +166,19 @@ class PlayerProvider extends ChangeNotifier {
     _trendingSongs = await _catalogService.fetchTrendingTracks();
     _curatedPlaylists = _catalogService.getCuratedPlaylists(songs: _trendingSongs);
 
+    // If currently playing song was deleted by admin, immediately stop playback!
+    if (_audioService.currentSong != null && deleted.contains(_audioService.currentSong!.id)) {
+      await _audioService.stop();
+    }
+
     // Purge deleted songs from favorites and recent history
     _favorites.removeWhere((s) => deleted.contains(s.id));
     _recentlyPlayed.removeWhere((s) => deleted.contains(s.id));
+
+    // Also purge deleted songs from custom playlists
+    for (final pl in _customPlaylists) {
+      pl.songs.removeWhere((s) => deleted.contains(s.id));
+    }
 
     _syncFavoritesFlag(_trendingSongs);
     _isLoadingTrending = false;
@@ -430,7 +446,9 @@ class PlayerProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    _cloudSyncTimer?.cancel();
     _sleepTimer?.cancel();
+    CloudBackendService().removeListener(_onBackendCatalogUpdated);
     _audioService.dispose();
     super.dispose();
   }

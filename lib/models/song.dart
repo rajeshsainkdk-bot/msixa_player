@@ -7,6 +7,7 @@ class Song {
   final String streamUrl;
   final String coverUrl;
   final String genre;
+  final String? subCategory;
   final String license;
   final String licenseUrl;
   final String source;
@@ -28,6 +29,7 @@ class Song {
     required this.streamUrl,
     required this.coverUrl,
     this.genre = 'Electronic',
+    this.subCategory,
     this.license = 'Creative Commons BY-SA',
     this.licenseUrl = 'https://creativecommons.org/licenses/',
     this.source = 'Jamendo Free Catalog',
@@ -67,6 +69,7 @@ class Song {
     String? streamUrl,
     String? coverUrl,
     String? genre,
+    String? subCategory,
     String? license,
     String? licenseUrl,
     String? source,
@@ -86,6 +89,7 @@ class Song {
       streamUrl: streamUrl ?? this.streamUrl,
       coverUrl: coverUrl ?? this.coverUrl,
       genre: genre ?? this.genre,
+      subCategory: subCategory ?? this.subCategory,
       license: license ?? this.license,
       licenseUrl: licenseUrl ?? this.licenseUrl,
       source: source ?? this.source,
@@ -108,6 +112,7 @@ class Song {
       'streamUrl': streamUrl,
       'coverUrl': coverUrl,
       'genre': genre,
+      'subCategory': subCategory,
       'license': license,
       'licenseUrl': licenseUrl,
       'source': source,
@@ -130,6 +135,7 @@ class Song {
       streamUrl: json['streamUrl'] as String? ?? '',
       coverUrl: json['coverUrl'] as String? ?? '',
       genre: json['genre'] as String? ?? 'Chill',
+      subCategory: json['subCategory'] as String? ?? json['sub_category'] as String?,
       license: json['license'] as String? ?? 'Creative Commons',
       licenseUrl: json['licenseUrl'] as String? ?? 'https://creativecommons.org/',
       source: json['source'] as String? ?? 'Legal Free Music',

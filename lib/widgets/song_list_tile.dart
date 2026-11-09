@@ -124,11 +124,11 @@ class SongListTile extends StatelessWidget {
                           ),
                           const SizedBox(width: 6),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
                             decoration: BoxDecoration(
                               color: AppColors.surface,
                               borderRadius: BorderRadius.circular(4),
-                              border: Border.all(color: Colors.white.withOpacity(0.08)),
+                              border: Border.all(color: Colors.white.withOpacity(0.12)),
                             ),
                             child: Text(
                               song.genre,
@@ -139,6 +139,27 @@ class SongListTile extends StatelessWidget {
                               ),
                             ),
                           ),
+                          if (song.subCategory != null &&
+                              song.subCategory!.trim().isNotEmpty &&
+                              song.subCategory!.trim().toLowerCase() != song.genre.trim().toLowerCase()) ...[
+                            const SizedBox(width: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                              decoration: BoxDecoration(
+                                color: AppColors.accentCyan.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(color: AppColors.accentCyan.withOpacity(0.35)),
+                              ),
+                              child: Text(
+                                song.subCategory!.trim(),
+                                style: const TextStyle(
+                                  color: AppColors.accentCyan,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ],

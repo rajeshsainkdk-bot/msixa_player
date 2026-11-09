@@ -15,6 +15,41 @@ import '../../models/song.dart';
 import '../../models/user_profile.dart';
 import '../../models/playlist.dart';
 
+class DetectedFolderHierarchy {
+  final String category;
+  final String? subCategory;
+
+  const DetectedFolderHierarchy({required this.category, this.subCategory});
+
+  static DetectedFolderHierarchy fromPath(String filePath) {
+    final cleanPath = filePath.replaceAll(r'\', '/');
+    final parts = cleanPath.split('/').where((p) => p.trim().isNotEmpty).toList();
+    if (parts.length < 2) {
+      return const DetectedFolderHierarchy(category: 'Rajasthani');
+    }
+    const systemFolders = {
+      'storage', 'emulated', '0', '1', 'sdcard', 'android', 'media', 'data',
+      'download', 'downloads', 'music', 'audio', 'documents', 'dcim', 'desktop',
+      'c:', 'd:', 'e:', 'users', 'user', 'home', 'appdata', 'temp', 'tmp'
+    };
+    final parentDir = parts[parts.length - 2];
+    final grandParentDir = parts.length >= 3 ? parts[parts.length - 3] : null;
+
+    if (grandParentDir != null && !systemFolders.contains(grandParentDir.toLowerCase())) {
+      return DetectedFolderHierarchy(
+        category: grandParentDir,
+        subCategory: parentDir,
+      );
+    } else {
+      final cat = systemFolders.contains(parentDir.toLowerCase()) ? 'Rajasthani' : parentDir;
+      return DetectedFolderHierarchy(
+        category: cat,
+        subCategory: null,
+      );
+    }
+  }
+}
+
 class AdminDashboardScreen extends StatefulWidget {
   final VoidCallback onSignOut;
 
@@ -53,6 +88,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
   Timer? _syncTimer;
   Map<String, dynamic>? _storageStats;
   bool _isLoadingStorageStats = false;
+  bool _adminGroupByCategory = true;
 
   @override
   void initState() {
@@ -169,16 +205,51 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
     if (await canLaunchUrl(uri)) await launchUrl(uri);
   }
 
-  void _showBulkUploadDialog() {
+  static DetectedFolderHierarchy detectFolderHierarchy(String filePath) =>
+      DetectedFolderHierarchy.fromPath(filePath);
+
+  void _showBulkUploadDialog({String? prefillGenre, String? prefillSubCategory}) {
     List<PlatformFile> pickedFiles = [];
+    final Map<String, DetectedFolderHierarchy> fileHierarchyMap = {};
     bool isUploading = false;
     int currentIndex = 0;
     double currentTrackProgress = 0.0;
     String statusMessage = '';
-    String selectedGenre = 'Rajasthani';
+    String selectedGenre = prefillGenre ?? 'Rajasthani';
     final genres = List<String>.from(_allGenres);
+    if (!genres.contains(selectedGenre)) genres.insert(0, selectedGenre);
     final playlistTitleCtrl = TextEditingController();
+    final subCategoryCtrl = TextEditingController(text: prefillSubCategory ?? '');
     bool createPlaylistWithFolder = true;
+
+    void updateFilesHierarchy(List<PlatformFile> files) {
+      pickedFiles = files;
+      for (final f in pickedFiles) {
+        if (f.path != null) {
+          if (prefillGenre != null) {
+            fileHierarchyMap[f.path!] = DetectedFolderHierarchy(
+              category: prefillGenre,
+              subCategory: prefillSubCategory ?? (subCategoryCtrl.text.trim().isNotEmpty ? subCategoryCtrl.text.trim() : null),
+            );
+          } else {
+            fileHierarchyMap[f.path!] = detectFolderHierarchy(f.path!);
+          }
+        }
+      }
+      if (pickedFiles.isNotEmpty && pickedFiles.first.path != null) {
+        final fh = fileHierarchyMap[pickedFiles.first.path!];
+        if (prefillGenre == null && fh != null) {
+          selectedGenre = fh.category;
+          if (!genres.contains(selectedGenre)) genres.insert(0, selectedGenre);
+          if (fh.subCategory != null && subCategoryCtrl.text.isEmpty) {
+            subCategoryCtrl.text = fh.subCategory!;
+          }
+        }
+        final parentDir = File(pickedFiles.first.path!).parent;
+        final folderName = parentDir.path.split(RegExp(r'[\\/]')).lastWhere((s) => s.isNotEmpty, orElse: () => 'Bulk Playlist');
+        playlistTitleCtrl.text = folderName;
+      }
+    }
 
     showDialog(
       context: context,
@@ -191,9 +262,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
             children: const [
               Icon(Icons.folder_copy_rounded, color: Color(0xFFFFB300), size: 24),
               SizedBox(width: 8),
-              Text(
-                'बल्क / फ़ोल्डर गाने अपलोड करें',
-                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+              Expanded(
+                child: Text(
+                  'बल्क / फ़ोल्डर गाने अपलोड करें',
+                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                ),
               ),
             ],
           ),
@@ -205,56 +278,115 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'डिवाइस से एक साथ कई गाने (Multiple MP3s) चुनें और Cloudflare R2 पर एक क्लिक में लाइव करें। स्क्रीन लॉक होने पर भी बैकग्राउंड में अपलोड जारी रहेगा।',
+                    'डिवाइस से फ़ोल्डर या कई MP3s चुनें। फ़ोल्डर का नाम Category और अंदर के सब-फ़ोल्डर का नाम Sub-Category बन जाएगा। स्क्रीन लॉक होने पर भी बैकग्राउंड में अपलोड जारी रहेगा।',
                     style: TextStyle(color: Colors.white70, fontSize: 11),
                   ),
                   const SizedBox(height: 14),
 
-                  if (!isUploading)
-                    ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF1E293B),
-                        foregroundColor: const Color(0xFF00E5FF),
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          side: BorderSide(color: const Color(0xFF00E5FF).withOpacity(0.4)),
-                        ),
-                      ),
-                      icon: const Icon(Icons.file_open_rounded, size: 20),
-                      label: Text(
-                        pickedFiles.isEmpty
-                            ? '📁 गाने चुनें (Select Multiple MP3 Files)'
-                            : '📁 और गाने जोड़ें / बदलें (${pickedFiles.length} Chune Gaye)',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                      ),
-                      onPressed: () async {
-                        try {
-                          final result = await FilePicker.platform.pickFiles(
-                            allowMultiple: true,
-                            type: FileType.custom,
-                            allowedExtensions: ['mp3', 'm4a', 'wav'],
-                          );
-                          if (result != null && result.files.isNotEmpty) {
-                            setDialogState(() {
-                              pickedFiles = result.files.where((f) => f.path != null).toList();
-                              if (pickedFiles.isNotEmpty && pickedFiles.first.path != null) {
-                                final parentDir = File(pickedFiles.first.path!).parent;
-                                final folderName = parentDir.path.split(RegExp(r'[\\/]')).lastWhere((s) => s.isNotEmpty, orElse: () => 'Bulk Playlist');
-                                playlistTitleCtrl.text = folderName;
+                  if (!isUploading) ...[
+                    Row(
+                      children: [
+                        // Button 1: Pick Directory
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF1E293B),
+                              foregroundColor: const Color(0xFFFFB300),
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 11),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                side: BorderSide(color: const Color(0xFFFFB300).withOpacity(0.5)),
+                              ),
+                            ),
+                            icon: const Icon(Icons.drive_folder_upload_rounded, size: 18),
+                            label: const Text(
+                              '📁 पूरा फ़ोल्डर चुनें',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+                            ),
+                            onPressed: () async {
+                              try {
+                                final dirPath = await FilePicker.platform.getDirectoryPath();
+                                if (dirPath != null) {
+                                  final dir = Directory(dirPath);
+                                  final List<PlatformFile> found = [];
+                                  try {
+                                    final entities = dir.listSync(recursive: true);
+                                    for (final e in entities) {
+                                      if (e is File) {
+                                        final ext = e.path.split('.').last.toLowerCase();
+                                        if (['mp3', 'm4a', 'wav'].contains(ext)) {
+                                          final len = await e.length();
+                                          final nm = e.path.split(RegExp(r'[\\/]')).last;
+                                          found.add(PlatformFile(path: e.path, name: nm, size: len));
+                                        }
+                                      }
+                                    }
+                                  } catch (dirErr) {
+                                    debugPrint('Directory scan error: $dirErr');
+                                  }
+
+                                  if (found.isNotEmpty) {
+                                    setDialogState(() {
+                                      updateFilesHierarchy(found);
+                                    });
+                                  } else {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('चयनित फ़ोल्डर में कोई MP3/M4A गाना नहीं मिला।')),
+                                    );
+                                  }
+                                }
+                              } catch (e) {
+                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Folder picker error: $e')));
                               }
-                            });
-                          }
-                        } catch (e) {
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('File picker error: $e')));
-                        }
-                      },
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+
+                        // Button 2: Pick Multiple MP3 Files
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF1E293B),
+                              foregroundColor: const Color(0xFF00E5FF),
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 11),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                side: BorderSide(color: const Color(0xFF00E5FF).withOpacity(0.5)),
+                              ),
+                            ),
+                            icon: const Icon(Icons.file_open_rounded, size: 18),
+                            label: Text(
+                              pickedFiles.isEmpty ? '🎵 गाने चुनें' : '🎵 बदलें (${pickedFiles.length})',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+                            ),
+                            onPressed: () async {
+                              try {
+                                final result = await FilePicker.platform.pickFiles(
+                                  allowMultiple: true,
+                                  type: FileType.custom,
+                                  allowedExtensions: ['mp3', 'm4a', 'wav'],
+                                );
+                                if (result != null && result.files.isNotEmpty) {
+                                  setDialogState(() {
+                                    final files = result.files.where((f) => f.path != null).toList();
+                                    updateFilesHierarchy(files);
+                                  });
+                                }
+                              } catch (e) {
+                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('File picker error: $e')));
+                              }
+                            },
+                          ),
+                        ),
+                      ],
                     ),
+                  ],
 
                   if (pickedFiles.isNotEmpty) ...[
                     const SizedBox(height: 14),
                     const Text(
-                      'डिफ़ॉल्ट संगीत विधा (Default Genre):',
+                      'डिफ़ॉल्ट श्रेणी (Default Category / Genre):',
                       style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 6),
@@ -273,6 +405,24 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                           : (val) {
                               if (val != null) setDialogState(() => selectedGenre = val);
                             },
+                    ),
+                    const SizedBox(height: 10),
+                    const Text(
+                      'डिफ़ॉल्ट उप-श्रेणी (Default Sub-Category - Optional):',
+                      style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: subCategoryCtrl,
+                      enabled: !isUploading,
+                      style: const TextStyle(color: Colors.white, fontSize: 12),
+                      decoration: InputDecoration(
+                        hintText: 'उदा. Marwadi Hits, Folk (वैकल्पिक)',
+                        hintStyle: const TextStyle(color: Colors.grey, fontSize: 11),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Colors.white24)),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFFFB300))),
+                      ),
                     ),
                     const SizedBox(height: 12),
 
@@ -347,9 +497,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                           final mb = (f.size / (1024 * 1024)).toStringAsFixed(1);
                           final cleanName = f.name.replaceAll(RegExp(r'\.[a-zA-Z0-9]+$'), '').replaceAll('_', ' ');
                           final isDup = _backend.checkDuplicateSong(title: cleanName, artist: '') != null;
+                          final h = fileHierarchyMap[f.path] ?? (prefillGenre != null
+                              ? DetectedFolderHierarchy(category: prefillGenre, subCategory: prefillSubCategory)
+                              : detectFolderHierarchy(f.path ?? ''));
 
                           return Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 2),
+                            padding: const EdgeInsets.symmetric(vertical: 3),
                             child: Row(
                               children: [
                                 Icon(
@@ -367,16 +520,40 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                                 ),
                                 const SizedBox(width: 6),
                                 Expanded(
-                                  child: Text(
-                                    f.name,
-                                    style: TextStyle(
-                                      color: isCurrent
-                                          ? const Color(0xFF00E5FF)
-                                          : (isDup ? Colors.amberAccent : Colors.white70),
-                                      fontSize: 11,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        f.name,
+                                        style: TextStyle(
+                                          color: isCurrent
+                                              ? const Color(0xFF00E5FF)
+                                              : (isDup ? Colors.amberAccent : Colors.white70),
+                                          fontSize: 11,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(height: 1),
+                                      Row(
+                                        children: [
+                                          Text('$mb MB', style: const TextStyle(color: Colors.grey, fontSize: 9)),
+                                          const SizedBox(width: 6),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 0.5),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFF00E5FF).withOpacity(0.12),
+                                              borderRadius: BorderRadius.circular(4),
+                                              border: Border.all(color: const Color(0xFF00E5FF).withOpacity(0.3)),
+                                            ),
+                                            child: Text(
+                                              h.subCategory != null ? '${h.category} › ${h.subCategory}' : h.category,
+                                              style: const TextStyle(color: Color(0xFF00E5FF), fontSize: 9, fontWeight: FontWeight.bold),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
                                   ),
                                 ),
                                 if (isDup && !isDone)
@@ -392,7 +569,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                                       style: TextStyle(color: Colors.amberAccent, fontSize: 9, fontWeight: FontWeight.bold),
                                     ),
                                   ),
-                                Text('$mb MB', style: const TextStyle(color: Colors.grey, fontSize: 10)),
                               ],
                             ),
                           );
@@ -494,11 +670,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                         );
 
                         if (cloudUrl != null && cloudUrl.isNotEmpty) {
+                          final h = fileHierarchyMap[pf.path] ?? (prefillGenre != null
+                              ? DetectedFolderHierarchy(category: prefillGenre, subCategory: prefillSubCategory)
+                              : detectFolderHierarchy(pf.path!));
+                          final targetCategory = prefillGenre ?? (h.category.isNotEmpty ? h.category : selectedGenre);
+                          final targetSubCategory = prefillSubCategory ?? (h.subCategory ?? (subCategoryCtrl.text.trim().isNotEmpty ? subCategoryCtrl.text.trim() : null));
+
                           final newSong = await _backend.addAdminSong(
                             title: cleanName,
                             artist: 'Various Artists',
-                            album: 'Msixa Cloud Hits',
-                            genre: selectedGenre,
+                            album: playlistTitleCtrl.text.trim().isNotEmpty ? playlistTitleCtrl.text.trim() : 'Msixa Cloud Hits',
+                            genre: targetCategory,
+                            subCategory: targetSubCategory,
                             audioPath: cloudUrl,
                           );
                           uploadedSongsList.add(newSong);
@@ -559,14 +742,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
     );
   }
 
-  void _showAddSongDialog() {
+  void _showAddSongDialog({String? prefillGenre, String? prefillSubCategory}) {
     final titleCtrl = TextEditingController();
     final artistCtrl = TextEditingController();
     final albumCtrl = TextEditingController(text: 'Msixa Originals');
+    final subCategoryCtrl = TextEditingController(text: prefillSubCategory ?? '');
     final audioCtrl = TextEditingController();
     final coverCtrl = TextEditingController();
-    String selectedGenre = 'Rajasthani';
+    String selectedGenre = prefillGenre ?? 'Rajasthani';
     final genres = List<String>.from(_allGenres);
+    if (!genres.contains(selectedGenre)) genres.insert(0, selectedGenre);
     bool isUploadingToR2 = false;
 
     showDialog(
@@ -665,6 +850,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                     if (val != null) setDialogState(() => selectedGenre = val);
                   },
                 ),
+                const SizedBox(height: 10),
+                _buildAdminTextField(subCategoryCtrl, 'उप-श्रेणी (Sub-Category - Optional)', 'उदा. Marwadi Hits, Folk, 90s'),
               ],
             ),
           ),
@@ -701,6 +888,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                     artist: artist,
                     album: albumCtrl.text,
                     genre: selectedGenre,
+                    subCategory: subCategoryCtrl.text.trim().isNotEmpty ? subCategoryCtrl.text.trim() : null,
                     audioPath: audioCtrl.text.trim().isNotEmpty ? audioCtrl.text.trim() : 'assets/audio/sankat_mochan_hanuman_ashtak.mp3',
                     coverUrl: coverCtrl.text.trim().isNotEmpty ? coverCtrl.text.trim() : null,
                   );
@@ -728,6 +916,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
     final titleCtrl = TextEditingController(text: song.title);
     final artistCtrl = TextEditingController(text: song.artist);
     final albumCtrl = TextEditingController(text: song.album);
+    final subCategoryCtrl = TextEditingController(text: song.subCategory ?? '');
     final audioCtrl = TextEditingController(text: song.streamUrl);
     final coverCtrl = TextEditingController(text: song.coverUrl);
     String selectedGenre = song.genre;
@@ -782,6 +971,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                     if (val != null) setDialogState(() => selectedGenre = val);
                   },
                 ),
+                const SizedBox(height: 10),
+                _buildAdminTextField(subCategoryCtrl, 'उप-श्रेणी (Sub-Category)', 'उदा. Marwadi Hits'),
               ],
             ),
           ),
@@ -799,6 +990,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                   artist: artistCtrl.text,
                   album: albumCtrl.text,
                   genre: selectedGenre,
+                  subCategory: subCategoryCtrl.text.trim().isNotEmpty ? subCategoryCtrl.text.trim() : null,
                   streamUrl: audioCtrl.text,
                   coverUrl: coverCtrl.text,
                 );
@@ -1563,6 +1755,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                       if (confirm == true) {
                         await _backend.rejectOrDeleteSong(song.id);
                         if (mounted) {
+                          setState(() {});
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(content: Text('"${song.title}" removed.')),
                           );
@@ -1579,6 +1772,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                     onPressed: () async {
                       await _backend.approveSong(song.id);
                       if (mounted) {
+                        setState(() {});
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(content: Text('🎉 "${song.title}" live!')),
                         );
@@ -1813,6 +2007,39 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                 ),
                 const SizedBox(width: 12),
 
+                // Toggle View: Category/Subcategory Accordion vs Flat List
+                InkWell(
+                  onTap: () => setState(() => _adminGroupByCategory = !_adminGroupByCategory),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: _adminGroupByCategory ? const Color(0xFFFFB300).withOpacity(0.2) : Colors.white10,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: _adminGroupByCategory ? const Color(0xFFFFB300) : Colors.white24),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          _adminGroupByCategory ? Icons.folder_copy_rounded : Icons.list_rounded,
+                          size: 14,
+                          color: _adminGroupByCategory ? const Color(0xFFFFB300) : Colors.white70,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          _adminGroupByCategory ? '📁 कैटेगरी व्यू' : '🎵 फ्लैट लिस्ट',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: _adminGroupByCategory ? const Color(0xFFFFB300) : Colors.white70,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+
                 // Bulk Folder / Multi-File Upload Button
                 ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
@@ -1824,7 +2051,22 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                   ),
                   icon: const Icon(Icons.drive_folder_upload_rounded, size: 16),
                   label: const Text('बल्क / फ़ोल्डर अपलोड', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                  onPressed: _showBulkUploadDialog,
+                  onPressed: () => _showBulkUploadDialog(),
+                ),
+                const SizedBox(width: 8),
+
+                // Single Add Song Dialog
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFFB300),
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    elevation: 0,
+                  ),
+                  icon: const Icon(Icons.add_rounded, size: 16),
+                  label: Text(_lang.t('add_song_admin'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                  onPressed: () => _showAddSongDialog(),
                 ),
                 const SizedBox(width: 8),
 
@@ -1849,21 +2091,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Export error: $e')));
                     }
                   },
-                ),
-                const SizedBox(width: 8),
-
-                // Single Add Song Dialog
-                ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFFB300),
-                    foregroundColor: Colors.black,
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    elevation: 0,
-                  ),
-                  icon: const Icon(Icons.add_rounded, size: 16),
-                  label: Text(_lang.t('add_song_admin'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                  onPressed: _showAddSongDialog,
                 ),
                 const SizedBox(width: 8),
 
@@ -1937,100 +2164,363 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
         Expanded(
           child: songs.isEmpty
               ? Center(child: Text(_lang.t('no_pending_songs'), style: const TextStyle(color: Colors.grey)))
-              : ListView.separated(
-                  padding: const EdgeInsets.all(14),
-                  itemCount: songs.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 10),
-                  itemBuilder: (context, index) {
-                    final s = songs[index];
-                    final isThisPlaying = _currentlyPlayingSongId == s.id && _isPlaying;
+              : _adminGroupByCategory
+                  ? _buildAdminCategorizedSongs(songs)
+                  : ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      itemCount: songs.length,
+                      itemBuilder: (context, index) => _buildAdminSongCard(songs[index]),
+                    ),
+        ),
+      ],
+    );
+  }
 
-                    return Container(
-                      padding: const EdgeInsets.all(12),
+  Widget _buildAdminCategorizedSongs(List<Song> songs) {
+    final Map<String, List<Song>> categoryMap = {};
+    for (final s in songs) {
+      final cat = s.genre.trim().isNotEmpty ? s.genre.trim() : 'Uncategorized';
+      categoryMap.putIfAbsent(cat, () => []).add(s);
+    }
+    final categories = categoryMap.keys.toList()..sort();
+
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 40),
+      itemCount: categories.length,
+      itemBuilder: (context, idx) {
+        final category = categories[idx];
+        final catSongs = categoryMap[category] ?? [];
+
+        final Map<String, List<Song>> subMap = {};
+        final List<Song> directSongs = [];
+        for (final s in catSongs) {
+          final sub = s.subCategory?.trim();
+          if (sub != null && sub.isNotEmpty && sub.toLowerCase() != category.toLowerCase()) {
+            subMap.putIfAbsent(sub, () => []).add(s);
+          } else {
+            directSongs.add(s);
+          }
+        }
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0F1728),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: Colors.white.withOpacity(0.08)),
+          ),
+          child: Theme(
+            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+            child: ExpansionTile(
+              initiallyExpanded: idx == 0,
+              tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+              leading: Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFB300).withOpacity(0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.folder_open_rounded, color: Color(0xFFFFB300), size: 18),
+              ),
+              title: Text(
+                category,
+                style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+              ),
+              subtitle: Text(
+                '${catSongs.length} Tracks',
+                style: const TextStyle(color: Colors.white54, fontSize: 10),
+              ),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  PopupMenuButton<String>(
+                    tooltip: 'इस कैटेगरी में नया गाना अपलोड करें',
+                    icon: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF131B2C),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: isThisPlaying ? const Color(0xFFFFB300) : Colors.white10,
-                        ),
+                        color: const Color(0xFFFFB300).withOpacity(0.18),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFFFB300).withOpacity(0.4)),
                       ),
                       child: Row(
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: Image.network(
-                              s.coverUrl,
-                              width: 44,
-                              height: 44,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(width: 44, height: 44, color: Colors.grey.shade800),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(s.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13), maxLines: 1),
-                                Text('${s.artist} • ${s.genre}', style: const TextStyle(color: Colors.white60, fontSize: 11), maxLines: 1),
-                              ],
-                            ),
-                          ),
-                          // Preview Button
-                          IconButton(
-                            icon: Icon(
-                              isThisPlaying ? Icons.pause_circle_filled_rounded : Icons.play_circle_fill_rounded,
-                              color: isThisPlaying ? const Color(0xFFFFB300) : Colors.white70,
-                              size: 26,
-                            ),
-                            tooltip: _lang.t('preview_play'),
-                            onPressed: () => _playSongPreview(s),
-                          ),
-                          // Edit Button
-                          IconButton(
-                            icon: const Icon(Icons.edit_note_rounded, color: Color(0xFF00E5FF), size: 22),
-                            tooltip: _lang.t('edit_btn'),
-                            onPressed: () => _showEditSongDialog(s),
-                          ),
-                          // Delete Button
-                          IconButton(
-                            icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20),
-                            tooltip: _lang.t('delete_btn'),
-                            onPressed: () async {
-                              final confirm = await showDialog<bool>(
-                                context: context,
-                                builder: (ctx) => AlertDialog(
-                                  backgroundColor: const Color(0xFF131A2A),
-                                  title: Text(_lang.t('confirm_delete_title'), style: const TextStyle(color: Colors.white)),
-                                  content: Text('${_lang.t('confirm_delete_msg')} ("${s.title}")', style: const TextStyle(color: Colors.white70)),
-                                  actions: [
-                                    TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(_lang.t('cancel'))),
-                                    ElevatedButton(
-                                      style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
-                                      onPressed: () => Navigator.pop(ctx, true),
-                                      child: Text(_lang.t('confirm_yes')),
-                                    ),
-                                  ],
-                                ),
-                              );
-
-                              if (confirm == true) {
-                                await _backend.rejectOrDeleteSong(s.id);
-                                if (mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text('"${s.title}" removed.')),
-                                  );
-                                }
-                              }
-                            },
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Icon(Icons.add_circle_outline_rounded, color: Color(0xFFFFB300), size: 13),
+                          SizedBox(width: 4),
+                          Text(
+                            '+ अपलोड',
+                            style: TextStyle(color: Color(0xFFFFB300), fontSize: 10, fontWeight: FontWeight.bold),
                           ),
                         ],
                       ),
+                    ),
+                    color: const Color(0xFF1E293B),
+                    onSelected: (val) {
+                      if (val == 'single') {
+                        _showAddSongDialog(prefillGenre: category);
+                      } else {
+                        _showBulkUploadDialog(prefillGenre: category);
+                      }
+                    },
+                    itemBuilder: (ctx) => [
+                      PopupMenuItem(
+                        value: 'single',
+                        child: Row(
+                          children: const [
+                            Icon(Icons.music_note_rounded, color: Color(0xFFFFB300), size: 16),
+                            SizedBox(width: 8),
+                            Text('+ एकल गाना जोड़ें', style: TextStyle(color: Colors.white, fontSize: 12)),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'bulk',
+                        child: Row(
+                          children: const [
+                            Icon(Icons.drive_folder_upload_rounded, color: Color(0xFF00E5FF), size: 16),
+                            SizedBox(width: 8),
+                            Text('📁 बल्क / फ़ोल्डर अपलोड', style: TextStyle(color: Colors.white, fontSize: 12)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.expand_more_rounded, color: Colors.white54),
+                ],
+              ),
+              children: [
+                const Divider(color: Colors.white10, height: 1),
+                if (subMap.isNotEmpty) ...[
+                  ...subMap.entries.map((entry) {
+                    final subCat = entry.key;
+                    final subSongs = entry.value;
+
+                    return Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF131B2C),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.white.withOpacity(0.04)),
+                      ),
+                      child: Theme(
+                        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                        child: ExpansionTile(
+                          initiallyExpanded: false,
+                          tilePadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                          leading: Container(
+                            padding: const EdgeInsets.all(5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF00E5FF).withOpacity(0.12),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.folder_copy_rounded, color: Color(0xFF00E5FF), size: 15),
+                          ),
+                          title: Text(
+                            subCat,
+                            style: const TextStyle(color: Color(0xFF00E5FF), fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                          subtitle: Text(
+                            '${subSongs.length} Tracks',
+                            style: const TextStyle(color: Colors.white54, fontSize: 10),
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              PopupMenuButton<String>(
+                                tooltip: 'इस सब-कैटेगरी में अपलोड करें',
+                                icon: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF00E5FF).withOpacity(0.15),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: const Color(0xFF00E5FF).withOpacity(0.35)),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: const [
+                                      Icon(Icons.add_rounded, color: Color(0xFF00E5FF), size: 12),
+                                      SizedBox(width: 2),
+                                      Text(
+                                        '+ अपलोड',
+                                        style: TextStyle(color: Color(0xFF00E5FF), fontSize: 9, fontWeight: FontWeight.bold),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                color: const Color(0xFF1E293B),
+                                onSelected: (val) {
+                                  if (val == 'single') {
+                                    _showAddSongDialog(prefillGenre: category, prefillSubCategory: subCat);
+                                  } else {
+                                    _showBulkUploadDialog(prefillGenre: category, prefillSubCategory: subCat);
+                                  }
+                                },
+                                itemBuilder: (ctx) => [
+                                  PopupMenuItem(
+                                    value: 'single',
+                                    child: Row(
+                                      children: const [
+                                        Icon(Icons.music_note_rounded, color: Color(0xFFFFB300), size: 14),
+                                        SizedBox(width: 6),
+                                        Text('+ एकल गाना जोड़ें', style: TextStyle(color: Colors.white, fontSize: 11)),
+                                      ],
+                                    ),
+                                  ),
+                                  PopupMenuItem(
+                                    value: 'bulk',
+                                    child: Row(
+                                      children: const [
+                                        Icon(Icons.drive_folder_upload_rounded, color: Color(0xFF00E5FF), size: 14),
+                                        SizedBox(width: 6),
+                                        Text('📁 बल्क / फ़ोल्डर अपलोड', style: TextStyle(color: Colors.white, fontSize: 11)),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(width: 2),
+                              const Icon(Icons.expand_more_rounded, color: Colors.white54, size: 18),
+                            ],
+                          ),
+                          children: subSongs.map((s) => _buildAdminSongCard(s)).toList(),
+                        ),
+                      ),
                     );
-                  },
-                ),
+                  }),
+                ],
+                if (directSongs.isNotEmpty) ...[
+                  if (subMap.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 6, 14, 2),
+                      child: Text(
+                        '🎵 $category मुख्य ट्रैक्स (${directSongs.length}):',
+                        style: const TextStyle(color: Colors.white60, fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ...directSongs.map((s) => _buildAdminSongCard(s)),
+                ],
+                const SizedBox(height: 6),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildAdminSongCard(Song s) {
+    final isThisPlaying = _currentlyPlayingSongId == s.id && _isPlaying;
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF131B2C),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isThisPlaying ? const Color(0xFFFFB300) : Colors.white10,
         ),
-      ],
+      ),
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.network(
+              s.coverUrl,
+              width: 44,
+              height: 44,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Container(width: 44, height: 44, color: Colors.grey.shade800),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(s.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13), maxLines: 1),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        s.artist,
+                        style: const TextStyle(color: Colors.white60, fontSize: 11),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF00E5FF).withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: const Color(0xFF00E5FF).withOpacity(0.3)),
+                      ),
+                      child: Text(
+                        s.subCategory != null && s.subCategory!.isNotEmpty && s.subCategory!.toLowerCase() != s.genre.toLowerCase()
+                            ? '${s.genre} › ${s.subCategory}'
+                            : s.genre,
+                        style: const TextStyle(color: Color(0xFF00E5FF), fontSize: 9, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          // Preview Button
+          IconButton(
+            icon: Icon(
+              isThisPlaying ? Icons.pause_circle_filled_rounded : Icons.play_circle_fill_rounded,
+              color: isThisPlaying ? const Color(0xFFFFB300) : Colors.white70,
+              size: 26,
+            ),
+            tooltip: _lang.t('preview_play'),
+            onPressed: () => _playSongPreview(s),
+          ),
+          // Edit Button
+          IconButton(
+            icon: const Icon(Icons.edit_note_rounded, color: Color(0xFF00E5FF), size: 22),
+            tooltip: _lang.t('edit_btn'),
+            onPressed: () => _showEditSongDialog(s),
+          ),
+          // Delete Button
+          IconButton(
+            icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20),
+            tooltip: _lang.t('delete_btn'),
+            onPressed: () async {
+              final confirm = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  backgroundColor: const Color(0xFF131A2A),
+                  title: Text(_lang.t('confirm_delete_title'), style: const TextStyle(color: Colors.white)),
+                  content: Text('${_lang.t('confirm_delete_msg')} ("${s.title}")', style: const TextStyle(color: Colors.white70)),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(_lang.t('cancel'))),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: Text(_lang.t('confirm_yes')),
+                    ),
+                  ],
+                ),
+              );
+
+              if (confirm == true) {
+                await _backend.rejectOrDeleteSong(s.id);
+                if (mounted) {
+                  setState(() {});
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('"${s.title}" removed.')),
+                  );
+                }
+              }
+            },
+          ),
+        ],
+      ),
     );
   }
 }
