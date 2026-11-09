@@ -59,12 +59,20 @@ class MsixaPlayerApp extends StatelessWidget {
         ChangeNotifierProvider<R2StorageService>.value(
           value: R2StorageService(),
         ),
+        ChangeNotifierProvider<LanguageService>.value(
+          value: LanguageService(),
+        ),
       ],
-      child: MaterialApp(
-        title: 'Msixa Player',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.darkTheme,
-        home: const UserAppRootView(),
+      child: AnimatedBuilder(
+        animation: LanguageService(),
+        builder: (context, _) {
+          return MaterialApp(
+            title: 'Msixa Player',
+            debugShowCheckedModeBanner: false,
+            theme: AppTheme.darkTheme,
+            home: const UserAppRootView(),
+          );
+        },
       ),
     );
   }

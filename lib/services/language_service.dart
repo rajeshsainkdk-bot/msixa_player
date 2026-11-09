@@ -8,8 +8,8 @@ class LanguageService extends ChangeNotifier {
   factory LanguageService() => _instance;
   LanguageService._internal();
 
-  static const String _prefKey = 'msixa_app_language';
-  AppLanguage _currentLanguage = AppLanguage.hindi; // Default to Hindi as preferred
+  static const String _prefKey = 'msixa_app_language_v3';
+  AppLanguage _currentLanguage = AppLanguage.english; // Default is strictly English!
 
   AppLanguage get currentLanguage => _currentLanguage;
   bool get isHindi => _currentLanguage == AppLanguage.hindi;
@@ -22,10 +22,11 @@ class LanguageService extends ChangeNotifier {
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
     final savedCode = prefs.getString(_prefKey);
-    if (savedCode == 'en') {
-      _currentLanguage = AppLanguage.english;
-    } else {
+    if (savedCode == 'hi') {
       _currentLanguage = AppLanguage.hindi;
+    } else {
+      // By default, or if set to 'en', language is ALWAYS English!
+      _currentLanguage = AppLanguage.english;
     }
     notifyListeners();
   }
@@ -41,7 +42,7 @@ class LanguageService extends ChangeNotifier {
   Future<void> setLanguage(AppLanguage lang) async {
     _currentLanguage = lang;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_prefKey, lang == AppLanguage.english ? 'en' : 'hi');
+    await prefs.setString(_prefKey, lang == AppLanguage.hindi ? 'hi' : 'en');
     notifyListeners();
   }
 
@@ -190,6 +191,27 @@ class LanguageService extends ChangeNotifier {
     'all_songs_approved': {'hi': 'सभी गाने अप्रूव हो चुके हैं।', 'en': 'All songs have been approved.'},
     'no_users_found': {'hi': 'कोई यूज़र नहीं मिला', 'en': 'No users found'},
     'switch_lang': {'hi': 'English में बदलें', 'en': 'हिंदी में बदलें'},
+
+    // Navigation & Global UI
+    'nav_discover': {'hi': 'डिस्कवर (Discover)', 'en': 'Discover'},
+    'nav_search': {'hi': 'सर्च (Search)', 'en': 'Search'},
+    'nav_library': {'hi': 'लाइब्रेरी (Library)', 'en': 'Library'},
+    'nav_sound_fx': {'hi': 'साउंड FX', 'en': 'Sound FX'},
+    'your_library': {'hi': 'आपकी लाइब्रेरी', 'en': 'Your Library'},
+    'search_title': {'hi': 'सर्च व एक्सप्लोर', 'en': 'Search & Explore'},
+    'search_hint': {'hi': 'गाने, आर्टिस्ट या शैली खोजें...', 'en': 'Search songs, artists, or genres...'},
+    'sound_fx_title': {'hi': 'साउंड व इक्वलाइज़र', 'en': 'Sound & Equalizer'},
+    'reset_btn': {'hi': 'रीसेट', 'en': 'Reset'},
+    'presets_title': {'hi': 'प्रीसेट्स', 'en': 'PRESETS'},
+    'hero_free_badge': {'hi': '🇮🇳 100% मुफ़्त • कोई शुल्क नहीं', 'en': '🇮🇳 100% FREE • NO PAYMENT'},
+    'hero_subtitle': {'hi': '100% मुफ़्त भारतीय एवं ऑफ़लाइन म्यूज़िक प्लेयर', 'en': '100% Free Indian & Offline Music Player'},
+    'see_all': {'hi': 'सभी देखें', 'en': 'See All'},
+    'clear_all_btn': {'hi': 'सभी हटाएं', 'en': 'Clear All'},
+    'admin_pin_title': {'hi': 'सुरक्षित एडमिनिस्ट्रेटर कंसोल', 'en': 'Secure Administrator Console'},
+    'admin_pin_subtitle': {'hi': 'सुरक्षित एडमिनिस्ट्रेटर कंसोल (Executive Access Only)', 'en': 'Secure Administrator Console (Executive Access Only)'},
+    'admin_pin_label': {'hi': 'एडमिन मास्टर पिन (Master PIN)', 'en': 'Admin Master PIN'},
+    'enter_pin_hint': {'hi': 'मास्टर पिन दर्ज करें (उदा. 9999)', 'en': 'Enter Master PIN (e.g. 9999)'},
+    'admin_login_btn': {'hi': 'लॉगिन करें (Admin Access)', 'en': 'Login (Admin Access)'},
   };
 }
 

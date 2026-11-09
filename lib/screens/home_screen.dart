@@ -141,9 +141,9 @@ class HomeScreen extends StatelessWidget {
                                 ],
                               ),
                               const SizedBox(height: 4),
-                              const Text(
-                                '100% Free Indian & Offline Music Player',
-                                style: TextStyle(
+                              Text(
+                                lang.t('hero_subtitle'),
+                                style: const TextStyle(
                                   color: AppColors.textSecondary,
                                   fontSize: 12,
                                   fontWeight: FontWeight.w500,
@@ -304,9 +304,9 @@ class HomeScreen extends StatelessWidget {
                                           color: AppColors.primary,
                                           borderRadius: BorderRadius.circular(12),
                                         ),
-                                        child: const Text(
-                                          '🇮🇳 100% FREE • NO PAYMENT',
-                                          style: TextStyle(
+                                        child: Text(
+                                          lang.t('hero_free_badge'),
+                                          style: const TextStyle(
                                             color: Colors.white,
                                             fontSize: 10,
                                             fontWeight: FontWeight.bold,
@@ -349,12 +349,12 @@ class HomeScreen extends StatelessWidget {
                                               borderRadius: BorderRadius.circular(20),
                                             ),
                                             child: Row(
-                                              children: const [
-                                                Icon(Icons.play_arrow_rounded, color: Colors.white, size: 18),
-                                                SizedBox(width: 4),
+                                              children: [
+                                                const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 18),
+                                                const SizedBox(width: 4),
                                                 Text(
-                                                  'Listen Free',
-                                                  style: TextStyle(
+                                                  lang.t('listen_free'),
+                                                  style: const TextStyle(
                                                     color: Colors.white,
                                                     fontWeight: FontWeight.bold,
                                                     fontSize: 12,
@@ -631,9 +631,9 @@ class HomeScreen extends StatelessWidget {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
-                        'Browse by Category',
-                        style: TextStyle(
+                      Text(
+                        lang.t('browse_category'),
+                        style: const TextStyle(
                           color: AppColors.textPrimary,
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -642,9 +642,9 @@ class HomeScreen extends StatelessWidget {
                       if (provider.selectedGenre != 'All')
                         GestureDetector(
                           onTap: () => provider.selectGenre('All'),
-                          child: const Text(
-                            'Show All',
-                            style: TextStyle(color: AppColors.accentCyan, fontSize: 13),
+                          child: Text(
+                            lang.t('show_all'),
+                            style: const TextStyle(color: AppColors.accentCyan, fontSize: 13),
                           ),
                         ),
                     ],
@@ -758,9 +758,9 @@ class HomeScreen extends StatelessWidget {
               ),
               GestureDetector(
                 onTap: () => provider.selectGenre(genreKey),
-                child: const Text(
-                  'See All',
-                  style: TextStyle(color: AppColors.accentCyan, fontSize: 13),
+                child: Text(
+                  LanguageService().t('see_all'),
+                  style: const TextStyle(color: AppColors.accentCyan, fontSize: 13),
                 ),
               ),
             ],

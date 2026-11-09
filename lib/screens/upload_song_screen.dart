@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../models/song.dart';
 import '../services/cloud_backend_service.dart';
 import '../services/r2_storage_service.dart';
+import '../services/language_service.dart';
 import '../providers/player_provider.dart';
 
 class UploadSongScreen extends StatefulWidget {
@@ -17,6 +18,7 @@ class UploadSongScreen extends StatefulWidget {
 
 class _UploadSongScreenState extends State<UploadSongScreen> {
   final _backend = CloudBackendService();
+  final _lang = LanguageService();
   final _titleCtrl = TextEditingController();
   final _artistCtrl = TextEditingController();
   final _albumCtrl = TextEditingController();
@@ -53,12 +55,18 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
   @override
   void initState() {
     super.initState();
+    _lang.addListener(_onLangUpdate);
     _titleCtrl.addListener(_onFieldChanged);
     _artistCtrl.addListener(_onFieldChanged);
   }
 
+  void _onLangUpdate() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void dispose() {
+    _lang.removeListener(_onLangUpdate);
     _titleCtrl.removeListener(_onFieldChanged);
     _artistCtrl.removeListener(_onFieldChanged);
     _titleCtrl.dispose();
@@ -258,13 +266,38 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         title: Text(
-          'गाना अपलोड करें (Upload Song)',
+          _lang.isHindi ? 'गाना अपलोड करें' : 'Upload Song',
           style: GoogleFonts.syne(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
         ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
           onPressed: () => Navigator.of(context).pop(),
         ),
+        actions: [
+          InkWell(
+            onTap: () => _lang.toggleLanguage(),
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF131A2A),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFF00E5FF).withOpacity(0.35)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.language_rounded, color: Color(0xFF00E5FF), size: 14),
+                  const SizedBox(width: 4),
+                  Text(
+                    _lang.displayLabel,
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -289,9 +322,17 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('कम्युनिटी म्यूज़िक शेयरिंग', style: GoogleFonts.syne(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
+                        Text(
+                          _lang.isHindi ? 'कम्युनिटी म्यूज़िक शेयरिंग' : 'Community Music Sharing',
+                          style: GoogleFonts.syne(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+                        ),
                         const SizedBox(height: 2),
-                        const Text('कोई भी नया MP3 अपलोड करें। एडमिन अप्रूवल के बाद यह सभी के लिए लाइव होगा।', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                        Text(
+                          _lang.isHindi
+                              ? 'कोई भी नया MP3 अपलोड करें। एडमिन अप्रूवल के बाद यह सभी के लिए लाइव होगा।'
+                              : 'Upload any MP3. Once approved by Admin, it goes live for everyone on the platform.',
+                          style: const TextStyle(color: Colors.white70, fontSize: 11),
+                        ),
                       ],
                     ),
                   ),
@@ -330,7 +371,7 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      _pickedFileName ?? 'फोन से MP3 ऑडियो फ़ाइल चुनें',
+                      _pickedFileName ?? (_lang.isHindi ? 'फोन से MP3 ऑडियो फ़ाइल चुनें' : 'Choose MP3 audio file from phone'),
                       textAlign: TextAlign.center,
                       style: GoogleFonts.outfit(
                         fontSize: 14,
@@ -341,8 +382,8 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
                     const SizedBox(height: 4),
                     Text(
                       _pickedFileSize != null
-                          ? '${(_pickedFileSize! / (1024 * 1024)).toStringAsFixed(2)} MB • तैयार'
-                          : 'MP3, M4A, WAV समर्थित (Click to browse)',
+                          ? '${(_pickedFileSize! / (1024 * 1024)).toStringAsFixed(2)} MB • ${_lang.isHindi ? "तैयार" : "Ready"}'
+                          : (_lang.isHindi ? 'MP3, M4A, WAV समर्थित (चुनने के लिए क्लिक करें)' : 'MP3, M4A, WAV supported (Click to browse)'),
                       style: TextStyle(
                         fontSize: 11,
                         color: _pickedFileSize != null ? const Color(0xFF00E5FF) : Colors.grey.shade600,
@@ -455,15 +496,30 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
             ],
 
             // Input Fields
-            _buildTextField(controller: _titleCtrl, label: 'गाने का शीर्षक (Song Title)', hint: 'उदा. राम सिया राम / Kesariya'),
+            _buildTextField(
+              controller: _titleCtrl,
+              label: _lang.isHindi ? 'गाने का शीर्षक (Song Title)' : 'Song Title *',
+              hint: _lang.isHindi ? 'उदा. राम सिया राम / Kesariya' : 'e.g. Ram Siya Ram / Kesariya',
+            ),
             const SizedBox(height: 14),
-            _buildTextField(controller: _artistCtrl, label: 'गायक / आर्टिस्ट (Artist)', hint: 'उदा. Sachet Tandon, Arijit Singh'),
+            _buildTextField(
+              controller: _artistCtrl,
+              label: _lang.isHindi ? 'गायक / आर्टिस्ट (Artist)' : 'Artist / Singer *',
+              hint: _lang.isHindi ? 'उदा. Sachet Tandon, Arijit Singh' : 'e.g. Sachet Tandon, Arijit Singh',
+            ),
             const SizedBox(height: 14),
-            _buildTextField(controller: _albumCtrl, label: 'एल्बम (Album - Optional)', hint: 'उदा. Single / Soundtrack'),
+            _buildTextField(
+              controller: _albumCtrl,
+              label: _lang.isHindi ? 'एल्बम (Album - Optional)' : 'Album (Optional)',
+              hint: _lang.isHindi ? 'उदा. Single / Soundtrack' : 'e.g. Single / Soundtrack',
+            ),
             const SizedBox(height: 14),
 
             // Genre Dropdown
-            Text('संगीत विधा (Genre / Category)', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade300)),
+            Text(
+              _lang.isHindi ? 'संगीत विधा (Genre / Category)' : 'Genre / Category',
+              style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade300),
+            ),
             const SizedBox(height: 6),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -489,8 +545,8 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
 
             _buildTextField(
               controller: _coverUrlCtrl,
-              label: 'पोस्टर आर्ट लिंक (Cover Image URL - Optional)',
-              hint: 'https://images.unsplash.com/... (खाली छोड़ने पर डिफ़ॉल्ट पोस्टर लगेगा)',
+              label: _lang.isHindi ? 'पोस्टर आर्ट लिंक (Cover Image URL - Optional)' : 'Cover Image URL (Optional)',
+              hint: _lang.isHindi ? 'https://images.unsplash.com/... (खाली छोड़ने पर डिफ़ॉल्ट पोस्टर लगेगा)' : 'https://images.unsplash.com/... (Leave empty for default)',
             ),
             if (_isUploading) ...[
               const SizedBox(height: 16),
@@ -505,7 +561,7 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                _uploadStatusText ?? 'अपलोड हो रहा है...',
+                _uploadStatusText ?? (_lang.isHindi ? 'अपलोड हो रहा है...' : 'Uploading track...'),
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: Color(0xFF00E5FF), fontSize: 12, fontWeight: FontWeight.bold),
               ),
@@ -534,7 +590,7 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
                         const Icon(Icons.send_rounded, size: 20),
                         const SizedBox(width: 8),
                         Text(
-                          'एडमिन को सबमिट करें (Submit for Approval)',
+                          _lang.isHindi ? 'एडमिन को सबमिट करें (Submit)' : 'Submit Song for Approval',
                           style: GoogleFonts.syne(fontSize: 15, fontWeight: FontWeight.bold),
                         ),
                       ],

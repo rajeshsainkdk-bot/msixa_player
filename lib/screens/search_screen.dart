@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/player_provider.dart';
+import '../services/language_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/song_list_tile.dart';
 
@@ -34,50 +35,54 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final provider = Provider.of<PlayerProvider>(context);
+    return ListenableBuilder(
+      listenable: LanguageService(),
+      builder: (context, _) {
+        final provider = Provider.of<PlayerProvider>(context);
+        final lang = LanguageService();
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('Search & Explore'),
-        centerTitle: false,
-      ),
-      body: Column(
-        children: [
-          // Search Input Bar
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-            child: Container(
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.white.withOpacity(0.08)),
-              ),
-              child: TextField(
-                controller: _searchController,
-                style: const TextStyle(color: AppColors.textPrimary),
-                decoration: InputDecoration(
-                  hintText: 'Search songs, artists, or genres...',
-                  hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 14),
-                  prefixIcon: const Icon(Icons.search_rounded, color: AppColors.accentCyan),
-                  suffixIcon: _searchController.text.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.close_rounded, color: AppColors.textMuted),
-                          onPressed: () {
-                            _searchController.clear();
-                            provider.search('');
-                          },
-                        )
-                      : null,
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-                onChanged: (query) {
-                  provider.search(query);
-                },
-              ),
-            ),
+        return Scaffold(
+          backgroundColor: AppColors.background,
+          appBar: AppBar(
+            title: Text(lang.t('search_title')),
+            centerTitle: false,
           ),
+          body: Column(
+            children: [
+              // Search Input Bar
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.white.withOpacity(0.08)),
+                  ),
+                  child: TextField(
+                    controller: _searchController,
+                    style: const TextStyle(color: AppColors.textPrimary),
+                    decoration: InputDecoration(
+                      hintText: lang.t('search_hint'),
+                      hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 14),
+                      prefixIcon: const Icon(Icons.search_rounded, color: AppColors.accentCyan),
+                      suffixIcon: _searchController.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.close_rounded, color: AppColors.textMuted),
+                              onPressed: () {
+                                _searchController.clear();
+                                provider.search('');
+                              },
+                            )
+                          : null,
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    onChanged: (query) {
+                      provider.search(query);
+                    },
+                  ),
+                ),
+              ),
 
           // Quick Tag Chips
           SizedBox(
@@ -174,6 +179,8 @@ class _SearchScreenState extends State<SearchScreen> {
           ),
         ],
       ),
+    );
+      },
     );
   }
 }

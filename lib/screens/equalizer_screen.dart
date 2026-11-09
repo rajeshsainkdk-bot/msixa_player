@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/equalizer_preset.dart';
 import '../providers/player_provider.dart';
+import '../services/language_service.dart';
 import '../theme/app_colors.dart';
 
 class EqualizerScreen extends StatelessWidget {
@@ -17,41 +18,45 @@ class EqualizerScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<PlayerProvider>(
-      builder: (context, provider, child) {
-        final gains = provider.bandGains;
+    return ListenableBuilder(
+      listenable: LanguageService(),
+      builder: (context, _) {
+        final lang = LanguageService();
+        return Consumer<PlayerProvider>(
+          builder: (context, provider, child) {
+            final gains = provider.bandGains;
 
-        return Scaffold(
-          backgroundColor: AppColors.background,
-          appBar: AppBar(
-            title: const Text('Sound & Equalizer'),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  provider.setEqPreset(EqualizerPreset.defaultPresets.first);
-                },
-                child: const Text(
-                  'Reset',
-                  style: TextStyle(color: AppColors.accentCyan),
-                ),
-              ),
-            ],
-          ),
-          body: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Preset selector chips
-                const Text(
-                  'PRESETS',
-                  style: TextStyle(
-                    color: AppColors.textMuted,
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.2,
+            return Scaffold(
+              backgroundColor: AppColors.background,
+              appBar: AppBar(
+                title: Text(lang.t('sound_fx_title')),
+                actions: [
+                  TextButton(
+                    onPressed: () {
+                      provider.setEqPreset(EqualizerPreset.defaultPresets.first);
+                    },
+                    child: Text(
+                      lang.t('reset_btn'),
+                      style: const TextStyle(color: AppColors.accentCyan),
+                    ),
                   ),
-                ),
+                ],
+              ),
+              body: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Preset selector chips
+                    Text(
+                      lang.t('presets_title'),
+                      style: const TextStyle(
+                        color: AppColors.textMuted,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
                 const SizedBox(height: 12),
                 SizedBox(
                   height: 38,
@@ -212,6 +217,8 @@ class EqualizerScreen extends StatelessWidget {
             ),
           ),
         );
+      },
+    );
       },
     );
   }

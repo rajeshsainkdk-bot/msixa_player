@@ -36,79 +36,84 @@ class _LibraryScreenState extends State<LibraryScreen>
 
   @override
   Widget build(BuildContext context) {
-    final provider = Provider.of<PlayerProvider>(context);
-    final cloudBackend = Provider.of<CloudBackendService>(context);
-    final lang = LanguageService();
+    return ListenableBuilder(
+      listenable: LanguageService(),
+      builder: (context, _) {
+        final provider = Provider.of<PlayerProvider>(context);
+        final cloudBackend = Provider.of<CloudBackendService>(context);
+        final lang = LanguageService();
 
-    // Master list of all songs across curated master catalog, approved community, and device offline
-    final Set<String> seenIds = {};
-    final List<Song> allSongs = [];
-    for (final s in [
-      ...provider.trendingSongs,
-      ...cloudBackend.approvedSongs,
-      ...provider.deviceSongs,
-    ]) {
-      if (seenIds.add(s.id)) {
-        allSongs.add(s);
-      }
-    }
+        // Master list of all songs across curated master catalog, approved community, and device offline
+        final Set<String> seenIds = {};
+        final List<Song> allSongs = [];
+        for (final s in [
+          ...provider.trendingSongs,
+          ...cloudBackend.approvedSongs,
+          ...provider.deviceSongs,
+        ]) {
+          if (seenIds.add(s.id)) {
+            allSongs.add(s);
+          }
+        }
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: Text(lang.isHindi ? 'आपकी लाइब्रेरी' : 'Your Library'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.account_circle_rounded, color: AppColors.accentCyan),
-            tooltip: lang.t('profile_title'),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ProfileScreen()),
-              );
-            },
+        return Scaffold(
+          backgroundColor: AppColors.background,
+          appBar: AppBar(
+            title: Text(lang.t('your_library')),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.account_circle_rounded, color: AppColors.accentCyan),
+                tooltip: lang.t('profile_title'),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                  );
+                },
+              ),
+              IconButton(
+                icon: const Icon(Icons.share_rounded, color: AppColors.accentCyan),
+                tooltip: 'Share APK with Friends',
+                onPressed: () => AppShareService.shareAppApk(),
+              ),
+            ],
+            bottom: TabBar(
+              controller: _tabController,
+              indicatorColor: AppColors.accentCyan,
+              indicatorWeight: 3,
+              labelColor: AppColors.accentCyan,
+              unselectedLabelColor: AppColors.textMuted,
+              isScrollable: true,
+              tabs: [
+                Tab(text: '${lang.isHindi ? "सभी गाने" : "All Songs"} (${allSongs.length})'),
+                Tab(text: '${lang.isHindi ? "पसंदीदा" : "Favorites"} (${provider.favorites.length})'),
+                Tab(text: '${lang.isHindi ? "प्लेलिस्ट्स" : "Playlists"} (${provider.customPlaylists.length + provider.curatedPlaylists.length})'),
+                Tab(text: '${lang.isHindi ? "फ़ोन स्टोरेज" : "Device"} (${provider.deviceSongs.length})'),
+                Tab(text: '${lang.isHindi ? "हाल ही के" : "Recent"} (${provider.recentlyPlayed.length})'),
+              ],
+            ),
           ),
-          IconButton(
-            icon: const Icon(Icons.share_rounded, color: AppColors.accentCyan),
-            tooltip: 'Share APK with Friends',
-            onPressed: () => AppShareService.shareAppApk(),
+          body: TabBarView(
+            controller: _tabController,
+            children: [
+              // 1. All Songs Tab (Direct flat list without playlists)
+              _buildAllSongsTab(context, provider, allSongs),
+
+              // 2. Favorites Tab
+              _buildFavoritesTab(context, provider),
+
+              // 3. Playlists Tab (Expandable & Collapsible)
+              _buildPlaylistsTab(context, provider),
+
+              // 4. Device Offline Songs Tab
+              _buildDeviceSongsTab(context, provider),
+
+              // 5. Recently Played Tab
+              _buildRecentTab(context, provider),
+            ],
           ),
-        ],
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: AppColors.accentCyan,
-          indicatorWeight: 3,
-          labelColor: AppColors.accentCyan,
-          unselectedLabelColor: AppColors.textMuted,
-          isScrollable: true,
-          tabs: [
-            Tab(text: '${lang.isHindi ? "सभी गाने" : "All Songs"} (${allSongs.length})'),
-            Tab(text: '${lang.isHindi ? "पसंदीदा" : "Favorites"} (${provider.favorites.length})'),
-            Tab(text: '${lang.isHindi ? "प्लेलिस्ट्स" : "Playlists"} (${provider.customPlaylists.length + provider.curatedPlaylists.length})'),
-            Tab(text: '${lang.isHindi ? "फ़ोन स्टोरेज" : "Device"} (${provider.deviceSongs.length})'),
-            Tab(text: '${lang.isHindi ? "हाल ही के" : "Recent"} (${provider.recentlyPlayed.length})'),
-          ],
-        ),
-      ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          // 1. All Songs Tab (Direct flat list without playlists)
-          _buildAllSongsTab(context, provider, allSongs),
-
-          // 2. Favorites Tab
-          _buildFavoritesTab(context, provider),
-
-          // 3. Playlists Tab (Expandable & Collapsible)
-          _buildPlaylistsTab(context, provider),
-
-          // 4. Device Offline Songs Tab
-          _buildDeviceSongsTab(context, provider),
-
-          // 5. Recently Played Tab
-          _buildRecentTab(context, provider),
-        ],
-      ),
+        );
+      },
     );
   }
 

@@ -14,51 +14,54 @@ class ProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final backend = Provider.of<CloudBackendService>(context);
-    final lang = LanguageService();
-    final user = backend.currentUser;
+    return ListenableBuilder(
+      listenable: LanguageService(),
+      builder: (context, _) {
+        final backend = Provider.of<CloudBackendService>(context);
+        final lang = LanguageService();
+        final user = backend.currentUser;
 
-    final joinDateFormatted = user != null
-        ? DateFormat('dd MMM yyyy, hh:mm a').format(user.createdAt)
-        : 'N/A';
+        final joinDateFormatted = user != null
+            ? DateFormat('dd MMM yyyy, hh:mm a').format(user.createdAt)
+            : 'N/A';
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF0B0F19),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF131A2A),
-        elevation: 0,
-        title: Text(
-          lang.t('profile_title'),
-          style: GoogleFonts.syne(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
-        ),
-        actions: [
-          // Language switcher pill in Profile AppBar
-          InkWell(
-            onTap: () => lang.toggleLanguage(),
-            borderRadius: BorderRadius.circular(20),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              margin: const EdgeInsets.only(right: 14),
-              decoration: BoxDecoration(
-                color: const Color(0xFF0B101D),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0xFF00E5FF).withOpacity(0.3)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.language_rounded, size: 14, color: Color(0xFF00E5FF)),
-                  const SizedBox(width: 4),
-                  Text(
-                    lang.displayLabel,
-                    style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
+        return Scaffold(
+          backgroundColor: const Color(0xFF0B0F19),
+          appBar: AppBar(
+            backgroundColor: const Color(0xFF131A2A),
+            elevation: 0,
+            title: Text(
+              lang.t('profile_title'),
+              style: GoogleFonts.syne(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
             ),
+            actions: [
+              // Language switcher pill in Profile AppBar
+              InkWell(
+                onTap: () => lang.toggleLanguage(),
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  margin: const EdgeInsets.only(right: 14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0B101D),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: const Color(0xFF00E5FF).withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.language_rounded, size: 14, color: Color(0xFF00E5FF)),
+                      const SizedBox(width: 4),
+                      Text(
+                        lang.displayLabel,
+                        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
-      body: SingleChildScrollView(
+          body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -340,6 +343,8 @@ class ProfileScreen extends StatelessWidget {
           ],
         ),
       ),
+    );
+      },
     );
   }
 
