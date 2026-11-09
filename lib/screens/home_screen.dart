@@ -12,8 +12,15 @@ import '../services/language_service.dart';
 import 'upload_song_screen.dart';
 import 'profile_screen.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  final Set<String> _expandedCategories = {};
 
   static const List<Map<String, dynamic>> _genres = [
     {
@@ -740,6 +747,9 @@ class HomeScreen extends StatelessWidget {
   }) {
     if (songs.isEmpty) return const SizedBox.shrink();
 
+    final isExpanded = _expandedCategories.contains(genreKey);
+    final lang = LanguageService();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -748,36 +758,84 @@ class HomeScreen extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
-              GestureDetector(
-                onTap: () => provider.selectGenre(genreKey),
-                child: Text(
-                  LanguageService().t('see_all'),
-                  style: const TextStyle(color: AppColors.accentCyan, fontSize: 13),
+              InkWell(
+                onTap: () {
+                  setState(() {
+                    if (isExpanded) {
+                      _expandedCategories.remove(genreKey);
+                    } else {
+                      _expandedCategories.add(genreKey);
+                    }
+                  });
+                },
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: isExpanded ? AppColors.accentCyan.withOpacity(0.15) : AppColors.card,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isExpanded ? AppColors.accentCyan : Colors.white.withOpacity(0.12),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        isExpanded
+                            ? (lang.isHindi ? 'कम करें ▲' : 'Collapse ▲')
+                            : '${songs.length} Tracks ▼',
+                        style: TextStyle(
+                          color: isExpanded ? AppColors.accentCyan : AppColors.textSecondary,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
           ),
         ),
-        SizedBox(
-          height: 195,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 20),
+        if (!isExpanded)
+          SizedBox(
+            height: 195,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              itemCount: songs.length,
+              itemBuilder: (context, index) {
+                final song = songs[index];
+                return _buildIndianSongCard(context, song, provider, songs);
+              },
+            ),
+          )
+        else
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             itemCount: songs.length,
             itemBuilder: (context, index) {
               final song = songs[index];
-              return _buildIndianSongCard(context, song, provider, songs);
+              return SongListTile(
+                song: song,
+                isCurrent: provider.currentSong?.id == song.id,
+                onTap: () => provider.playSong(song, queueContext: songs),
+              );
             },
           ),
-        ),
       ],
     );
   }

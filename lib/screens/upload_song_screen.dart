@@ -7,6 +7,7 @@ import '../models/song.dart';
 import '../services/cloud_backend_service.dart';
 import '../services/r2_storage_service.dart';
 import '../services/language_service.dart';
+import '../services/background_upload_service.dart';
 import '../providers/player_provider.dart';
 
 class UploadSongScreen extends StatefulWidget {
@@ -23,6 +24,14 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
   final _artistCtrl = TextEditingController();
   final _albumCtrl = TextEditingController();
   final _coverUrlCtrl = TextEditingController();
+
+  // Mode: 0 = Single Song, 1 = Folder Upload with Auto Playlist
+  int _uploadMode = 0;
+  List<PlatformFile> _folderPickedFiles = [];
+  final _folderPlaylistNameCtrl = TextEditingController();
+  final _folderArtistCtrl = TextEditingController(text: 'Various Artists');
+  bool _createPlaylistChecked = true;
+  int _folderCurrentIndex = 0;
 
   String _selectedGenre = 'Rajasthani';
   String? _pickedFilePath;
@@ -73,6 +82,8 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
     _artistCtrl.dispose();
     _albumCtrl.dispose();
     _coverUrlCtrl.dispose();
+    _folderPlaylistNameCtrl.dispose();
+    _folderArtistCtrl.dispose();
     super.dispose();
   }
 
@@ -266,6 +277,209 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
     }
   }
 
+  Future<void> _pickFolderAudioFiles() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        allowMultiple: true,
+        type: FileType.custom,
+        allowedExtensions: ['mp3', 'm4a', 'wav', 'aac', 'flac'],
+      );
+
+      if (result != null && result.files.isNotEmpty) {
+        final files = result.files.where((f) => f.path != null).toList();
+        String detectedFolder = 'My Folder Hits';
+        if (files.isNotEmpty && files.first.path != null) {
+          final parentDir = File(files.first.path!).parent;
+          detectedFolder = parentDir.path.split(RegExp(r'[\\/]')).lastWhere((s) => s.isNotEmpty, orElse: () => 'My Folder');
+        }
+
+        setState(() {
+          _folderPickedFiles = files;
+          if (_folderPlaylistNameCtrl.text.isEmpty || _folderPlaylistNameCtrl.text == 'My Folder Hits') {
+            _folderPlaylistNameCtrl.text = detectedFolder;
+          }
+          _errorMessage = null;
+        });
+      }
+    } catch (e) {
+      setState(() => _errorMessage = 'फ़ाइलें चुनने में समस्या: $e');
+    }
+  }
+
+  Future<void> _submitFolderUpload() async {
+    if (_folderPickedFiles.isEmpty) {
+      setState(() => _errorMessage = 'कृपया पहले फ़ोल्डर या MP3 गाने चुनें');
+      return;
+    }
+
+    final playlistTitle = _folderPlaylistNameCtrl.text.trim().isNotEmpty
+        ? _folderPlaylistNameCtrl.text.trim()
+        : 'My Folder Playlist';
+    final defaultArtist = _folderArtistCtrl.text.trim().isNotEmpty
+        ? _folderArtistCtrl.text.trim()
+        : 'Various Artists';
+
+    setState(() {
+      _isUploading = true;
+      _folderCurrentIndex = 0;
+      _uploadProgress = 0.05;
+      _uploadStatusText = 'अपलोड शुरू हो रहा है...';
+      _errorMessage = null;
+    });
+
+    // Keep screen on & background CPU active
+    await BackgroundUploadService.acquireWakeLock();
+
+    final r2 = R2StorageService();
+    int successCount = 0;
+    int skippedCount = 0;
+    final Set<String> batchUploadedTitles = {};
+    final List<Song> uploadedSongs = [];
+
+    try {
+      for (int i = 0; i < _folderPickedFiles.length; i++) {
+        final pf = _folderPickedFiles[i];
+        if (pf.path == null) continue;
+
+        final cleanName = pf.name.replaceAll(RegExp(r'\.[a-zA-Z0-9]+$'), '').replaceAll('_', ' ');
+
+        // Strict duplicate check
+        final duplicate = _backend.checkDuplicateSong(title: cleanName, artist: defaultArtist);
+        final isBatchDup = batchUploadedTitles.contains(CloudBackendService.normalizeTitle(cleanName));
+
+        if (duplicate != null || isBatchDup) {
+          skippedCount++;
+          setState(() {
+            _folderCurrentIndex = i;
+            _uploadProgress = (i + 1) / _folderPickedFiles.length;
+            _uploadStatusText = '⚠️ स्किप किया (Duplicate): $cleanName';
+          });
+          await Future.delayed(const Duration(milliseconds: 200));
+          continue;
+        }
+
+        batchUploadedTitles.add(CloudBackendService.normalizeTitle(cleanName));
+
+        setState(() {
+          _folderCurrentIndex = i;
+          _uploadProgress = (i + 0.3) / _folderPickedFiles.length;
+          _uploadStatusText = 'अपलोड हो रहा है (${i + 1}/${_folderPickedFiles.length}): $cleanName...';
+        });
+
+        String finalAudioUrl = pf.path!;
+        if (r2.isConfigured) {
+          try {
+            final cloudUrl = await r2.uploadAudioFile(
+              File(pf.path!),
+              customId: 'folder_${DateTime.now().millisecondsSinceEpoch}_$i',
+            );
+            if (cloudUrl != null && cloudUrl.isNotEmpty) {
+              finalAudioUrl = cloudUrl;
+            }
+          } catch (e) {
+            debugPrint('R2 folder track error: $e');
+          }
+        }
+
+        try {
+          final newSong = await _backend.submitUserSong(
+            title: cleanName,
+            artist: defaultArtist,
+            album: playlistTitle,
+            genre: _selectedGenre,
+            audioPath: finalAudioUrl,
+          );
+          uploadedSongs.add(newSong);
+          successCount++;
+        } catch (se) {
+          debugPrint('Backend song submit error: $se');
+        }
+      }
+
+      // Auto-create Playlist in User Library with the Folder Name
+      if (_createPlaylistChecked && uploadedSongs.isNotEmpty) {
+        try {
+          if (mounted) {
+            context.read<PlayerProvider>().createPlaylist(playlistTitle, uploadedSongs);
+          }
+        } catch (pe) {
+          debugPrint('createPlaylist provider error: $pe');
+        }
+      }
+    } finally {
+      await BackgroundUploadService.releaseWakeLock();
+      await BackgroundUploadService.showUploadNotification(
+        title: '🎉 फ़ोल्डर अपलोड पूरा हुआ!',
+        message: '$successCount गाने अपलोड हुए और "$playlistTitle" प्लेलिस्ट तैयार हो गई!' + (skippedCount > 0 ? ' ($skippedCount डुप्लीकेट स्किप)' : ''),
+      );
+    }
+
+    setState(() => _isUploading = false);
+
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF131A2A),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: const [
+            Icon(Icons.check_circle_rounded, color: Color(0xFF00E5FF), size: 28),
+            SizedBox(width: 10),
+            Text('फ़ोल्डर अपलोड पूरा हुआ!', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '🎉 $successCount गाने सफलतापूर्वक सबमिट हो गए!' + (skippedCount > 0 ? '\n⚠️ $skippedCount डुप्लीकेट गाने पहले से मौजूद थे इसलिए स्किप किए गए।' : ''),
+              style: const TextStyle(color: Colors.white70, fontSize: 14),
+            ),
+            const SizedBox(height: 12),
+            if (_createPlaylistChecked && uploadedSongs.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0B101D),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFF00E5FF).withOpacity(0.4)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.playlist_add_check_rounded, color: Color(0xFF00E5FF), size: 24),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'आपकी लाइब्रेरी में "$playlistTitle" नाम से नई प्लेलिस्ट तैयार हो गई है जिसमें ये सभी $successCount गाने जोड़े गए हैं!',
+                        style: const TextStyle(color: Color(0xFF00E5FF), fontSize: 12, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              Navigator.of(context).pop();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF00E5FF),
+              foregroundColor: Colors.black,
+            ),
+            child: const Text('ठीक है (Done)', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -347,8 +561,71 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
                 ],
               ),
             ),
+            const SizedBox(height: 16),
+
+            // Mode Selector: Single Song vs Folder / Playlist Upload
+            Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: const Color(0xFF131A2A),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white.withOpacity(0.08)),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: _isUploading ? null : () => setState(() => _uploadMode = 0),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        decoration: BoxDecoration(
+                          color: _uploadMode == 0 ? const Color(0xFF00E5FF) : Colors.transparent,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Center(
+                          child: Text(
+                            _lang.isHindi ? '🎵 एक गाना' : '🎵 Single Song',
+                            style: TextStyle(
+                              color: _uploadMode == 0 ? Colors.black : Colors.white70,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: _isUploading ? null : () => setState(() => _uploadMode = 1),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        decoration: BoxDecoration(
+                          color: _uploadMode == 1 ? const Color(0xFF00E5FF) : Colors.transparent,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Center(
+                          child: Text(
+                            _lang.isHindi ? '📁 फ़ोल्डर / प्लेलिस्ट' : '📁 Folder / Playlist',
+                            style: TextStyle(
+                              color: _uploadMode == 1 ? Colors.black : Colors.white70,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
             const SizedBox(height: 20),
 
+            if (_uploadMode == 1)
+              _buildFolderUploadView()
+            else ...[
             // File Picker Box
             GestureDetector(
               onTap: _pickAudioFile,
@@ -604,9 +881,285 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
                       ],
                     ),
             ),
+            ],
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildFolderUploadView() {
+    int dupCount = 0;
+    for (final f in _folderPickedFiles) {
+      final clean = f.name.replaceAll(RegExp(r'\.[a-zA-Z0-9]+$'), '').replaceAll('_', ' ');
+      if (_backend.checkDuplicateSong(title: clean, artist: _folderArtistCtrl.text.trim()) != null) {
+        dupCount++;
+      }
+    }
+    final readyCount = _folderPickedFiles.length - dupCount;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Picker Box
+        GestureDetector(
+          onTap: _isUploading ? null : _pickFolderAudioFiles,
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 22, horizontal: 16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF131A2A),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: _folderPickedFiles.isNotEmpty ? const Color(0xFF00E5FF) : Colors.white.withOpacity(0.12),
+                width: _folderPickedFiles.isNotEmpty ? 1.5 : 1,
+              ),
+            ),
+            child: Column(
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: _folderPickedFiles.isNotEmpty ? const Color(0xFF00E5FF).withOpacity(0.15) : Colors.white.withOpacity(0.05),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    _folderPickedFiles.isNotEmpty ? Icons.folder_copy_rounded : Icons.drive_folder_upload_rounded,
+                    color: _folderPickedFiles.isNotEmpty ? const Color(0xFF00E5FF) : Colors.grey,
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  _folderPickedFiles.isNotEmpty
+                      ? '${_folderPickedFiles.length} ${_lang.isHindi ? "गाने चुने गए" : "Tracks Selected"}'
+                      : (_lang.isHindi ? 'फ़ोल्डर या कई गाने चुनें (Select Audio Folder)' : 'Select Audio Folder / Multiple MP3s'),
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.outfit(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: _folderPickedFiles.isNotEmpty ? Colors.white : Colors.grey.shade400,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _folderPickedFiles.isNotEmpty
+                      ? '$readyCount नए गाने तैयार • $dupCount डुप्लीकेट स्किप होंगे'
+                      : (_lang.isHindi ? 'फ़ोल्डर के नाम से अपने आप प्लेलिस्ट बन जाएगी' : 'Folder name auto-creates playlist in your Library'),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: _folderPickedFiles.isNotEmpty ? const Color(0xFF00E5FF) : Colors.grey.shade600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 18),
+
+        if (_folderPickedFiles.isNotEmpty) ...[
+          // Auto Playlist creation option
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF131A2A),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFF00E5FF).withOpacity(0.3)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                CheckboxListTile(
+                  value: _createPlaylistChecked,
+                  onChanged: _isUploading ? null : (v) => setState(() => _createPlaylistChecked = v ?? true),
+                  activeColor: const Color(0xFF00E5FF),
+                  checkColor: Colors.black,
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  title: Text(
+                    _lang.isHindi ? '📁 इस फ़ोल्डर के नाम से प्लेलिस्ट बनाएं' : '📁 Auto-Create Playlist with Folder Name',
+                    style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: Text(
+                    _lang.isHindi
+                        ? 'आपकी लाइब्रेरी में इस फ़ोल्डर के सभी गानों की प्लेलिस्ट बन जाएगी'
+                        : 'Saved to your Library playlists under your login account',
+                    style: const TextStyle(color: Colors.white60, fontSize: 10),
+                  ),
+                ),
+                if (_createPlaylistChecked) ...[
+                  const SizedBox(height: 8),
+                  _buildTextField(
+                    controller: _folderPlaylistNameCtrl,
+                    label: _lang.isHindi ? 'प्लेलिस्ट का नाम (फ़ोल्डर का नाम)' : 'Playlist Name (Folder Name)',
+                    hint: 'My Playlist',
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          _buildTextField(
+            controller: _folderArtistCtrl,
+            label: _lang.isHindi ? 'डिफ़ॉल्ट आर्टिस्ट / गायक का नाम' : 'Default Artist / Singer',
+            hint: 'Various Artists',
+          ),
+          const SizedBox(height: 14),
+
+          // Genre Dropdown
+          Text(
+            _lang.isHindi ? 'संगीत विधा (Category / Genre)' : 'Category / Genre',
+            style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade300),
+          ),
+          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            decoration: BoxDecoration(
+              color: const Color(0xFF131A2A),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white.withOpacity(0.08)),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: _selectedGenre,
+                dropdownColor: const Color(0xFF131A2A),
+                isExpanded: true,
+                style: const TextStyle(color: Colors.white, fontSize: 14),
+                items: _genres.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
+                onChanged: _isUploading ? null : (v) => setState(() => _selectedGenre = v!),
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // Picked Tracks Preview list
+          Text(
+            '${_folderPickedFiles.length} ${_lang.isHindi ? "गाने" : "Tracks"} ($readyCount ${_lang.isHindi ? "अपलोड होंगे" : "will upload"}):',
+            style: const TextStyle(color: Color(0xFF00E5FF), fontSize: 12, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 6),
+          Container(
+            constraints: const BoxConstraints(maxHeight: 180),
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF131A2A),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white10),
+            ),
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: _folderPickedFiles.length,
+              itemBuilder: (context, idx) {
+                final f = _folderPickedFiles[idx];
+                final clean = f.name.replaceAll(RegExp(r'\.[a-zA-Z0-9]+$'), '').replaceAll('_', ' ');
+                final isDup = _backend.checkDuplicateSong(title: clean, artist: _folderArtistCtrl.text.trim()) != null;
+                final isDone = _isUploading && idx < _folderCurrentIndex;
+                final isCurrent = _isUploading && idx == _folderCurrentIndex;
+                final mb = (f.size / (1024 * 1024)).toStringAsFixed(1);
+
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 3),
+                  child: Row(
+                    children: [
+                      Icon(
+                        isDone
+                            ? Icons.check_circle_rounded
+                            : (isCurrent
+                                ? Icons.cloud_upload_rounded
+                                : (isDup ? Icons.warning_amber_rounded : Icons.music_note_rounded)),
+                        size: 14,
+                        color: isDone
+                            ? Colors.greenAccent
+                            : (isCurrent
+                                ? const Color(0xFF00E5FF)
+                                : (isDup ? Colors.amberAccent : Colors.grey)),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          f.name,
+                          style: TextStyle(
+                            color: isCurrent
+                                ? const Color(0xFF00E5FF)
+                                : (isDup ? Colors.amberAccent : Colors.white70),
+                            fontSize: 11,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (isDup && !isDone)
+                        Container(
+                          margin: const EdgeInsets.only(right: 6),
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: Colors.amber.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text('Duplicate', style: TextStyle(color: Colors.amberAccent, fontSize: 9, fontWeight: FontWeight.bold)),
+                        ),
+                      Text('$mb MB', style: const TextStyle(color: Colors.grey, fontSize: 10)),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 18),
+        ],
+
+        // Progress bar during bulk upload
+        if (_isUploading) ...[
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: LinearProgressIndicator(
+              value: _uploadProgress,
+              backgroundColor: Colors.white.withOpacity(0.08),
+              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF00E5FF)),
+              minHeight: 8,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _uploadStatusText ?? 'अपलोड हो रहा है...',
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Color(0xFF00E5FF), fontSize: 12, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 14),
+        ],
+
+        // Submit Button
+        ElevatedButton(
+          onPressed: (_isUploading || _folderPickedFiles.isEmpty) ? null : _submitFolderUpload,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF00E5FF),
+            foregroundColor: Colors.black,
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            elevation: 0,
+          ),
+          child: _isUploading
+              ? const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2),
+                )
+              : Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.playlist_add_check_circle_rounded, size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      _lang.isHindi
+                          ? 'सभी गाने अपलोड करें और प्लेलिस्ट बनाएं'
+                          : 'Upload All & Create Playlist',
+                      style: GoogleFonts.syne(fontSize: 14, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+        ),
+      ],
     );
   }
 

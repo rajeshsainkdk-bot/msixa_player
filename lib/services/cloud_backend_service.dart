@@ -74,8 +74,26 @@ class CloudBackendService extends ChangeNotifier {
   String? get pendingPhone => _pendingPhone;
 
   List<UserProfile> get allUsers => List.unmodifiable(_allUsers);
-  List<Song> get pendingSongs => _communitySongs.where((s) => s.isPending && !_deletedSongIds.contains(s.id)).toList();
-  List<Song> get approvedSongs => _communitySongs.where((s) => s.isApproved && !_deletedSongIds.contains(s.id)).toList();
+  List<Song> get pendingSongs {
+    final list = _communitySongs.where((s) => s.isPending && !_deletedSongIds.contains(s.id)).toList();
+    list.sort((a, b) {
+      if (a.createdAt != null && b.createdAt != null) {
+        return b.createdAt!.compareTo(a.createdAt!);
+      }
+      return b.id.compareTo(a.id);
+    });
+    return list;
+  }
+  List<Song> get approvedSongs {
+    final list = _communitySongs.where((s) => s.isApproved && !_deletedSongIds.contains(s.id)).toList();
+    list.sort((a, b) {
+      if (a.createdAt != null && b.createdAt != null) {
+        return b.createdAt!.compareTo(a.createdAt!);
+      }
+      return b.id.compareTo(a.id);
+    });
+    return list;
+  }
   Set<String> get deletedSongIds => Set.unmodifiable(_deletedSongIds);
 
   int get totalUsersCount => _allUsers.length;

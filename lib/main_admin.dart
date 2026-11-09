@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'services/cloud_backend_service.dart';
 import 'services/language_service.dart';
 import 'services/r2_storage_service.dart';
+import 'services/update_service.dart';
 import 'screens/admin/admin_dashboard_screen.dart';
 
 void main() async {
@@ -57,6 +58,14 @@ class _AdminRootViewState extends State<AdminRootView> {
   final _pinCtrl = TextEditingController();
   bool _isLoading = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      UpdateService.checkForUpdate(context, autoPrompt: true, isAdmin: true);
+    });
+  }
 
   @override
   void dispose() {

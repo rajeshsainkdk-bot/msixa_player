@@ -14,6 +14,7 @@ import 'package:google_fonts/google_fonts.dart';
 /// - Supports both user-initiated check & silent app-startup auto-prompt
 class UpdateService {
   static const String manifestUrl = 'https://pub-d4f2e58dc2594d0c8dc1f30bbae4344f.r2.dev/update/version.json';
+  static const String adminManifestUrl = 'https://pub-d4f2e58dc2594d0c8dc1f30bbae4344f.r2.dev/update/admin_version.json';
   static const MethodChannel _channel = MethodChannel('com.msixa.player/app_share');
   static const String _prefKeyLastChecked = 'msixa_last_update_check';
   static const String _prefKeyDismissedVersion = 'msixa_dismissed_update_version';
@@ -35,13 +36,14 @@ class UpdateService {
   }
 
   /// Check for latest update from Cloudflare R2
-  static Future<void> checkForUpdate(BuildContext context, {bool autoPrompt = false}) async {
+  static Future<void> checkForUpdate(BuildContext context, {bool autoPrompt = false, bool isAdmin = false}) async {
     if (autoPrompt && _hasCheckedThisSession) return;
     if (autoPrompt) _hasCheckedThisSession = true;
 
     try {
+      final targetManifest = isAdmin ? adminManifestUrl : manifestUrl;
       final ts = DateTime.now().millisecondsSinceEpoch;
-      final uri = Uri.parse('$manifestUrl?t=$ts');
+      final uri = Uri.parse('$targetManifest?t=$ts');
       final resp = await http.get(
         uri,
         headers: {
@@ -66,6 +68,9 @@ class UpdateService {
       final forceUpdate = data['force_update'] as bool? ?? false;
 
       final prefs = await SharedPreferences.getInstance();
+      final prefKeyDismissed = isAdmin ? '${_prefKeyDismissedVersion}_admin' : _prefKeyDismissedVersion;
+      final prefKeyPrompt = isAdmin ? '${_prefKeyLastPromptTime}_admin' : _prefKeyLastPromptTime;
+
       await prefs.setInt(_prefKeyLastChecked, ts);
 
       // Get exact installed version from device OS
@@ -73,12 +78,12 @@ class UpdateService {
       final installedCode = installed['versionCode'] as int;
       final installedName = installed['versionName'] as String;
 
-      debugPrint('📱 App Version Check: Installed=$installedCode (v$installedName), Remote=$remoteCode (v$remoteName)');
+      debugPrint('📱 ${isAdmin ? "Admin" : "Player"} Version Check: Installed=$installedCode (v$installedName), Remote=$remoteCode (v$remoteName)');
 
       // If user dismissed this version or was prompted recently, don't show auto-prompt again
       if (autoPrompt && !forceUpdate) {
-        final dismissedCode = prefs.getInt(_prefKeyDismissedVersion) ?? 0;
-        final lastPromptTime = prefs.getInt(_prefKeyLastPromptTime) ?? 0;
+        final dismissedCode = prefs.getInt(prefKeyDismissed) ?? 0;
+        final lastPromptTime = prefs.getInt(prefKeyPrompt) ?? 0;
         if (dismissedCode >= remoteCode || (ts - lastPromptTime) < 2 * 3600 * 1000) {
           return;
         }
@@ -86,7 +91,7 @@ class UpdateService {
 
       // ONLY prompt if remote version is strictly newer than installed version
       if (remoteCode > installedCode && apkUrl.isNotEmpty) {
-        await prefs.setInt(_prefKeyLastPromptTime, ts);
+        await prefs.setInt(prefKeyPrompt, ts);
         if (context.mounted) {
           _showUpdateDialog(
             context,
@@ -96,6 +101,7 @@ class UpdateService {
             apkUrl: apkUrl,
             forceUpdate: forceUpdate,
             remoteCode: remoteCode,
+            isAdmin: isAdmin,
           );
         }
       } else {
@@ -129,6 +135,7 @@ class UpdateService {
     required String apkUrl,
     required bool forceUpdate,
     required int remoteCode,
+    bool isAdmin = false,
   }) {
     showDialog(
       context: context,
@@ -139,6 +146,8 @@ class UpdateService {
         String statusText = '';
         int downloadedBytes = 0;
         int totalBytes = (sizeMb * 1024 * 1024).toInt();
+        final prefKeyDismissed = isAdmin ? '${_prefKeyDismissedVersion}_admin' : _prefKeyDismissedVersion;
+        final prefKeyPrompt = isAdmin ? '${_prefKeyLastPromptTime}_admin' : _prefKeyLastPromptTime;
 
         return StatefulBuilder(
           builder: (dialogContext, setState) {
@@ -166,7 +175,7 @@ class UpdateService {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'नया अपडेट उपलब्ध है!',
+                            isAdmin ? 'नया एडमिन अपडेट उपलब्ध है!' : 'नया अपडेट उपलब्ध है!',
                             style: GoogleFonts.syne(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
                           ),
                           Text(
@@ -242,8 +251,8 @@ class UpdateService {
                       onPressed: () async {
                         try {
                           final p = await SharedPreferences.getInstance();
-                          await p.setInt(_prefKeyDismissedVersion, remoteCode);
-                          await p.setInt(_prefKeyLastPromptTime, DateTime.now().millisecondsSinceEpoch);
+                          await p.setInt(prefKeyDismissed, remoteCode);
+                          await p.setInt(prefKeyPrompt, DateTime.now().millisecondsSinceEpoch);
                         } catch (_) {}
                         if (dialogContext.mounted) {
                           Navigator.pop(dialogContext);
@@ -334,7 +343,8 @@ class UpdateService {
                           downloadedBytes = 0;
 
                           final tempDir = Directory.systemTemp;
-                          final apkFile = File('${tempDir.path}/msixa_player_latest.apk');
+                          final apkName = isAdmin ? 'msixa_admin_latest.apk' : 'msixa_player_latest.apk';
+                          final apkFile = File('${tempDir.path}/$apkName');
                           if (await apkFile.exists()) {
                             await apkFile.delete();
                           }
@@ -365,8 +375,8 @@ class UpdateService {
                           // 2. Remember dismissed version code to avoid nagging on immediate restart
                           try {
                             final p = await SharedPreferences.getInstance();
-                            await p.setInt(_prefKeyDismissedVersion, remoteCode);
-                            await p.setInt(_prefKeyLastPromptTime, DateTime.now().millisecondsSinceEpoch);
+                            await p.setInt(prefKeyDismissed, remoteCode);
+                            await p.setInt(prefKeyPrompt, DateTime.now().millisecondsSinceEpoch);
                           } catch (_) {}
 
                           // 3. Automatically dismiss the popup dialog immediately

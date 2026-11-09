@@ -20,6 +20,7 @@ class LibraryScreen extends StatefulWidget {
 class _LibraryScreenState extends State<LibraryScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  bool _isGroupedByCategory = false;
 
   @override
   void initState() {
@@ -141,75 +142,197 @@ class _LibraryScreenState extends State<LibraryScreen>
 
     return Column(
       children: [
-        // Play All / Shuffle All Header
+        // Play All / Shuffle All Header with Category Grouping Switcher
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: Column(
             children: [
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.accentCyan,
-                  foregroundColor: Colors.black,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                ),
-                icon: const Icon(Icons.play_arrow_rounded, size: 20),
-                label: Text(
-                  lang.isHindi ? 'सभी बजाएं' : 'Play All',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                onPressed: () {
-                  provider.playSong(allSongs.first, queueContext: allSongs);
-                },
-              ),
-              const SizedBox(width: 10),
-              OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.textPrimary,
-                  side: BorderSide(color: Colors.white.withOpacity(0.15)),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                ),
-                icon: const Icon(Icons.shuffle_rounded, size: 18),
-                label: Text(lang.isHindi ? 'शफ़ल' : 'Shuffle'),
-                onPressed: () {
-                  final shuffled = List.of(allSongs)..shuffle();
-                  provider.playSong(shuffled.first, queueContext: shuffled);
-                },
-              ),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.card,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.accentCyan.withOpacity(0.3)),
-                ),
-                child: Text(
-                  '${allSongs.length} ${lang.isHindi ? "गाने" : "Tracks"}',
-                  style: const TextStyle(color: AppColors.accentCyan, fontSize: 11, fontWeight: FontWeight.bold),
-                ),
+              Row(
+                children: [
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.accentCyan,
+                      foregroundColor: Colors.black,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    ),
+                    icon: const Icon(Icons.play_arrow_rounded, size: 20),
+                    label: Text(
+                      lang.isHindi ? 'सभी बजाएं' : 'Play All',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                    ),
+                    onPressed: () {
+                      provider.playSong(allSongs.first, queueContext: allSongs);
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.textPrimary,
+                      side: BorderSide(color: Colors.white.withOpacity(0.15)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                    icon: const Icon(Icons.shuffle_rounded, size: 16),
+                    label: Text(lang.isHindi ? 'शफ़ल' : 'Shuffle', style: const TextStyle(fontSize: 12)),
+                    onPressed: () {
+                      final shuffled = List.of(allSongs)..shuffle();
+                      provider.playSong(shuffled.first, queueContext: shuffled);
+                    },
+                  ),
+                  const Spacer(),
+                  // Toggle View: Flat List vs Expandable Category Accordion
+                  InkWell(
+                    onTap: () => setState(() => _isGroupedByCategory = !_isGroupedByCategory),
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: _isGroupedByCategory ? AppColors.accentCyan.withOpacity(0.2) : AppColors.card,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: _isGroupedByCategory ? AppColors.accentCyan : Colors.white.withOpacity(0.12),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            _isGroupedByCategory ? Icons.folder_rounded : Icons.list_rounded,
+                            size: 14,
+                            color: _isGroupedByCategory ? AppColors.accentCyan : Colors.white70,
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            _isGroupedByCategory
+                                ? (lang.isHindi ? 'कैटेगरी सूची' : 'By Category')
+                                : (lang.isHindi ? 'सीधी सूची' : 'Flat List'),
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: _isGroupedByCategory ? AppColors.accentCyan : Colors.white70,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
         ),
         Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.only(bottom: 120),
-            itemCount: allSongs.length,
-            itemBuilder: (context, index) {
-              final song = allSongs[index];
-              final isCurrent = provider.currentSong?.id == song.id;
+          child: _isGroupedByCategory
+              ? _buildCategorizedSongsList(context, provider, allSongs, lang)
+              : ListView.builder(
+                  padding: const EdgeInsets.only(bottom: 120),
+                  itemCount: allSongs.length,
+                  itemBuilder: (context, index) {
+                    final song = allSongs[index];
+                    final isCurrent = provider.currentSong?.id == song.id;
 
-              return SongListTile(
-                song: song,
-                isCurrent: isCurrent,
-                onTap: () => provider.playSong(song, queueContext: allSongs),
-              );
-            },
-          ),
+                    return SongListTile(
+                      song: song,
+                      isCurrent: isCurrent,
+                      onTap: () => provider.playSong(song, queueContext: allSongs),
+                    );
+                  },
+                ),
         ),
       ],
+    );
+  }
+
+  Widget _buildCategorizedSongsList(
+    BuildContext context,
+    PlayerProvider provider,
+    List<Song> allSongs,
+    LanguageService lang,
+  ) {
+    final Map<String, List<Song>> categoryMap = {};
+    for (final song in allSongs) {
+      final genre = song.genre.trim().isNotEmpty ? song.genre.trim() : 'Other';
+      categoryMap.putIfAbsent(genre, () => []).add(song);
+    }
+
+    final categories = categoryMap.keys.toList()..sort();
+
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
+      itemCount: categories.length,
+      itemBuilder: (context, index) {
+        final category = categories[index];
+        final songs = categoryMap[category] ?? [];
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: AppColors.card,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white.withOpacity(0.06)),
+          ),
+          child: Theme(
+            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+            child: ExpansionTile(
+              initiallyExpanded: index == 0,
+              tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.accentCyan.withOpacity(0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.folder_open_rounded, color: AppColors.accentCyan, size: 20),
+              ),
+              title: Text(
+                category,
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              subtitle: Text(
+                '${songs.length} ${lang.isHindi ? "गाने (टैप करके देखें/छिपाएं)" : "Tracks (Tap to expand/collapse)"}',
+                style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+              ),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.play_circle_fill_rounded, color: AppColors.accentCyan, size: 28),
+                    tooltip: lang.isHindi ? '$category के सभी गाने बजाएं' : 'Play all in $category',
+                    onPressed: () {
+                      if (songs.isNotEmpty) {
+                        provider.playSong(songs.first, queueContext: songs);
+                      }
+                    },
+                  ),
+                  const Icon(Icons.expand_more_rounded, color: AppColors.textSecondary),
+                ],
+              ),
+              children: [
+                const Divider(color: Colors.white10, height: 1),
+                ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: songs.length,
+                  itemBuilder: (context, songIdx) {
+                    final song = songs[songIdx];
+                    final isCurrent = provider.currentSong?.id == song.id;
+
+                    return SongListTile(
+                      song: song,
+                      isCurrent: isCurrent,
+                      onTap: () => provider.playSong(song, queueContext: songs),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 

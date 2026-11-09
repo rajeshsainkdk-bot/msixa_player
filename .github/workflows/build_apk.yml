@@ -160,11 +160,63 @@ jobs:
 
           class MainActivity: AudioServiceActivity() {
               private val CHANNEL = "com.msixa.player/app_share"
+              private var wakeLock: android.os.PowerManager.WakeLock? = null
 
               override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
                   super.configureFlutterEngine(flutterEngine)
                   MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
-                      if (call.method == "shareApk") {
+                      if (call.method == "acquireWakeLock") {
+                          try {
+                              window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                              val powerManager = getSystemService(android.content.Context.POWER_SERVICE) as android.os.PowerManager
+                              if (wakeLock == null) {
+                                  wakeLock = powerManager.newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK, "Msixa:BulkUploadWakeLock")
+                              }
+                              if (wakeLock?.isHeld != true) {
+                                  wakeLock?.acquire(45 * 60 * 1000L)
+                              }
+                              result.success(true)
+                          } catch (e: Exception) {
+                              result.error("WAKELOCK_ERR", e.localizedMessage, null)
+                          }
+                      } else if (call.method == "releaseWakeLock") {
+                          try {
+                              window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                              if (wakeLock?.isHeld == true) {
+                                  wakeLock?.release()
+                              }
+                              result.success(true)
+                          } catch (e: Exception) {
+                              result.error("WAKELOCK_RELEASE_ERR", e.localizedMessage, null)
+                          }
+                      } else if (call.method == "showUploadNotification") {
+                          try {
+                              val title = call.argument<String>("title") ?: "Msixa Bulk Upload"
+                              val message = call.argument<String>("message") ?: "Upload Completed!"
+                              val notificationManager = getSystemService(android.content.Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+                              val channelId = "msixa_upload_channel"
+                              if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                                  val channel = android.app.NotificationChannel(
+                                      channelId,
+                                      "Msixa Upload Status",
+                                      android.app.NotificationManager.IMPORTANCE_HIGH
+                                  ).apply {
+                                      description = "Notifications for bulk upload completion"
+                                  }
+                                  notificationManager.createNotificationChannel(channel)
+                              }
+                              val builder = androidx.core.app.NotificationCompat.Builder(this, channelId)
+                                  .setSmallIcon(android.R.drawable.stat_sys_upload_done)
+                                  .setContentTitle(title)
+                                  .setContentText(message)
+                                  .setPriority(androidx.core.app.NotificationCompat.PRIORITY_HIGH)
+                                  .setAutoCancel(true)
+                              notificationManager.notify(101, builder.build())
+                              result.success(true)
+                          } catch (e: Exception) {
+                              result.error("NOTIF_ERR", e.localizedMessage, null)
+                          }
+                      } else if (call.method == "shareApk") {
                           try {
                               val appInfo = applicationContext.applicationInfo
                               val srcApk = File(appInfo.sourceDir)
@@ -405,7 +457,19 @@ jobs:
           flutter build apk --release --build-name=1.0.${{ github.run_number }} --build-number=${{ github.run_number }} --no-tree-shake-icons
           cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/msixa-player-release.apk
 
-      - name: Deploy Live Update Package to Cloudflare R2
+      - name: Build Admin Control APK (Release)
+        run: |
+          # Configure unique Application ID and App Label for Admin so both apps install side-by-side on same device
+          sed -i -E 's/applicationId[[:space:]=]+"[^"]+"/applicationId = "com.msixa.admin"/' android/app/build.gradle || true
+          sed -i 's/applicationId "com.msixa.msixa_player"/applicationId "com.msixa.admin"/' android/app/build.gradle || true
+          sed -i 's/applicationId "com.msixa.player"/applicationId "com.msixa.admin"/' android/app/build.gradle || true
+          sed -i 's/android:label="Msixa Player"/android:label="Msixa Player Admin"/' android/app/src/main/AndroidManifest.xml || true
+          rm -rf build/app/outputs/flutter-apk/app-release.apk
+
+          flutter build apk --release --target=lib/main_admin.dart --build-name=1.0.${{ github.run_number }} --build-number=${{ github.run_number }} --no-tree-shake-icons
+          cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/msixa-admin-release.apk
+
+      - name: Deploy Live Dual OTA Update Packages to Cloudflare R2
         run: |
           pip install boto3
           python - << 'EOF'
@@ -419,47 +483,66 @@ jobs:
               region_name='auto'
           )
 
-          apk_path = 'build/app/outputs/flutter-apk/msixa-player-release.apk'
-          if os.path.exists(apk_path):
-              size_mb = round(os.path.getsize(apk_path) / (1024 * 1024), 2)
-              print(f"Uploading {apk_path} ({size_mb} MB) to R2 update/msixa_player_latest.apk...")
+          run_num = int(os.environ.get('GITHUB_RUN_NUMBER', 1))
+
+          # 1. Deploy Player App OTA Update
+          player_apk = 'build/app/outputs/flutter-apk/msixa-player-release.apk'
+          if os.path.exists(player_apk):
+              size_mb = round(os.path.getsize(player_apk) / (1024 * 1024), 2)
+              print(f"Uploading {player_apk} ({size_mb} MB) to R2 update/msixa_player_latest.apk...")
               s3.upload_file(
-                  apk_path,
+                  player_apk,
                   'msixa-music',
                   'update/msixa_player_latest.apk',
                   ExtraArgs={'ContentType': 'application/vnd.android.package-archive'}
               )
 
-              run_num = int(os.environ.get('GITHUB_RUN_NUMBER', 1))
               manifest = {
                   'version_code': run_num,
                   'version_name': f"1.0.{run_num}",
                   'apk_url': 'https://pub-d4f2e58dc2594d0c8dc1f30bbae4344f.r2.dev/update/msixa_player_latest.apk',
                   'file_size_mb': size_mb,
-                  'release_notes': 'Auto-Update: Realtime sync and platform enhancements!',
+                  'release_notes': 'Msixa Player OTA Auto-Update: Realtime sync and platform enhancements!',
                   'force_update': False
               }
-              print(f"Deploying update manifest: {manifest}")
+              print(f"Deploying Player update manifest: {manifest}")
               s3.put_object(
                   Bucket='msixa-music',
                   Key='update/version.json',
                   Body=json.dumps(manifest),
                   ContentType='application/json'
               )
-              print("Cloudflare R2 OTA Auto-Update successfully deployed!")
+              print("Player OTA Auto-Update successfully deployed!")
+
+          # 2. Deploy Admin Control App OTA Update
+          admin_apk = 'build/app/outputs/flutter-apk/msixa-admin-release.apk'
+          if os.path.exists(admin_apk):
+              admin_size_mb = round(os.path.getsize(admin_apk) / (1024 * 1024), 2)
+              print(f"Uploading {admin_apk} ({admin_size_mb} MB) to R2 update/msixa_admin_latest.apk...")
+              s3.upload_file(
+                  admin_apk,
+                  'msixa-music',
+                  'update/msixa_admin_latest.apk',
+                  ExtraArgs={'ContentType': 'application/vnd.android.package-archive'}
+              )
+
+              admin_manifest = {
+                  'version_code': run_num,
+                  'version_name': f"1.0.{run_num}",
+                  'apk_url': 'https://pub-d4f2e58dc2594d0c8dc1f30bbae4344f.r2.dev/update/msixa_admin_latest.apk',
+                  'file_size_mb': admin_size_mb,
+                  'release_notes': 'Msixa Admin OTA Auto-Update: Background uploading, R2 storage monitor & real-time sync!',
+                  'force_update': False
+              }
+              print(f"Deploying Admin update manifest: {admin_manifest}")
+              s3.put_object(
+                  Bucket='msixa-music',
+                  Key='update/admin_version.json',
+                  Body=json.dumps(admin_manifest),
+                  ContentType='application/json'
+              )
+              print("Admin OTA Auto-Update successfully deployed!")
           EOF
-
-      - name: Build Admin Control APK (Release)
-        run: |
-          # Configure unique Application ID and App Label for Admin so both apps install side-by-side on same device
-          sed -i -E 's/applicationId[[:space:]=]+"[^"]+"/applicationId = "com.msixa.admin"/' android/app/build.gradle || true
-          sed -i 's/applicationId "com.msixa.msixa_player"/applicationId "com.msixa.admin"/' android/app/build.gradle || true
-          sed -i 's/applicationId "com.msixa.player"/applicationId "com.msixa.admin"/' android/app/build.gradle || true
-          sed -i 's/android:label="Msixa Player"/android:label="Msixa Player Admin"/' android/app/src/main/AndroidManifest.xml || true
-          rm -rf build/app/outputs/flutter-apk/app-release.apk
-
-          flutter build apk --release --target=lib/main_admin.dart --build-name=1.0.${{ github.run_number }} --build-number=${{ github.run_number }} --no-tree-shake-icons
-          cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/msixa-admin-release.apk
 
       - name: Upload User APK Artifact
         uses: actions/upload-artifact@v4

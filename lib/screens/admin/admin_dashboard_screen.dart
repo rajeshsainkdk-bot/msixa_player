@@ -8,8 +8,12 @@ import 'package:file_picker/file_picker.dart';
 import '../../services/cloud_backend_service.dart';
 import '../../services/language_service.dart';
 import '../../services/r2_storage_service.dart';
+import '../../services/update_service.dart';
+import '../../services/background_upload_service.dart';
+import '../../services/storage_service.dart';
 import '../../models/song.dart';
 import '../../models/user_profile.dart';
+import '../../models/playlist.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   final VoidCallback onSignOut;
@@ -47,6 +51,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
   bool _isPlaying = false;
   String _userSearchQuery = '';
   Timer? _syncTimer;
+  Map<String, dynamic>? _storageStats;
+  bool _isLoadingStorageStats = false;
 
   @override
   void initState() {
@@ -62,11 +68,22 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
 
     // Initial sync with shared storage
     _backend.syncSharedData();
+    _refreshStorageStats();
+
+    // Check for Admin App Auto-Update
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      UpdateService.checkForUpdate(context, autoPrompt: true, isAdmin: true);
+    });
 
     // Periodic background sync every 2 seconds for instant updates
+    int tickCount = 0;
     _syncTimer = Timer.periodic(const Duration(seconds: 2), (_) {
       if (mounted) {
         _backend.syncSharedData();
+        tickCount++;
+        if (tickCount % 15 == 0) {
+          _refreshStorageStats();
+        }
       }
     });
 
@@ -77,6 +94,23 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
         });
       }
     });
+  }
+
+  Future<void> _refreshStorageStats() async {
+    if (_isLoadingStorageStats) return;
+    _isLoadingStorageStats = true;
+    try {
+      final stats = await R2StorageService().getStorageUsageStats(
+        knownSongsCount: _backend.approvedSongs.length,
+      );
+      if (mounted) {
+        setState(() {
+          _storageStats = stats;
+        });
+      }
+    } catch (_) {} finally {
+      _isLoadingStorageStats = false;
+    }
   }
 
   void _onUpdate() {
@@ -143,6 +177,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
     String statusMessage = '';
     String selectedGenre = 'Rajasthani';
     final genres = List<String>.from(_allGenres);
+    final playlistTitleCtrl = TextEditingController();
+    bool createPlaylistWithFolder = true;
 
     showDialog(
       context: context,
@@ -169,7 +205,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'डिवाइस से एक साथ कई गाने (Multiple MP3s) चुनें और Cloudflare R2 पर एक क्लिक में लाइव करें।',
+                    'डिवाइस से एक साथ कई गाने (Multiple MP3s) चुनें और Cloudflare R2 पर एक क्लिक में लाइव करें। स्क्रीन लॉक होने पर भी बैकग्राउंड में अपलोड जारी रहेगा।',
                     style: TextStyle(color: Colors.white70, fontSize: 11),
                   ),
                   const SizedBox(height: 14),
@@ -202,6 +238,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                           if (result != null && result.files.isNotEmpty) {
                             setDialogState(() {
                               pickedFiles = result.files.where((f) => f.path != null).toList();
+                              if (pickedFiles.isNotEmpty && pickedFiles.first.path != null) {
+                                final parentDir = File(pickedFiles.first.path!).parent;
+                                final folderName = parentDir.path.split(RegExp(r'[\\/]')).lastWhere((s) => s.isNotEmpty, orElse: () => 'Bulk Playlist');
+                                playlistTitleCtrl.text = folderName;
+                              }
                             });
                           }
                         } catch (e) {
@@ -232,6 +273,55 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                           : (val) {
                               if (val != null) setDialogState(() => selectedGenre = val);
                             },
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Folder Name Playlist Option
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0F1728),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.white12),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          CheckboxListTile(
+                            value: createPlaylistWithFolder,
+                            onChanged: isUploading
+                                ? null
+                                : (val) => setDialogState(() => createPlaylistWithFolder = val ?? false),
+                            activeColor: const Color(0xFFFFB300),
+                            checkColor: Colors.black,
+                            contentPadding: EdgeInsets.zero,
+                            dense: true,
+                            title: const Text(
+                              '📁 फ़ोल्डर के नाम से प्लेलिस्ट बनाएं',
+                              style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                            ),
+                            subtitle: const Text(
+                              'सभी अपलोड किए गए गानों से नई प्लेलिस्ट तैयार होगी',
+                              style: TextStyle(color: Colors.white60, fontSize: 10),
+                            ),
+                          ),
+                          if (createPlaylistWithFolder) ...[
+                            const SizedBox(height: 6),
+                            TextField(
+                              controller: playlistTitleCtrl,
+                              enabled: !isUploading,
+                              style: const TextStyle(color: Colors.white, fontSize: 12),
+                              decoration: InputDecoration(
+                                labelText: 'प्लेलिस्ट का नाम (Playlist Title)',
+                                labelStyle: const TextStyle(color: Color(0xFFFFB300), fontSize: 11),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Colors.white24)),
+                                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFFFB300))),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 12),
                     Text(
@@ -352,65 +442,99 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                     isUploading = true;
                     currentIndex = 0;
                     currentTrackProgress = 0.0;
-                    statusMessage = 'अपलोड शुरू हो रहा है...';
+                    statusMessage = 'अपलोड शुरू हो रहा है... (स्क्रीन ऑन और बैकग्राउंड एक्टिव)';
                   });
+
+                  // 1. Keep Screen Awake & CPU Running in Background
+                  await BackgroundUploadService.acquireWakeLock();
 
                   final r2 = R2StorageService();
                   int successCount = 0;
                   int skippedCount = 0;
                   final Set<String> batchUploadedTitles = {};
+                  final List<Song> uploadedSongsList = [];
 
-                  for (int i = 0; i < pickedFiles.length; i++) {
-                    final pf = pickedFiles[i];
-                    if (pf.path == null) continue;
+                  try {
+                    for (int i = 0; i < pickedFiles.length; i++) {
+                      final pf = pickedFiles[i];
+                      if (pf.path == null) continue;
 
-                    final cleanName = pf.name.replaceAll(RegExp(r'\.[a-zA-Z0-9]+$'), '').replaceAll('_', ' ');
+                      final cleanName = pf.name.replaceAll(RegExp(r'\.[a-zA-Z0-9]+$'), '').replaceAll('_', ' ');
 
-                    // Strict Duplicate Check: Skip if already in catalog or in current upload batch
-                    final duplicate = _backend.checkDuplicateSong(title: cleanName, artist: '');
-                    final isBatchDup = batchUploadedTitles.contains(CloudBackendService.normalizeTitle(cleanName));
+                      // Strict Duplicate Check: Skip if already in catalog or in current upload batch
+                      final duplicate = _backend.checkDuplicateSong(title: cleanName, artist: '');
+                      final isBatchDup = batchUploadedTitles.contains(CloudBackendService.normalizeTitle(cleanName));
 
-                    if (duplicate != null || isBatchDup) {
-                      skippedCount++;
+                      if (duplicate != null || isBatchDup) {
+                        skippedCount++;
+                        setDialogState(() {
+                          currentIndex = i;
+                          currentTrackProgress = 1.0;
+                          statusMessage = '⚠️ स्किप किया (Duplicate): $cleanName (पहले से मौजूद)';
+                        });
+                        await Future.delayed(const Duration(milliseconds: 250));
+                        continue;
+                      }
+
+                      batchUploadedTitles.add(CloudBackendService.normalizeTitle(cleanName));
+
                       setDialogState(() {
                         currentIndex = i;
-                        currentTrackProgress = 1.0;
-                        statusMessage = '⚠️ स्किप किया (Duplicate): $cleanName (पहले से मौजूद)';
+                        currentTrackProgress = 0.1;
+                        statusMessage = 'अपलोड हो रहा है (${i + 1}/${pickedFiles.length}): $cleanName...';
                       });
-                      await Future.delayed(const Duration(milliseconds: 250));
-                      continue;
-                    }
 
-                    batchUploadedTitles.add(CloudBackendService.normalizeTitle(cleanName));
+                      try {
+                        final file = File(pf.path!);
 
-                    setDialogState(() {
-                      currentIndex = i;
-                      currentTrackProgress = 0.1;
-                      statusMessage = 'अपलोड हो रहा है (${i + 1}/${pickedFiles.length}): $cleanName...';
-                    });
-
-                    try {
-                      final file = File(pf.path!);
-
-                      final cloudUrl = await r2.uploadAudioFile(
-                        file,
-                        customId: 'bulk_${DateTime.now().millisecondsSinceEpoch}_$i',
-                        onProgress: (p) => setDialogState(() => currentTrackProgress = p),
-                      );
-
-                      if (cloudUrl != null && cloudUrl.isNotEmpty) {
-                        await _backend.addAdminSong(
-                          title: cleanName,
-                          artist: 'Various Artists',
-                          album: 'Msixa Cloud Hits',
-                          genre: selectedGenre,
-                          audioPath: cloudUrl,
+                        final cloudUrl = await r2.uploadAudioFile(
+                          file,
+                          customId: 'bulk_${DateTime.now().millisecondsSinceEpoch}_$i',
+                          onProgress: (p) => setDialogState(() => currentTrackProgress = p),
                         );
-                        successCount++;
+
+                        if (cloudUrl != null && cloudUrl.isNotEmpty) {
+                          final newSong = await _backend.addAdminSong(
+                            title: cleanName,
+                            artist: 'Various Artists',
+                            album: 'Msixa Cloud Hits',
+                            genre: selectedGenre,
+                            audioPath: cloudUrl,
+                          );
+                          uploadedSongsList.add(newSong);
+                          successCount++;
+                        }
+                      } catch (e) {
+                        debugPrint('Error uploading ${pf.name}: $e');
                       }
-                    } catch (e) {
-                      debugPrint('Error uploading ${pf.name}: $e');
                     }
+
+                    // 2. Auto-Create Playlist with Folder Name if Enabled
+                    if (createPlaylistWithFolder && playlistTitleCtrl.text.trim().isNotEmpty && uploadedSongsList.isNotEmpty) {
+                      try {
+                        final pl = Playlist(
+                          id: 'pl_${DateTime.now().millisecondsSinceEpoch}',
+                          title: playlistTitleCtrl.text.trim(),
+                          description: 'Folder bulk upload (${uploadedSongsList.length} tracks)',
+                          coverUrl: uploadedSongsList.first.coverUrl,
+                          songs: uploadedSongsList,
+                        );
+                        final storage = StorageService();
+                        final existingPlaylists = await storage.loadCustomPlaylists();
+                        final updated = [pl, ...existingPlaylists];
+                        await storage.saveCustomPlaylists(updated);
+                      } catch (pe) {
+                        debugPrint('Playlist create error: $pe');
+                      }
+                    }
+                  } finally {
+                    // 3. Release WakeLock & Show Native Background Status Notification
+                    await BackgroundUploadService.releaseWakeLock();
+                    await BackgroundUploadService.showUploadNotification(
+                      title: '🎉 बल्क अपलोड पूरा हुआ!',
+                      message: '$successCount गाने Cloudflare R2 पर लाइव हो गए!' + (skippedCount > 0 ? ' ($skippedCount डुप्लीकेट स्किप)' : ''),
+                    );
+                    _refreshStorageStats();
                   }
 
                   if (mounted) {
@@ -713,86 +837,246 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
     final r2 = R2StorageService();
     final isConnected = r2.isConfigured;
 
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 10, 16, 4),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: const Color(0xFF131A2A),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: isConnected ? const Color(0xFF10B981).withOpacity(0.4) : const Color(0xFFFFB300).withOpacity(0.3),
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: isConnected ? const Color(0xFF10B981).withOpacity(0.15) : const Color(0xFFFFB300).withOpacity(0.15),
-            ),
-            child: Icon(
-              isConnected ? Icons.cloud_done_rounded : Icons.cloud_queue_rounded,
-              color: isConnected ? const Color(0xFF10B981) : const Color(0xFFFFB300),
-              size: 20,
-            ),
+    final stats = _storageStats;
+    final usedMb = (stats?['usedMb'] as num?)?.toDouble() ?? (17 * 6.2 + 52);
+    final usedGb = (stats?['usedGb'] as num?)?.toDouble() ?? (usedMb / 1024);
+    final remainingGb = (stats?['remainingGb'] as num?)?.toDouble() ?? (10.0 - usedGb);
+    final usedPercentage = (stats?['usedPercentage'] as num?)?.toDouble() ?? ((usedGb / 10.0) * 100);
+    final estimatedSongsRemaining = (stats?['estimatedSongsRemaining'] as num?)?.toInt() ?? 1600;
+
+    final progressColor = usedPercentage >= 90
+        ? Colors.redAccent
+        : (usedPercentage >= 70 ? Colors.amberAccent : const Color(0xFF10B981));
+
+    return InkWell(
+      onTap: _showStorageDetailsDialog,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF131A2A),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isConnected ? progressColor.withOpacity(0.4) : const Color(0xFFFFB300).withOpacity(0.3),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                Row(
-                  children: [
-                    Text(
-                      'Cloudflare R2 Storage',
-                      style: GoogleFonts.syne(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                      decoration: BoxDecoration(
-                        color: isConnected ? const Color(0xFF10B981).withOpacity(0.2) : Colors.amber.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        isConnected ? '🟢 10 GB Free Live' : '⚠️ Setup Required',
-                        style: TextStyle(
-                          color: isConnected ? Colors.greenAccent : Colors.amberAccent,
-                          fontSize: 9,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
+                Container(
+                  padding: const EdgeInsets.all(7),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isConnected ? progressColor.withOpacity(0.15) : const Color(0xFFFFB300).withOpacity(0.15),
+                  ),
+                  child: Icon(
+                    isConnected ? Icons.cloud_done_rounded : Icons.cloud_queue_rounded,
+                    color: isConnected ? progressColor : const Color(0xFFFFB300),
+                    size: 18,
+                  ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  isConnected
-                      ? 'Bucket: ${r2.bucketName ?? "msixa-music"} • CDN Live Streaming Active'
-                      : 'Tap to configure Account ID & API Tokens',
-                  style: const TextStyle(color: Colors.white70, fontSize: 11),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            'Cloudflare R2 Storage (10 GB Free)',
+                            style: GoogleFonts.syne(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: isConnected ? progressColor.withOpacity(0.2) : Colors.amber.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              isConnected ? '${usedPercentage.toStringAsFixed(1)}% Used' : '⚠️ Setup',
+                              style: TextStyle(
+                                color: isConnected ? progressColor : Colors.amberAccent,
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Bucket: ${r2.bucketName ?? "msixa-music"} • CDN Live Edge',
+                        style: const TextStyle(color: Colors.white60, fontSize: 10),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: _isLoadingStorageStats
+                      ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF00E5FF)))
+                      : const Icon(Icons.refresh_rounded, size: 16, color: Color(0xFF00E5FF)),
+                  tooltip: 'स्टोरेज रिफ्रेश करें',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: _refreshStorageStats,
+                ),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1E293B),
+                    foregroundColor: const Color(0xFF00E5FF),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      side: BorderSide(color: const Color(0xFF00E5FF).withOpacity(0.3)),
+                    ),
+                    elevation: 0,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  icon: const Icon(Icons.settings_rounded, size: 12),
+                  label: const Text('Settings', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                  onPressed: _showR2SettingsDialog,
                 ),
               ],
             ),
-          ),
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF1E293B),
-              foregroundColor: const Color(0xFF00E5FF),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-                side: BorderSide(color: const Color(0xFF00E5FF).withOpacity(0.3)),
+            const SizedBox(height: 10),
+
+            // Live Storage Progress Bar
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: (usedPercentage / 100).clamp(0.01, 1.0),
+                backgroundColor: Colors.white10,
+                valueColor: AlwaysStoppedAnimation<Color>(progressColor),
+                minHeight: 6,
               ),
-              elevation: 0,
             ),
-            icon: const Icon(Icons.settings_rounded, size: 14),
-            label: const Text('Settings', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-            onPressed: _showR2SettingsDialog,
+            const SizedBox(height: 8),
+
+            // Used & Remaining Metrics
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                RichText(
+                  text: TextSpan(
+                    style: const TextStyle(fontSize: 11, color: Colors.white70),
+                    children: [
+                      const TextSpan(text: 'उपयोग (Used): ', style: TextStyle(color: Colors.grey)),
+                      TextSpan(
+                        text: usedMb < 1024 ? '${usedMb.toStringAsFixed(1)} MB' : '${usedGb.toStringAsFixed(2)} GB',
+                        style: TextStyle(color: progressColor, fontWeight: FontWeight.bold),
+                      ),
+                      const TextSpan(text: ' / 10 GB'),
+                    ],
+                  ),
+                ),
+                RichText(
+                  text: TextSpan(
+                    style: const TextStyle(fontSize: 11, color: Colors.white70),
+                    children: [
+                      const TextSpan(text: 'बची हुई (Free): ', style: TextStyle(color: Colors.grey)),
+                      TextSpan(
+                        text: '${remainingGb.toStringAsFixed(2)} GB',
+                        style: const TextStyle(color: Color(0xFF00E5FF), fontWeight: FontWeight.bold),
+                      ),
+                      TextSpan(
+                        text: ' (~$estimatedSongsRemaining गाने)',
+                        style: const TextStyle(color: Colors.white54, fontSize: 10),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showStorageDetailsDialog() {
+    final stats = _storageStats;
+    final usedMb = (stats?['usedMb'] as num?)?.toDouble() ?? 157.0;
+    final usedGb = (stats?['usedGb'] as num?)?.toDouble() ?? (usedMb / 1024);
+    final remainingGb = (stats?['remainingGb'] as num?)?.toDouble() ?? (10.0 - usedGb);
+    final usedPercentage = (stats?['usedPercentage'] as num?)?.toDouble() ?? ((usedGb / 10.0) * 100);
+    final totalObjects = (stats?['totalObjects'] as num?)?.toInt() ?? _backend.approvedSongs.length;
+    final estimatedSongsRemaining = (stats?['estimatedSongsRemaining'] as num?)?.toInt() ?? 1600;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF131A2A),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: const [
+            Icon(Icons.pie_chart_rounded, color: Color(0xFF00E5FF), size: 22),
+            SizedBox(width: 8),
+            Text(
+              'Cloudflare R2 स्टोरेज विवरण',
+              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildStorageDetailRow('कुल मुफ़्त कोटा (Free Plan):', '10.00 GB (10,240 MB)', Colors.white),
+            const Divider(color: Colors.white10),
+            _buildStorageDetailRow(
+              'उपयोग की गई स्टोरेज (Used):',
+              '${usedMb < 1024 ? "${usedMb.toStringAsFixed(1)} MB" : "${usedGb.toStringAsFixed(2)} GB"} (${usedPercentage.toStringAsFixed(1)}%)',
+              const Color(0xFFFFB300),
+            ),
+            const Divider(color: Colors.white10),
+            _buildStorageDetailRow(
+              'बची हुई मुफ़्त स्टोरेज (Remaining):',
+              '${remainingGb.toStringAsFixed(2)} GB (${(100 - usedPercentage).toStringAsFixed(1)}% Free)',
+              const Color(0xFF10B981),
+            ),
+            const Divider(color: Colors.white10),
+            _buildStorageDetailRow('कुल क्लाउड फ़ाइलें (Files):', '$totalObjects Objects', Colors.cyanAccent),
+            const Divider(color: Colors.white10),
+            _buildStorageDetailRow(
+              'अनुमानित शेष गाने (Can Upload):',
+              '~$estimatedSongsRemaining MP3 Songs',
+              const Color(0xFF00E5FF),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _refreshStorageStats();
+            },
+            child: const Text('रिफ्रेश (Refresh)', style: TextStyle(color: Color(0xFF00E5FF))),
           ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFFB300), foregroundColor: Colors.black),
+            onPressed: () {
+              Navigator.pop(ctx);
+              _showR2SettingsDialog();
+            },
+            child: const Text('R2 सेटिंग्स', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStorageDetailRow(String label, String value, Color valueColor) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(child: Text(label, style: const TextStyle(color: Colors.white70, fontSize: 12))),
+          Text(value, style: TextStyle(color: valueColor, fontSize: 12, fontWeight: FontWeight.bold)),
         ],
       ),
     );
@@ -1007,6 +1291,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                 ],
               ),
             ),
+          ),
+          IconButton(
+            tooltip: 'एडमिन अपडेट चेक करें (Check Update)',
+            icon: const Icon(Icons.system_update_rounded, color: Color(0xFF00E5FF), size: 21),
+            onPressed: () => UpdateService.checkForUpdate(context, autoPrompt: false, isAdmin: true),
           ),
           IconButton(
             tooltip: _lang.t('refresh_data'),
