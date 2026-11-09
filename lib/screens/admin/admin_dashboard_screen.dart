@@ -173,6 +173,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
 
   String? _currentlyPlayingSongId;
   bool _isPlaying = false;
+  Duration _previewPosition = Duration.zero;
+  Duration _previewDuration = Duration.zero;
+  StreamSubscription? _posSub;
+  StreamSubscription? _durSub;
   String _userSearchQuery = '';
   Timer? _syncTimer;
   Map<String, dynamic>? _storageStats;
@@ -218,7 +222,23 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
       if (mounted) {
         setState(() {
           _isPlaying = state.playing && state.processingState != ProcessingState.completed;
+          if (state.processingState == ProcessingState.completed) {
+            _currentlyPlayingSongId = null;
+            _previewPosition = Duration.zero;
+          }
         });
+      }
+    });
+
+    _posSub = _player.positionStream.listen((pos) {
+      if (mounted) {
+        setState(() => _previewPosition = pos);
+      }
+    });
+
+    _durSub = _player.durationStream.listen((dur) {
+      if (mounted) {
+        setState(() => _previewDuration = dur ?? Duration.zero);
       }
     });
   }
@@ -247,11 +267,41 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
   @override
   void dispose() {
     _syncTimer?.cancel();
+    _posSub?.cancel();
+    _durSub?.cancel();
     _tabController.dispose();
     _backend.removeListener(_onUpdate);
     _lang.removeListener(_onUpdate);
     _player.dispose();
     super.dispose();
+  }
+
+  String _formatPreviewDuration(Duration d) {
+    final minutes = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final seconds = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '$minutes:$seconds';
+  }
+
+  Future<void> _seekPreview(Duration pos) async {
+    await _player.seek(pos);
+  }
+
+  Future<void> _seekPreviewRelative(int seconds) async {
+    final targetMs = _previewPosition.inMilliseconds + (seconds * 1000);
+    final maxMs = _previewDuration.inMilliseconds > 0 ? _previewDuration.inMilliseconds : 600000;
+    final clamped = targetMs.clamp(0, maxMs);
+    await _player.seek(Duration(milliseconds: clamped));
+  }
+
+  Future<void> _stopSongPreview() async {
+    await _player.stop();
+    if (mounted) {
+      setState(() {
+        _currentlyPlayingSongId = null;
+        _previewPosition = Duration.zero;
+        _previewDuration = Duration.zero;
+      });
+    }
   }
 
   Future<void> _playSongPreview(Song song) async {
@@ -261,7 +311,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
         return;
       }
 
-      setState(() => _currentlyPlayingSongId = song.id);
+      setState(() {
+        _currentlyPlayingSongId = song.id;
+        _previewPosition = Duration.zero;
+        _previewDuration = Duration(seconds: song.duration > 0 ? song.duration : 0);
+      });
 
       if (song.streamUrl.startsWith('assets/')) {
         await _player.setAsset(song.streamUrl);
@@ -1091,12 +1145,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                       }
                     }
 
-                    // 2. Auto-Create Playlists with Folder Hierarchy if Enabled
-                    if (createPlaylistWithFolder && playlistTitleCtrl.text.trim().isNotEmpty && uploadedSongsList.isNotEmpty) {
+                    // 2. Auto-Create Playlists with Folder Hierarchy (Cloud & Local)
+                    if (uploadedSongsList.isNotEmpty) {
                       try {
                         final storage = StorageService();
                         final existingPlaylists = await storage.loadCustomPlaylists();
                         final List<Playlist> newGeneratedPlaylists = [];
+
+                        final rootTitle = playlistTitleCtrl.text.trim().isNotEmpty
+                            ? playlistTitleCtrl.text.trim()
+                            : (prefillSubCategory ?? (uploadedSongsList.first.subCategory ?? '${uploadedSongsList.first.genre} Collection'));
 
                         // Group by subcategory/subfolder
                         final Map<String, List<Song>> subFolderMap = {};
@@ -1109,9 +1167,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
 
                         // Create distinct playlist for each subfolder
                         for (final entry in subFolderMap.entries) {
+                          final subPlTitle = '$rootTitle › ${entry.key}';
                           newGeneratedPlaylists.add(Playlist(
                             id: 'pl_${DateTime.now().millisecondsSinceEpoch}_${entry.key.hashCode.abs()}',
-                            title: '${playlistTitleCtrl.text.trim()} › ${entry.key}',
+                            title: subPlTitle,
                             description: 'Sub-folder collection (${entry.value.length} tracks)',
                             coverUrl: entry.value.first.coverUrl,
                             songs: entry.value,
@@ -1121,22 +1180,22 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                         // Master playlist containing all songs of root folder
                         newGeneratedPlaylists.add(Playlist(
                           id: 'pl_${DateTime.now().millisecondsSinceEpoch}',
-                          title: playlistTitleCtrl.text.trim(),
+                          title: rootTitle,
                           description: 'Full folder collection (${uploadedSongsList.length} tracks)',
                           coverUrl: uploadedSongsList.first.coverUrl,
                           songs: uploadedSongsList,
                         ));
 
+                        // 1. Add to Cloud Backend (persists to R2 db/playlists.json for all users!)
+                        for (final pl in newGeneratedPlaylists) {
+                          await _backend.addCloudPlaylist(pl);
+                        }
+
+                        // 2. Save locally
                         final updated = [...newGeneratedPlaylists, ...existingPlaylists];
                         await storage.saveCustomPlaylists(updated);
-
-                        // Also persist playlists to Cloudflare R2 so all devices receive them!
-                        try {
-                          final plJson = jsonEncode(updated.map((p) => p.toJson()).toList());
-                          await r2.putString('db/playlists.json', plJson);
-                        } catch (_) {}
                       } catch (pe) {
-                        debugPrint('Playlist create error: $pe');
+                        debugPrint('Playlist auto-create error: $pe');
                       }
                     }
                   } finally {
@@ -2029,6 +2088,161 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
               ],
             ),
           ),
+
+          // Sticky Persistent Audio Preview Player with Seek Scrubber
+          if (_currentlyPlayingSongId != null)
+            _buildStickyPreviewBottomBar(approved, pending),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStickyPreviewBottomBar(List<Song> approved, List<Song> pending) {
+    final allSongs = [...approved, ...pending];
+    final song = allSongs.firstWhere(
+      (s) => s.id == _currentlyPlayingSongId,
+      orElse: () => Song(
+        id: _currentlyPlayingSongId ?? 'preview',
+        title: 'Audio Preview',
+        artist: 'Msixa Music',
+        album: 'Live Preview',
+        duration: 0,
+        streamUrl: '',
+        coverUrl: '',
+      ),
+    );
+
+    final maxMs = _previewDuration.inMilliseconds > 0 ? _previewDuration.inMilliseconds.toDouble() : 1.0;
+    final currMs = _previewPosition.inMilliseconds.clamp(0, maxMs.toInt()).toDouble();
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A),
+        border: Border(top: BorderSide(color: const Color(0xFFFFB300).withOpacity(0.6), width: 1.5)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.6),
+            blurRadius: 16,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Interactive Seek Scrubber
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              trackHeight: 3,
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+              overlayShape: const RoundSliderOverlayShape(overlayRadius: 10),
+              activeTrackColor: const Color(0xFFFFB300),
+              inactiveTrackColor: Colors.white24,
+              thumbColor: const Color(0xFFFFB300),
+            ),
+            child: Slider(
+              value: currMs,
+              max: maxMs,
+              onChanged: (val) => _seekPreview(Duration(milliseconds: val.toInt())),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 12, 10),
+            child: Row(
+              children: [
+                SongThumbnailWidget(
+                  song: song,
+                  size: 44,
+                  borderRadius: 8,
+                  isPlaying: _isPlaying,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        song.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          Text(
+                            _formatPreviewDuration(_previewPosition),
+                            style: const TextStyle(
+                              color: Color(0xFFFFB300),
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            ' / ${_formatPreviewDuration(_previewDuration)}',
+                            style: const TextStyle(
+                              color: Colors.white60,
+                              fontSize: 10,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              '• ${song.artist}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white54,
+                                fontSize: 10,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                // Rewind 10s
+                IconButton(
+                  icon: const Icon(Icons.replay_10_rounded, color: Colors.white70, size: 22),
+                  tooltip: '10s पीछे करें (Rewind 10s)',
+                  onPressed: () => _seekPreviewRelative(-10),
+                  visualDensity: VisualDensity.compact,
+                ),
+                // Play / Pause
+                IconButton(
+                  icon: Icon(
+                    _isPlaying ? Icons.pause_circle_filled_rounded : Icons.play_circle_fill_rounded,
+                    color: const Color(0xFFFFB300),
+                    size: 34,
+                  ),
+                  tooltip: _isPlaying ? 'रोकें (Pause)' : 'चलाएं (Play)',
+                  onPressed: () => _playSongPreview(song),
+                  visualDensity: VisualDensity.compact,
+                ),
+                // Forward 10s
+                IconButton(
+                  icon: const Icon(Icons.forward_10_rounded, color: Colors.white70, size: 22),
+                  tooltip: '10s आगे करें (Forward 10s)',
+                  onPressed: () => _seekPreviewRelative(10),
+                  visualDensity: VisualDensity.compact,
+                ),
+                // Close
+                IconButton(
+                  icon: const Icon(Icons.close_rounded, color: Colors.white54, size: 18),
+                  tooltip: 'बंद करें (Close)',
+                  onPressed: _stopSongPreview,
+                  visualDensity: VisualDensity.compact,
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -2152,6 +2366,50 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
               const SizedBox(height: 12),
               const Divider(color: Colors.white10, height: 1),
               const SizedBox(height: 10),
+
+              // Inline Preview Scrubber & Time Display when playing
+              if (isThisPlaying) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  margin: const EdgeInsets.only(bottom: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.45),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFFFB300).withOpacity(0.4)),
+                  ),
+                  child: Row(
+                    children: [
+                      Text(
+                        _formatPreviewDuration(_previewPosition),
+                        style: const TextStyle(color: Color(0xFFFFB300), fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
+                      Expanded(
+                        child: SliderTheme(
+                          data: SliderTheme.of(context).copyWith(
+                            trackHeight: 3,
+                            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                            overlayShape: const RoundSliderOverlayShape(overlayRadius: 10),
+                            activeTrackColor: const Color(0xFFFFB300),
+                            inactiveTrackColor: Colors.white24,
+                            thumbColor: const Color(0xFFFFB300),
+                          ),
+                          child: Slider(
+                            value: _previewDuration.inMilliseconds > 0
+                                ? _previewPosition.inMilliseconds.clamp(0, _previewDuration.inMilliseconds).toDouble()
+                                : 0.0,
+                            max: _previewDuration.inMilliseconds > 0 ? _previewDuration.inMilliseconds.toDouble() : 1.0,
+                            onChanged: (val) => _seekPreview(Duration(milliseconds: val.toInt())),
+                          ),
+                        ),
+                      ),
+                      Text(
+                        _formatPreviewDuration(_previewDuration),
+                        style: const TextStyle(color: Colors.white60, fontSize: 10),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
 
               // Action Buttons
               Row(
@@ -3345,6 +3603,40 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                     ),
                   ],
                 ),
+                if (isThisPlaying) ...[
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Text(
+                        _formatPreviewDuration(_previewPosition),
+                        style: const TextStyle(color: Color(0xFFFFB300), fontSize: 9, fontWeight: FontWeight.bold),
+                      ),
+                      Expanded(
+                        child: SliderTheme(
+                          data: SliderTheme.of(context).copyWith(
+                            trackHeight: 2,
+                            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
+                            overlayShape: const RoundSliderOverlayShape(overlayRadius: 8),
+                            activeTrackColor: const Color(0xFFFFB300),
+                            inactiveTrackColor: Colors.white24,
+                            thumbColor: const Color(0xFFFFB300),
+                          ),
+                          child: Slider(
+                            value: _previewDuration.inMilliseconds > 0
+                                ? _previewPosition.inMilliseconds.clamp(0, _previewDuration.inMilliseconds).toDouble()
+                                : 0.0,
+                            max: _previewDuration.inMilliseconds > 0 ? _previewDuration.inMilliseconds.toDouble() : 1.0,
+                            onChanged: (val) => _seekPreview(Duration(milliseconds: val.toInt())),
+                          ),
+                        ),
+                      ),
+                      Text(
+                        _formatPreviewDuration(_previewDuration),
+                        style: const TextStyle(color: Colors.white60, fontSize: 9),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),

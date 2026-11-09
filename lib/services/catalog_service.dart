@@ -3,6 +3,8 @@ import 'package:http/http.dart' as http;
 import '../models/song.dart';
 import '../models/playlist.dart';
 import 'cloud_backend_service.dart';
+import 'ai_artwork_service.dart';
+import 'ai_music_service.dart';
 
 class CatalogService {
   static const String _jamendoClientId = '56d30c95';
@@ -266,7 +268,8 @@ class CatalogService {
         map[s.id] = s;
       }
     }
-    return map.values.toList();
+    final list = map.values.toList();
+    return AiMusicService().cleanAndOptimizeAll(list);
   }
 
   /// Filter tracks by selected genre
@@ -367,7 +370,58 @@ class CatalogService {
       ));
     }
 
-    // Dynamically generate playlists for all Admin-uploaded categories and sub-categories!
+    // 0. Include all remote Cloud Playlists uploaded to R2 db/playlists.json
+    final Set<String> registeredPlaylistTitles = {};
+    for (final pl in backend.cloudPlaylists) {
+      if (pl.songs.isNotEmpty && registeredPlaylistTitles.add(pl.title.toLowerCase().trim())) {
+        playlists.add(pl);
+      }
+    }
+
+    // 1. Group by Folders / Sub-Categories (Admin multi-folder & folder uploads)
+    final Map<String, List<Song>> folderMap = {};
+    for (final s in baseSongs) {
+      final cleanedSong = AiMusicService().cleanAndOptimizeSong(s);
+
+      // Check subCategory (sub-folder name)
+      final sub = cleanedSong.subCategory?.trim();
+      if (sub != null && sub.isNotEmpty && sub.toLowerCase() != cleanedSong.genre.toLowerCase()) {
+        folderMap.putIfAbsent(sub, () => []).add(cleanedSong);
+      }
+
+      // Check album if not generic (root folder name)
+      final album = cleanedSong.album.trim();
+      final isGenericAlbum = album.isEmpty ||
+          album.toLowerCase() == 'msixa library' ||
+          album.toLowerCase() == 'unknown album' ||
+          album.toLowerCase() == 'msixa cloud hits' ||
+          album.toLowerCase() == 'jamendo free catalog' ||
+          album.toLowerCase().endsWith('essentials');
+      if (!isGenericAlbum && album != sub) {
+        folderMap.putIfAbsent(album, () => []).add(cleanedSong);
+      }
+    }
+
+    // Add each discovered folder as an auto-created playlist
+    for (final entry in folderMap.entries) {
+      final title = '📁 ${entry.key}';
+      if (entry.value.isNotEmpty && registeredPlaylistTitles.add(title.toLowerCase().trim())) {
+        final cover = entry.value.firstWhere(
+          (s) => s.coverUrl.trim().startsWith('http'),
+          orElse: () => entry.value.first,
+        ).coverUrl;
+
+        playlists.insert(0, Playlist(
+          id: 'pl_folder_${entry.key.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_')}',
+          title: title,
+          description: 'Folder collection (${entry.value.length} tracks)',
+          coverUrl: cover.startsWith('http') ? cover : AiArtworkService().getAiCoverForSong(entry.value.first),
+          songs: entry.value,
+        ));
+      }
+    }
+
+    // 2. Group custom genres
     final knownPlaylistGenreSet = {
       'rajasthani',
       'bhakti',
@@ -381,42 +435,26 @@ class CatalogService {
       'ghazal',
     };
 
-    // 1. Group custom genres
     final Map<String, List<Song>> customGenreMap = {};
     for (final s in baseSongs) {
       final g = s.genre.trim();
       if (g.isNotEmpty && !knownPlaylistGenreSet.contains(g.toLowerCase())) {
-        customGenreMap.putIfAbsent(g, () => []).add(s);
+        customGenreMap.putIfAbsent(g, () => []).add(AiMusicService().cleanAndOptimizeSong(s));
       }
     }
     for (final entry in customGenreMap.entries) {
-      if (entry.value.isNotEmpty) {
+      final title = '🎵 ${entry.key}';
+      if (entry.value.isNotEmpty && registeredPlaylistTitles.add(title.toLowerCase().trim())) {
+        final cover = entry.value.firstWhere(
+          (s) => s.coverUrl.trim().startsWith('http'),
+          orElse: () => entry.value.first,
+        ).coverUrl;
+
         playlists.add(Playlist(
           id: 'pl_custom_${entry.key.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_')}',
-          title: '🎵 ${entry.key}',
+          title: title,
           description: '${entry.value.length} tracks • ${entry.key}',
-          coverUrl: entry.value.first.coverUrl ?? 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&q=80',
-          songs: entry.value,
-        ));
-      }
-    }
-
-    // 2. Group sub-categories (sub-folders from admin folder upload!)
-    final Map<String, List<Song>> subCategoryMap = {};
-    for (final s in baseSongs) {
-      final sub = s.subCategory?.trim();
-      if (sub != null && sub.isNotEmpty) {
-        final key = '${s.genre} › $sub';
-        subCategoryMap.putIfAbsent(key, () => []).add(s);
-      }
-    }
-    for (final entry in subCategoryMap.entries) {
-      if (entry.value.isNotEmpty) {
-        playlists.add(Playlist(
-          id: 'pl_sub_${entry.key.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_')}',
-          title: '📁 ${entry.key}',
-          description: '${entry.value.length} tracks • ${entry.key}',
-          coverUrl: entry.value.first.coverUrl ?? 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&q=80',
+          coverUrl: cover.startsWith('http') ? cover : AiArtworkService().getAiCoverForSong(entry.value.first),
           songs: entry.value,
         ));
       }

@@ -3,12 +3,15 @@ import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 import '../models/song.dart';
 import '../models/playlist.dart';
+import '../models/artist.dart';
+import '../models/album.dart';
 import '../models/equalizer_preset.dart';
 import '../services/audio_player_service.dart';
 import '../services/catalog_service.dart';
 import '../services/storage_service.dart';
 import '../services/device_audio_service.dart';
 import '../services/cloud_backend_service.dart';
+import '../services/ai_music_service.dart';
 
 class PlayerProvider extends ChangeNotifier {
   final AudioPlayerService _audioService = AudioPlayerService();
@@ -63,6 +66,8 @@ class PlayerProvider extends ChangeNotifier {
 
   List<Song> get trendingSongs => _trendingSongs;
   List<Playlist> get curatedPlaylists => _curatedPlaylists;
+  List<Artist> get artists => AiMusicService().extractArtists(_trendingSongs);
+  List<Album> get albums => AiMusicService().extractAlbums(_trendingSongs);
   List<Song> get searchResults => _searchResults;
   List<Song> get favorites => _favorites;
   List<Song> get recentlyPlayed => _recentlyPlayed;

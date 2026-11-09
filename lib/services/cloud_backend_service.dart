@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import '../models/user_profile.dart';
 import '../models/song.dart';
+import '../models/playlist.dart';
 import 'catalog_service.dart';
 import 'r2_storage_service.dart';
 
@@ -21,6 +22,7 @@ class CloudBackendService extends ChangeNotifier {
   static const String _keyAllUsers = 'msixa_all_registered_users';
   static const String _keyCommunitySongs = 'msixa_community_songs';
   static const String _keyDeletedSongIds = 'msixa_deleted_song_ids_v1';
+  static const String _keyCloudPlaylists = 'msixa_cloud_playlists_v1';
   static const String _keyCatalogSeeded = 'msixa_catalog_seeded_v3';
   static const String _adminPin = '7777'; // Default Admin Master Key
 
@@ -55,10 +57,21 @@ class CloudBackendService extends ChangeNotifier {
     '/sdcard/Download/msixa_deleted_songs.json',
   ];
 
+  static final List<String> _sharedPlaylistFilePaths = [
+    '/data/data/com.msixa.player/files/msixa_shared_playlists.json',
+    '/data/data/com.msixa.admin/files/msixa_shared_playlists.json',
+    '/data/user/0/com.msixa.player/files/msixa_shared_playlists.json',
+    '/data/user/0/com.msixa.admin/files/msixa_shared_playlists.json',
+    '/data/data/com.msixa.msixa_player/files/msixa_shared_playlists.json',
+    '/storage/emulated/0/Download/msixa_shared_playlists.json',
+    '/sdcard/Download/msixa_shared_playlists.json',
+  ];
+
   UserProfile? _currentUser;
   final List<UserProfile> _allUsers = [];
   final List<Song> _communitySongs = [];
   final Set<String> _deletedSongIds = {};
+  final List<Playlist> _sharedPlaylists = [];
 
   // Temporary Verification State
   String? _generatedPhoneOtp;
@@ -95,6 +108,7 @@ class CloudBackendService extends ChangeNotifier {
     return list;
   }
   Set<String> get deletedSongIds => Set.unmodifiable(_deletedSongIds);
+  List<Playlist> get cloudPlaylists => List.unmodifiable(_sharedPlaylists);
 
   int get totalUsersCount => _allUsers.length;
   int get activeUsersCount {
@@ -161,9 +175,21 @@ class CloudBackendService extends ChangeNotifier {
       }
     }
 
+    // 3.5 Load Cached Cloud Playlists for instant offline display
+    final plRaw = prefs.getStringList(_keyCloudPlaylists);
+    _sharedPlaylists.clear();
+    if (plRaw != null) {
+      for (final raw in plRaw) {
+        try {
+          _sharedPlaylists.add(Playlist.fromJson(jsonDecode(raw)));
+        } catch (_) {}
+      }
+    }
+
     // 4. Synchronize with Cloudflare R2 Remote Cloud Database FIRST!
     await _loadSharedUsers();
     await _loadSharedSongs();
+    await _loadSharedPlaylists();
 
     // 5. Seed initial curated catalog ONLY if BOTH local and cloud are completely empty
     final isCatalogSeeded = prefs.getBool(_keyCatalogSeeded) ?? false;
@@ -897,7 +923,8 @@ class CloudBackendService extends ChangeNotifier {
     try {
       final usersChanged = await _loadSharedUsers();
       final songsChanged = await _loadSharedSongs();
-      if (usersChanged || songsChanged) {
+      final playlistsChanged = await _loadSharedPlaylists();
+      if (usersChanged || songsChanged || playlistsChanged) {
         notifyListeners();
       }
     } catch (e) {
@@ -906,6 +933,8 @@ class CloudBackendService extends ChangeNotifier {
       _isSyncing = false;
     }
   }
+
+  Future<void> syncWithCloud() async => await syncSharedData();
 
   Future<bool> _loadSharedUsers() async {
     bool hasChanges = false;
@@ -1089,6 +1118,108 @@ class CloudBackendService extends ChangeNotifier {
       }
     } catch (_) {}
     return hasChanges;
+  }
+
+  Future<bool> _loadSharedPlaylists() async {
+    bool hasChanges = false;
+
+    // 1. Local Shared Files
+    for (final path in _sharedPlaylistFilePaths) {
+      try {
+        final file = File(path);
+        if (await file.exists()) {
+          final content = await file.readAsString();
+          if (content.trim().isNotEmpty) {
+            if (_mergePlaylistsFromJson(content)) hasChanges = true;
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 2. Cloudflare R2 Remote db/playlists.json
+    try {
+      final r2 = R2StorageService();
+      if (r2.isConfigured) {
+        final cloudJson = await r2.getString('db/playlists.json');
+        if (cloudJson != null && cloudJson.trim().isNotEmpty) {
+          if (_mergePlaylistsFromJson(cloudJson)) hasChanges = true;
+        }
+      }
+    } catch (_) {}
+
+    if (hasChanges) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setStringList(
+          _keyCloudPlaylists,
+          _sharedPlaylists.map((p) => jsonEncode(p.toJson())).toList(),
+        );
+      } catch (_) {}
+    }
+
+    return hasChanges;
+  }
+
+  bool _mergePlaylistsFromJson(String content) {
+    bool hasChanges = false;
+    try {
+      final List<dynamic> jsonList = jsonDecode(content);
+      for (final item in jsonList) {
+        try {
+          final pl = Playlist.fromJson(item as Map<String, dynamic>);
+          // Filter any deleted songs from playlist
+          pl.songs.removeWhere((s) => _deletedSongIds.contains(s.id));
+          if (pl.songs.isEmpty) continue;
+
+          final idx = _sharedPlaylists.indexWhere((p) => p.id == pl.id || p.title.toLowerCase() == pl.title.toLowerCase());
+          if (idx == -1) {
+            _sharedPlaylists.add(pl);
+            hasChanges = true;
+          } else {
+            if (_sharedPlaylists[idx].songs.length != pl.songs.length) {
+              _sharedPlaylists[idx] = pl;
+              hasChanges = true;
+            }
+          }
+        } catch (_) {}
+      }
+    } catch (_) {}
+    return hasChanges;
+  }
+
+  /// Add or update a cloud playlist and persist to R2 & local shared storage
+  Future<void> addCloudPlaylist(Playlist playlist) async {
+    final idx = _sharedPlaylists.indexWhere((p) => p.id == playlist.id || p.title.toLowerCase() == playlist.title.toLowerCase());
+    if (idx != -1) {
+      _sharedPlaylists[idx] = playlist;
+    } else {
+      _sharedPlaylists.insert(0, playlist);
+    }
+    await _persistPlaylists();
+    notifyListeners();
+  }
+
+  Future<void> _persistPlaylists() async {
+    final jsonStr = jsonEncode(_sharedPlaylists.map((p) => p.toJson()).toList());
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_keyCloudPlaylists, _sharedPlaylists.map((p) => jsonEncode(p.toJson())).toList());
+
+    for (final path in _sharedPlaylistFilePaths) {
+      try {
+        final file = File(path);
+        if (!await file.parent.exists()) await file.parent.create(recursive: true);
+        await file.writeAsString(jsonStr, flush: true);
+      } catch (_) {}
+    }
+
+    if (isAdmin || _currentUser?.role == 'admin') {
+      try {
+        final r2 = R2StorageService();
+        if (r2.isConfigured) {
+          await r2.putString('db/playlists.json', jsonStr);
+        }
+      } catch (_) {}
+    }
   }
 
   // ==========================================
