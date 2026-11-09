@@ -255,6 +255,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                           final isCurrent = isUploading && currentIndex == idx;
                           final isDone = isUploading && idx < currentIndex;
                           final mb = (f.size / (1024 * 1024)).toStringAsFixed(1);
+                          final cleanName = f.name.replaceAll(RegExp(r'\.[a-zA-Z0-9]+$'), '').replaceAll('_', ' ');
+                          final isDup = _backend.checkDuplicateSong(title: cleanName, artist: '') != null;
 
                           return Padding(
                             padding: const EdgeInsets.symmetric(vertical: 2),
@@ -265,26 +267,41 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                                       ? Icons.check_circle_rounded
                                       : isCurrent
                                           ? Icons.cloud_upload_rounded
-                                          : Icons.music_note_rounded,
+                                          : (isDup ? Icons.warning_amber_rounded : Icons.music_note_rounded),
                                   size: 14,
                                   color: isDone
                                       ? Colors.greenAccent
                                       : isCurrent
                                           ? const Color(0xFF00E5FF)
-                                          : Colors.grey,
+                                          : (isDup ? Colors.amberAccent : Colors.grey),
                                 ),
                                 const SizedBox(width: 6),
                                 Expanded(
                                   child: Text(
                                     f.name,
                                     style: TextStyle(
-                                      color: isCurrent ? const Color(0xFF00E5FF) : Colors.white70,
+                                      color: isCurrent
+                                          ? const Color(0xFF00E5FF)
+                                          : (isDup ? Colors.amberAccent : Colors.white70),
                                       fontSize: 11,
                                     ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
+                                if (isDup && !isDone)
+                                  Container(
+                                    margin: const EdgeInsets.only(right: 6),
+                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                    decoration: BoxDecoration(
+                                      color: Colors.amber.withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: const Text(
+                                      'Duplicate',
+                                      style: TextStyle(color: Colors.amberAccent, fontSize: 9, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
                                 Text('$mb MB', style: const TextStyle(color: Colors.grey, fontSize: 10)),
                               ],
                             ),
@@ -340,20 +357,40 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
 
                   final r2 = R2StorageService();
                   int successCount = 0;
+                  int skippedCount = 0;
+                  final Set<String> batchUploadedTitles = {};
 
                   for (int i = 0; i < pickedFiles.length; i++) {
                     final pf = pickedFiles[i];
                     if (pf.path == null) continue;
 
+                    final cleanName = pf.name.replaceAll(RegExp(r'\.[a-zA-Z0-9]+$'), '').replaceAll('_', ' ');
+
+                    // Strict Duplicate Check: Skip if already in catalog or in current upload batch
+                    final duplicate = _backend.checkDuplicateSong(title: cleanName, artist: '');
+                    final isBatchDup = batchUploadedTitles.contains(CloudBackendService.normalizeTitle(cleanName));
+
+                    if (duplicate != null || isBatchDup) {
+                      skippedCount++;
+                      setDialogState(() {
+                        currentIndex = i;
+                        currentTrackProgress = 1.0;
+                        statusMessage = '⚠️ स्किप किया (Duplicate): $cleanName (पहले से मौजूद)';
+                      });
+                      await Future.delayed(const Duration(milliseconds: 250));
+                      continue;
+                    }
+
+                    batchUploadedTitles.add(CloudBackendService.normalizeTitle(cleanName));
+
                     setDialogState(() {
                       currentIndex = i;
                       currentTrackProgress = 0.1;
-                      statusMessage = 'अपलोड हो रहा है (${i + 1}/${pickedFiles.length}): ${pf.name}...';
+                      statusMessage = 'अपलोड हो रहा है (${i + 1}/${pickedFiles.length}): $cleanName...';
                     });
 
                     try {
                       final file = File(pf.path!);
-                      final cleanName = pf.name.replaceAll(RegExp(r'\.[a-zA-Z0-9]+$'), '').replaceAll('_', ' ');
 
                       final cloudUrl = await r2.uploadAudioFile(
                         file,
@@ -379,9 +416,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                   if (mounted) {
                     Navigator.pop(ctx);
                     setState(() {});
+                    final summaryMsg = skippedCount > 0
+                        ? '🎉 $successCount गाने लाइव हुए • ⚠️ $skippedCount डुप्लीकेट गाने स्किप कर दिए गए!'
+                        : '🎉 $successCount / ${pickedFiles.length} गाने Cloudflare R2 पर सफलतापूर्वक लाइव हो गए!';
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('🎉 $successCount / ${pickedFiles.length} गाने Cloudflare R2 पर सफलतापूर्वक लाइव हो गए!'),
+                        content: Text(summaryMsg),
                         backgroundColor: const Color(0xFF10B981),
                         duration: const Duration(seconds: 4),
                       ),
@@ -512,19 +552,43 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFFB300), foregroundColor: Colors.black),
               onPressed: () async {
-                if (titleCtrl.text.trim().isEmpty || artistCtrl.text.trim().isEmpty) return;
-                await _backend.addAdminSong(
-                  title: titleCtrl.text,
-                  artist: artistCtrl.text,
-                  album: albumCtrl.text,
-                  genre: selectedGenre,
-                  audioPath: audioCtrl.text.trim().isNotEmpty ? audioCtrl.text.trim() : 'assets/audio/sankat_mochan_hanuman_ashtak.mp3',
-                  coverUrl: coverCtrl.text.trim().isNotEmpty ? coverCtrl.text.trim() : null,
-                );
-                if (mounted) {
-                  Navigator.pop(ctx);
+                final title = titleCtrl.text.trim();
+                final artist = artistCtrl.text.trim();
+                if (title.isEmpty || artist.isEmpty) return;
+
+                final duplicate = _backend.checkDuplicateSong(title: title, artist: artist);
+                if (duplicate != null) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('🎉 "${titleCtrl.text}" ${_lang.isHindi ? "सफलतापूर्वक लाइव कर दिया गया!" : "successfully published live!"}')),
+                    SnackBar(
+                      content: Text(
+                        _lang.isHindi
+                            ? '⚠️ गाना "$title" पहले से मौजूद है! डुप्लीकेट गाना लाइव नहीं किया जा सकता।'
+                            : '⚠️ Song "$title" already exists in library! Duplicates not allowed.',
+                      ),
+                      backgroundColor: Colors.redAccent,
+                    ),
+                  );
+                  return;
+                }
+
+                try {
+                  await _backend.addAdminSong(
+                    title: title,
+                    artist: artist,
+                    album: albumCtrl.text,
+                    genre: selectedGenre,
+                    audioPath: audioCtrl.text.trim().isNotEmpty ? audioCtrl.text.trim() : 'assets/audio/sankat_mochan_hanuman_ashtak.mp3',
+                    coverUrl: coverCtrl.text.trim().isNotEmpty ? coverCtrl.text.trim() : null,
+                  );
+                  if (mounted) {
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('🎉 "$title" ${_lang.isHindi ? "सफलतापूर्वक लाइव कर दिया गया!" : "successfully published live!"}')),
+                    );
+                  }
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error: $e'), backgroundColor: Colors.redAccent),
                   );
                 }
               },

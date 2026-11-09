@@ -138,11 +138,19 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
       return;
     }
     if (artist.isEmpty) {
-      setState(() => _errorMessage = 'गायक या आर्टिस्ट का नाम (Artist) दर्ज करें');
+      setState(() => _errorMessage = _lang.isHindi ? 'गायक या आर्टिस्ट का नाम (Artist) दर्ज करें' : 'Please enter artist / singer name');
       return;
     }
-    if (_duplicateMatch != null) {
-      setState(() => _errorMessage = 'यह गाना पहले से मौजूद है, इसे दोबारा अपलोड नहीं किया जा सकता।');
+
+    final duplicate = _backend.checkDuplicateSong(title: title, artist: artist);
+    if (duplicate != null || _duplicateMatch != null) {
+      final dup = duplicate ?? _duplicateMatch!;
+      setState(() {
+        _duplicateMatch = dup;
+        _errorMessage = _lang.isHindi
+            ? '⚠️ गाना "${dup.title}" पहले से मौजूद है! डुप्लीकेट गाना अपलोड नहीं किया जा सकता।'
+            : '⚠️ Song "${dup.title}" already exists in catalog! Duplicates cannot be uploaded.';
+      });
       return;
     }
 

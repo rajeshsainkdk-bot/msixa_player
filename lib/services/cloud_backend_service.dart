@@ -468,21 +468,47 @@ class CloudBackendService extends ChangeNotifier {
   // SONG UPLOAD & DUPLICATE DETECTION
   // ==========================================
 
-  /// Check if a song already exists in catalog or community songs
-  Song? checkDuplicateSong({required String title, required String artist}) {
-    final cleanTitle = title.toLowerCase().trim();
-    final cleanArtist = artist.toLowerCase().trim();
+  /// Normalizes a song title for strict duplicate detection:
+  /// - Strips file extensions (.mp3, .m4a, .wav)
+  /// - Strips parenthesized / bracketed tags [Audio], (Official Video), (Lofi)
+  /// - Removes all symbols, spaces, hyphens, underscores
+  /// - Lowercases everything
+  static String normalizeTitle(String title) {
+    return title
+        .toLowerCase()
+        .replaceAll(RegExp(r'\.[a-zA-Z0-9]+$'), '')
+        .replaceAll(RegExp(r'[\(\[\{].*?[\)\]\}]'), '')
+        .replaceAll(RegExp(r'[^a-z0-9\u0900-\u097F]'), '')
+        .trim();
+  }
 
-    if (cleanTitle.isEmpty) return null;
+  /// Check if a song already exists in catalog or community songs (ignoring deleted songs)
+  Song? checkDuplicateSong({required String title, String? artist}) {
+    final cleanInput = normalizeTitle(title);
+    if (cleanInput.isEmpty || cleanInput.length < 3) return null;
 
-    for (final song in _communitySongs) {
-      final sTitle = song.title.toLowerCase();
-      final sArtist = song.artist.toLowerCase();
+    final allActiveSongs = <Song>[];
+    // Add all community approved and pending songs (excluding deleted ones)
+    for (final s in _communitySongs) {
+      if (!_deletedSongIds.contains(s.id)) {
+        allActiveSongs.add(s);
+      }
+    }
+    // Also include curated catalog tracks (excluding deleted ones)
+    for (final s in CatalogService.getCuratedSongs()) {
+      if (!_deletedSongIds.contains(s.id) && !allActiveSongs.any((existing) => existing.id == s.id)) {
+        allActiveSongs.add(s);
+      }
+    }
 
-      if (sTitle == cleanTitle ||
-          (sTitle.contains(cleanTitle) && cleanTitle.length > 4) ||
-          (cleanTitle.contains(sTitle) && sTitle.length > 4)) {
-        if (cleanArtist.isEmpty || sArtist.contains(cleanArtist) || cleanArtist.contains(sArtist)) {
+    for (final song in allActiveSongs) {
+      final sNorm = normalizeTitle(song.title);
+      if (sNorm == cleanInput) {
+        return song;
+      }
+      // If either title is long enough and contains the other
+      if (cleanInput.length >= 6 && sNorm.length >= 6) {
+        if (sNorm.contains(cleanInput) || cleanInput.contains(sNorm)) {
           return song;
         }
       }
@@ -500,6 +526,11 @@ class CloudBackendService extends ChangeNotifier {
     required String audioPath,
     String? coverUrl,
   }) async {
+    final duplicate = checkDuplicateSong(title: title, artist: artist);
+    if (duplicate != null) {
+      throw 'DUPLICATE_SONG: "${duplicate.title}" already exists in the catalog';
+    }
+
     final songId = 'user_song_${DateTime.now().millisecondsSinceEpoch}';
     final song = Song(
       id: songId,
@@ -538,6 +569,11 @@ class CloudBackendService extends ChangeNotifier {
     required String audioPath,
     String? coverUrl,
   }) async {
+    final duplicate = checkDuplicateSong(title: title, artist: artist);
+    if (duplicate != null) {
+      throw 'DUPLICATE_SONG: "${duplicate.title}" already exists in the catalog';
+    }
+
     final songId = 'admin_song_${DateTime.now().millisecondsSinceEpoch}';
     final song = Song(
       id: songId,
