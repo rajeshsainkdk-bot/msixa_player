@@ -78,7 +78,7 @@ class MiniPlayer extends StatelessWidget {
                               song: currentSong,
                               size: 46,
                               borderRadius: 12,
-                              isPlaying: isPlaying,
+                              isPlaying: provider.isPlaying,
                               showVisualizerWhenPlaying: false,
                             ),
                           ),

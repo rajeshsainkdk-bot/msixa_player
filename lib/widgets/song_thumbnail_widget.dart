@@ -184,7 +184,7 @@ class SongThumbnailWidget extends StatelessWidget {
                         fontWeight: FontWeight.w900,
                         shadows: const [
                           Shadow(
-                            color: Colors.black80,
+                            color: Colors.black87,
                             blurRadius: 4,
                             offset: Offset(0, 1),
                           ),
