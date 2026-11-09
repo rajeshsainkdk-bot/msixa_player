@@ -22,7 +22,7 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
   final _albumCtrl = TextEditingController();
   final _coverUrlCtrl = TextEditingController();
 
-  String _selectedGenre = 'Bhakti';
+  String _selectedGenre = 'Rajasthani';
   String? _pickedFilePath;
   String? _pickedFileName;
   int? _pickedFileSize;
@@ -34,12 +34,16 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
   String? _errorMessage;
 
   final List<String> _genres = [
+    'Rajasthani',
     'Bhakti',
-    'Sufi',
+    'Haryanvi',
     'Punjabi',
+    'Sufi',
     'Bollywood',
     'Desi Lo-Fi',
     'Ghazal',
+    'DJ Remix',
+    'Bhojpuri',
     'Spiritual',
     'Folk Fusion',
     'Classical',

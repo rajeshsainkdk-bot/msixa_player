@@ -26,6 +26,23 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
   final _player = AudioPlayer();
   late TabController _tabController;
 
+  static const List<String> _allGenres = [
+    'Rajasthani',
+    'Bhakti',
+    'Haryanvi',
+    'Punjabi',
+    'Sufi',
+    'Bollywood',
+    'Desi Lo-Fi',
+    'Ghazal',
+    'DJ Remix',
+    'Bhojpuri',
+    'Spiritual',
+    'Folk Fusion',
+    'Classical',
+    'Pop / Indie',
+  ];
+
   String? _currentlyPlayingSongId;
   bool _isPlaying = false;
   String _userSearchQuery = '';
@@ -124,8 +141,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
     int currentIndex = 0;
     double currentTrackProgress = 0.0;
     String statusMessage = '';
-    String selectedGenre = 'Bhakti';
-    final genres = ['Bhakti', 'Punjabi', 'Sufi', 'Bollywood', 'Spiritual', 'Desi Lo-Fi', 'Ghazal', 'Indie Pop'];
+    String selectedGenre = 'Rajasthani';
+    final genres = List<String>.from(_allGenres);
 
     showDialog(
       context: context,
@@ -384,8 +401,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
     final albumCtrl = TextEditingController(text: 'Msixa Originals');
     final audioCtrl = TextEditingController();
     final coverCtrl = TextEditingController();
-    String selectedGenre = 'Bhakti';
-    final genres = ['Bhakti', 'Punjabi', 'Sufi', 'Bollywood', 'Spiritual', 'Desi Lo-Fi', 'Ghazal', 'Indie Pop'];
+    String selectedGenre = 'Rajasthani';
+    final genres = List<String>.from(_allGenres);
     bool isUploadingToR2 = false;
 
     showDialog(
@@ -526,7 +543,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
     final audioCtrl = TextEditingController(text: song.streamUrl);
     final coverCtrl = TextEditingController(text: song.coverUrl);
     String selectedGenre = song.genre;
-    final genres = ['Bhakti', 'Punjabi', 'Sufi', 'Bollywood', 'Spiritual', 'Desi Lo-Fi', 'Ghazal', 'Indie Pop'];
+    final genres = List<String>.from(_allGenres);
     if (!genres.contains(selectedGenre)) genres.add(selectedGenre);
 
     showDialog(
@@ -1494,6 +1511,70 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                   icon: const Icon(Icons.add_rounded, size: 16),
                   label: Text(_lang.t('add_song_admin'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                   onPressed: _showAddSongDialog,
+                ),
+                const SizedBox(width: 8),
+
+                // Clear All Live Songs (Permanent Purge)
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFDC2626),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    elevation: 0,
+                  ),
+                  icon: const Icon(Icons.delete_sweep_rounded, size: 16),
+                  label: Text(_lang.isHindi ? 'सभी हटाएं' : 'Clear All', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                  onPressed: songs.isEmpty
+                      ? null
+                      : () async {
+                          final confirm = await showDialog<bool>(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              backgroundColor: const Color(0xFF131A2A),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              title: Row(
+                                children: [
+                                  const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 24),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    _lang.isHindi ? 'सभी गाने हटाएं?' : 'Delete All Songs?',
+                                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                                  ),
+                                ],
+                              ),
+                              content: Text(
+                                _lang.isHindi
+                                    ? 'क्या आप सचमुच सभी गानों को हटाना चाहते हैं? इसके बाद ऐप में कोई भी गाना (डिफ़ॉल्ट 17 गानों सहित) ऐप दोबारा खोलने पर भी वापस नहीं आएगा।'
+                                    : 'Are you sure you want to delete all songs? All tracks including default 17 tracks will be permanently removed and will not return on restart.',
+                                style: const TextStyle(color: Colors.white70, fontSize: 13),
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(ctx, false),
+                                  child: Text(_lang.t('cancel'), style: const TextStyle(color: Colors.grey)),
+                                ),
+                                ElevatedButton(
+                                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFDC2626), foregroundColor: Colors.white),
+                                  onPressed: () => Navigator.pop(ctx, true),
+                                  child: Text(_lang.isHindi ? 'हाँ, सब हटाएं' : 'Yes, Delete All', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                ),
+                              ],
+                            ),
+                          );
+
+                          if (confirm == true) {
+                            await _backend.deleteAllApprovedSongs();
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(_lang.isHindi ? '✅ सभी गाने सफलतापूर्वक हटा दिए गए!' : '✅ All songs purged successfully!'),
+                                  backgroundColor: const Color(0xFFDC2626),
+                                ),
+                              );
+                            }
+                          }
+                        },
                 ),
               ],
             ),

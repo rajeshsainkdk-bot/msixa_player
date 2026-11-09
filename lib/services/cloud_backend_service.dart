@@ -20,6 +20,8 @@ class CloudBackendService extends ChangeNotifier {
   static const String _keyCurrentUser = 'msixa_current_user';
   static const String _keyAllUsers = 'msixa_all_registered_users';
   static const String _keyCommunitySongs = 'msixa_community_songs';
+  static const String _keyDeletedSongIds = 'msixa_deleted_song_ids_v1';
+  static const String _keyCatalogSeeded = 'msixa_catalog_seeded_v3';
   static const String _adminPin = '7777'; // Default Admin Master Key
 
   // Shared file paths across User App and Admin App
@@ -43,9 +45,20 @@ class CloudBackendService extends ChangeNotifier {
     '/sdcard/Download/msixa_shared_songs.json',
   ];
 
+  static final List<String> _sharedDeletedSongFilePaths = [
+    '/data/data/com.msixa.player/files/msixa_deleted_songs.json',
+    '/data/data/com.msixa.admin/files/msixa_deleted_songs.json',
+    '/data/user/0/com.msixa.player/files/msixa_deleted_songs.json',
+    '/data/user/0/com.msixa.admin/files/msixa_deleted_songs.json',
+    '/data/data/com.msixa.msixa_player/files/msixa_deleted_songs.json',
+    '/storage/emulated/0/Download/msixa_deleted_songs.json',
+    '/sdcard/Download/msixa_deleted_songs.json',
+  ];
+
   UserProfile? _currentUser;
   final List<UserProfile> _allUsers = [];
   final List<Song> _communitySongs = [];
+  final Set<String> _deletedSongIds = {};
 
   // Temporary Verification State
   String? _generatedPhoneOtp;
@@ -61,8 +74,9 @@ class CloudBackendService extends ChangeNotifier {
   String? get pendingPhone => _pendingPhone;
 
   List<UserProfile> get allUsers => List.unmodifiable(_allUsers);
-  List<Song> get pendingSongs => _communitySongs.where((s) => s.isPending).toList();
-  List<Song> get approvedSongs => _communitySongs.where((s) => s.isApproved).toList();
+  List<Song> get pendingSongs => _communitySongs.where((s) => s.isPending && !_deletedSongIds.contains(s.id)).toList();
+  List<Song> get approvedSongs => _communitySongs.where((s) => s.isApproved && !_deletedSongIds.contains(s.id)).toList();
+  Set<String> get deletedSongIds => Set.unmodifiable(_deletedSongIds);
 
   int get totalUsersCount => _allUsers.length;
   int get activeUsersCount {
@@ -110,19 +124,37 @@ class CloudBackendService extends ChangeNotifier {
       _allUsers.add(defaultAdmin);
     }
 
+    // 2.5 Load Deleted Song IDs (Tombstones so deleted songs NEVER resurrect)
+    final deletedRaw = prefs.getStringList(_keyDeletedSongIds) ?? [];
+    _deletedSongIds.clear();
+    _deletedSongIds.addAll(deletedRaw);
+
     // 3. Load Songs (Pending + Approved)
+    final isCatalogSeeded = prefs.getBool(_keyCatalogSeeded) ?? false;
     final songsRaw = prefs.getStringList(_keyCommunitySongs);
     _communitySongs.clear();
-    if (songsRaw != null && songsRaw.isNotEmpty) {
+    if (songsRaw != null) {
       for (final raw in songsRaw) {
         try {
-          _communitySongs.add(Song.fromJson(jsonDecode(raw)));
+          final s = Song.fromJson(jsonDecode(raw));
+          if (!_deletedSongIds.contains(s.id)) {
+            _communitySongs.add(s);
+          }
         } catch (_) {}
       }
-    } else {
-      // Seed with curated catalog so Admin can manage all songs!
-      _communitySongs.addAll(CatalogService.getCuratedSongs().map((s) => s.copyWith(status: 'approved')));
+    }
+
+    // Seed initial curated catalog ONLY ONCE on very first fresh install
+    if (!isCatalogSeeded && _deletedSongIds.isEmpty && _communitySongs.isEmpty) {
+      for (final s in CatalogService.getCuratedSongs()) {
+        if (!_deletedSongIds.contains(s.id) && !_communitySongs.any((existing) => existing.id == s.id)) {
+          _communitySongs.add(s.copyWith(status: 'approved'));
+        }
+      }
+      await prefs.setBool(_keyCatalogSeeded, true);
       await _persistSongs();
+    } else if (!isCatalogSeeded) {
+      await prefs.setBool(_keyCatalogSeeded, true);
     }
 
     // 4. Synchronize with cross-app shared storage on device
@@ -569,9 +601,26 @@ class CloudBackendService extends ChangeNotifier {
     }
   }
 
-  /// Reject / Delete a song from the platform permanently
+  /// Reject / Delete a song from the platform permanently (Guarantees it NEVER returns!)
   Future<void> rejectOrDeleteSong(String songId) async {
+    _deletedSongIds.add(songId);
     _communitySongs.removeWhere((s) => s.id == songId);
+    await _persistDeletedSongs();
+    await _persistSongs();
+    notifyListeners();
+  }
+
+  /// Delete ALL approved songs from platform (Permanent purge, won't restore on reopen)
+  Future<void> deleteAllApprovedSongs() async {
+    for (final s in _communitySongs) {
+      _deletedSongIds.add(s.id);
+    }
+    // Also mark all curated catalog IDs as deleted so they cannot re-seed
+    for (final s in CatalogService.getCuratedSongs()) {
+      _deletedSongIds.add(s.id);
+    }
+    _communitySongs.clear();
+    await _persistDeletedSongs();
     await _persistSongs();
     notifyListeners();
   }
@@ -579,6 +628,35 @@ class CloudBackendService extends ChangeNotifier {
   // ==========================================
   // STORAGE HELPERS
   // ==========================================
+
+  Future<void> _persistDeletedSongs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(_keyDeletedSongIds, _deletedSongIds.toList());
+
+      final jsonContent = jsonEncode(_deletedSongIds.toList());
+
+      // 1. Sync to shared cross-app files on device
+      for (final path in _sharedDeletedSongFilePaths) {
+        try {
+          final file = File(path);
+          if (!await file.parent.exists()) {
+            await file.parent.create(recursive: true);
+          }
+          await file.writeAsString(jsonContent, flush: true);
+        } catch (_) {}
+      }
+
+      // 2. Sync to Cloudflare R2
+      final r2 = R2StorageService();
+      if (r2.isConfigured) {
+        await r2.putString('db/deleted_songs.json', jsonContent);
+        debugPrint('✅ Persisted ${_deletedSongIds.length} deleted song IDs to Cloudflare R2');
+      }
+    } catch (e) {
+      debugPrint('Error persisting deleted songs: $e');
+    }
+  }
 
   Future<void> _persistUsers() async {
     final prefs = await SharedPreferences.getInstance();
@@ -735,6 +813,47 @@ class CloudBackendService extends ChangeNotifier {
 
   Future<bool> _loadSharedSongs() async {
     bool hasChanges = false;
+
+    // 0. Sync Deleted Song IDs first (so any tombstoned song is never restored)
+    for (final path in _sharedDeletedSongFilePaths) {
+      try {
+        final file = File(path);
+        if (await file.exists()) {
+          final content = await file.readAsString();
+          if (content.trim().isNotEmpty) {
+            final List<dynamic> ids = jsonDecode(content);
+            for (final id in ids) {
+              if (id is String && id.trim().isNotEmpty) {
+                if (_deletedSongIds.add(id)) hasChanges = true;
+              }
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    try {
+      final r2 = R2StorageService();
+      if (r2.isConfigured) {
+        final cloudDeletedJson = await r2.getString('db/deleted_songs.json');
+        if (cloudDeletedJson != null && cloudDeletedJson.trim().isNotEmpty) {
+          final List<dynamic> ids = jsonDecode(cloudDeletedJson);
+          for (final id in ids) {
+            if (id is String && id.trim().isNotEmpty) {
+              if (_deletedSongIds.add(id)) hasChanges = true;
+            }
+          }
+        }
+      }
+    } catch (_) {}
+
+    // Purge any currently loaded songs that exist in deleted list
+    final beforePurge = _communitySongs.length;
+    _communitySongs.removeWhere((s) => _deletedSongIds.contains(s.id));
+    if (_communitySongs.length != beforePurge) {
+      hasChanges = true;
+    }
+
     // 1. Local Shared Files
     for (final path in _sharedSongFilePaths) {
       try {
@@ -767,6 +886,7 @@ class CloudBackendService extends ChangeNotifier {
       try {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setStringList(_keyCommunitySongs, _communitySongs.map((s) => jsonEncode(s.toJson())).toList());
+        await prefs.setStringList(_keyDeletedSongIds, _deletedSongIds.toList());
       } catch (_) {}
     }
 
@@ -780,6 +900,10 @@ class CloudBackendService extends ChangeNotifier {
       for (final item in jsonList) {
         try {
           final song = Song.fromJson(item as Map<String, dynamic>);
+          // NEVER add back a deleted song!
+          if (_deletedSongIds.contains(song.id)) {
+            continue;
+          }
           final idx = _communitySongs.indexWhere((s) => s.id == song.id);
           if (idx == -1) {
             _communitySongs.add(song);
@@ -792,6 +916,11 @@ class CloudBackendService extends ChangeNotifier {
             }
           }
         } catch (_) {}
+      }
+      final beforePurge = _communitySongs.length;
+      _communitySongs.removeWhere((s) => _deletedSongIds.contains(s.id));
+      if (_communitySongs.length != beforePurge) {
+        hasChanges = true;
       }
     } catch (_) {}
     return hasChanges;

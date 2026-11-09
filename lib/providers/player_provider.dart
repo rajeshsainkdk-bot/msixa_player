@@ -79,6 +79,12 @@ class PlayerProvider extends ChangeNotifier {
 
   PlayerProvider() {
     _init();
+    // Realtime synchronization: listen to CloudBackendService so admin additions & deletions update user player immediately
+    CloudBackendService().addListener(_onBackendCatalogUpdated);
+  }
+
+  void _onBackendCatalogUpdated() {
+    refreshCatalog();
   }
 
   void _init() async {
@@ -148,8 +154,15 @@ class PlayerProvider extends ChangeNotifier {
     _isLoadingTrending = true;
     notifyListeners();
 
+    final backend = CloudBackendService();
+    final deleted = backend.deletedSongIds;
+
     _trendingSongs = await _catalogService.fetchTrendingTracks();
-    _curatedPlaylists = _catalogService.getCuratedPlaylists();
+    _curatedPlaylists = _catalogService.getCuratedPlaylists(songs: _trendingSongs);
+
+    // Purge deleted songs from favorites and recent history
+    _favorites.removeWhere((s) => deleted.contains(s.id));
+    _recentlyPlayed.removeWhere((s) => deleted.contains(s.id));
 
     _syncFavoritesFlag(_trendingSongs);
     _isLoadingTrending = false;

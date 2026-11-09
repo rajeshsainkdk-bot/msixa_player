@@ -22,9 +22,19 @@ class HomeScreen extends StatelessWidget {
       'gradient': LinearGradient(colors: [Color(0xFFFF9933), Color(0xFF138808)]),
     },
     {
+      'title': 'Rajasthani',
+      'icon': Icons.audiotrack_rounded,
+      'gradient': LinearGradient(colors: [Color(0xFFFF6F00), Color(0xFFFFD54F)]),
+    },
+    {
       'title': 'Bhakti',
       'icon': Icons.temple_hindu_rounded,
       'gradient': LinearGradient(colors: [Color(0xFFF59E0B), Color(0xFFD97706)]),
+    },
+    {
+      'title': 'Haryanvi',
+      'icon': Icons.speaker_group_rounded,
+      'gradient': LinearGradient(colors: [Color(0xFF10B981), Color(0xFF047857)]),
     },
     {
       'title': 'Punjabi',
@@ -55,6 +65,31 @@ class HomeScreen extends StatelessWidget {
       'title': 'Ghazal',
       'icon': Icons.waves_rounded,
       'gradient': LinearGradient(colors: [Color(0xFFEC4899), Color(0xFFF43F5E)]),
+    },
+    {
+      'title': 'Folk Fusion',
+      'icon': Icons.album_rounded,
+      'gradient': LinearGradient(colors: [Color(0xFFD97706), Color(0xFFB45309)]),
+    },
+    {
+      'title': 'Bhojpuri',
+      'icon': Icons.music_video_rounded,
+      'gradient': LinearGradient(colors: [Color(0xFFF43F5E), Color(0xFFBE123C)]),
+    },
+    {
+      'title': 'DJ Remix',
+      'icon': Icons.equalizer_rounded,
+      'gradient': LinearGradient(colors: [Color(0xFF00E5FF), Color(0xFF4F46E5)]),
+    },
+    {
+      'title': 'Classical',
+      'icon': Icons.graphic_eq_rounded,
+      'gradient': LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFF4338CA)]),
+    },
+    {
+      'title': 'Indie Pop',
+      'icon': Icons.radio_rounded,
+      'gradient': LinearGradient(colors: [Color(0xFF06B6D4), Color(0xFF0284C7)]),
     },
   ];
 
@@ -553,6 +588,39 @@ class HomeScreen extends StatelessWidget {
                   genreKey: 'Desi Lo-Fi',
                   provider: provider,
                   songs: trending.where((s) => s.genre == 'Desi Lo-Fi' || s.genre == 'Ghazal').toList(),
+                ),
+
+                // ==========================================
+                // SECTION 6: RANGEELO RAJASTHANI & MARWADI HITS
+                // ==========================================
+                _buildCategorySection(
+                  context,
+                  title: '🐪 Rangeelo Rajasthani & Marwadi Hits',
+                  genreKey: 'Rajasthani',
+                  provider: provider,
+                  songs: trending.where((s) => s.genre == 'Rajasthani').toList(),
+                ),
+
+                // ==========================================
+                // SECTION 7: HARYANVI & DESI BEATS
+                // ==========================================
+                _buildCategorySection(
+                  context,
+                  title: '🌾 Haryanvi & Desi Beats',
+                  genreKey: 'Haryanvi',
+                  provider: provider,
+                  songs: trending.where((s) => s.genre == 'Haryanvi').toList(),
+                ),
+
+                // ==========================================
+                // SECTION 8: DJ REMIX & BASS BOOSTED
+                // ==========================================
+                _buildCategorySection(
+                  context,
+                  title: '🎧 DJ Remix & Bass Boosted',
+                  genreKey: 'DJ Remix',
+                  provider: provider,
+                  songs: trending.where((s) => s.genre == 'DJ Remix').toList(),
                 ),
 
                 const SizedBox(height: 20),
