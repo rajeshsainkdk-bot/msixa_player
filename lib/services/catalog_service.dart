@@ -367,6 +367,61 @@ class CatalogService {
       ));
     }
 
+    // Dynamically generate playlists for all Admin-uploaded categories and sub-categories!
+    final knownPlaylistGenreSet = {
+      'rajasthani',
+      'bhakti',
+      'spiritual',
+      'haryanvi',
+      'sufi',
+      'punjabi',
+      'bollywood',
+      'indie pop',
+      'desi lo-fi',
+      'ghazal',
+    };
+
+    // 1. Group custom genres
+    final Map<String, List<Song>> customGenreMap = {};
+    for (final s in baseSongs) {
+      final g = s.genre.trim();
+      if (g.isNotEmpty && !knownPlaylistGenreSet.contains(g.toLowerCase())) {
+        customGenreMap.putIfAbsent(g, () => []).add(s);
+      }
+    }
+    for (final entry in customGenreMap.entries) {
+      if (entry.value.isNotEmpty) {
+        playlists.add(Playlist(
+          id: 'pl_custom_${entry.key.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_')}',
+          title: '🎵 ${entry.key}',
+          description: '${entry.value.length} tracks • ${entry.key}',
+          coverUrl: entry.value.first.coverUrl ?? 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&q=80',
+          songs: entry.value,
+        ));
+      }
+    }
+
+    // 2. Group sub-categories (sub-folders from admin folder upload!)
+    final Map<String, List<Song>> subCategoryMap = {};
+    for (final s in baseSongs) {
+      final sub = s.subCategory?.trim();
+      if (sub != null && sub.isNotEmpty) {
+        final key = '${s.genre} › $sub';
+        subCategoryMap.putIfAbsent(key, () => []).add(s);
+      }
+    }
+    for (final entry in subCategoryMap.entries) {
+      if (entry.value.isNotEmpty) {
+        playlists.add(Playlist(
+          id: 'pl_sub_${entry.key.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_')}',
+          title: '📁 ${entry.key}',
+          description: '${entry.value.length} tracks • ${entry.key}',
+          coverUrl: entry.value.first.coverUrl ?? 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&q=80',
+          songs: entry.value,
+        ));
+      }
+    }
+
     return playlists;
   }
 

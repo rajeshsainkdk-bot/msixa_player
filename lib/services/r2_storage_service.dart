@@ -355,7 +355,7 @@ class R2StorageService extends ChangeNotifier {
     return _putObject(objectKey: objectKey, data: bytes, contentType: contentType);
   }
 
-  /// Read text / JSON string from Cloudflare R2 public CDN with cache-busting
+  /// Read text / JSON string from Cloudflare R2 public CDN with cache-busting and direct S3 SigV4 fallback
   Future<String?> getString(String objectKey) async {
     if (!isConfigured) return null;
     try {
@@ -367,12 +367,76 @@ class R2StorageService extends ChangeNotifier {
           'Cache-Control': 'no-cache, no-store, must-revalidate',
           'Pragma': 'no-cache',
         },
-      ).timeout(const Duration(seconds: 5));
-      if (res.statusCode == 200) {
+      ).timeout(const Duration(seconds: 12));
+      if (res.statusCode == 200 && res.bodyBytes.isNotEmpty) {
         return utf8.decode(res.bodyBytes);
       }
     } catch (e) {
-      debugPrint('R2 getString [$objectKey] exception: $e');
+      debugPrint('R2 public getString [$objectKey] notice: $e (trying authenticated S3 fallback)');
+    }
+
+    // Direct S3 Authenticated GET fallback (bypasses CDN cache and public URL restrictions)
+    return await _getObjectAuthenticated(objectKey);
+  }
+
+  /// Direct S3 Authenticated GET using AWS Signature Version 4
+  Future<String?> _getObjectAuthenticated(String objectKey) async {
+    if (!isConfigured) return null;
+    try {
+      final now = DateTime.now().toUtc();
+      final dateStamp = _formatDateStamp(now);
+      final amzDate = _formatAmzDate(now);
+
+      final endpointHost = '$_accountId.r2.cloudflarestorage.com';
+      final requestUri = Uri.parse('https://$endpointHost/$_bucketName/$objectKey');
+
+      const emptyPayloadHash = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
+
+      final canonicalHeaders = 'host:$endpointHost\n'
+          'x-amz-content-sha256:$emptyPayloadHash\n'
+          'x-amz-date:$amzDate\n';
+      const signedHeaders = 'host;x-amz-content-sha256;x-amz-date';
+
+      final canonicalRequest = 'GET\n'
+          '/${_bucketName!}/$objectKey\n'
+          '\n'
+          '$canonicalHeaders\n'
+          '$signedHeaders\n'
+          '$emptyPayloadHash';
+
+      final canonicalRequestHash = sha256.convert(utf8.encode(canonicalRequest)).toString();
+      const algorithm = 'AWS4-HMAC-SHA256';
+      const region = 'auto';
+      const service = 's3';
+      final credentialScope = '$dateStamp/$region/$service/aws4_request';
+
+      final stringToSign = '$algorithm\n'
+          '$amzDate\n'
+          '$credentialScope\n'
+          '$canonicalRequestHash';
+
+      final signingKey = _getSignatureKey(_secretAccessKey!, dateStamp, region, service);
+      final signature = Hmac(sha256, signingKey).convert(utf8.encode(stringToSign)).toString();
+
+      final authorization = '$algorithm Credential=$_accessKeyId/$credentialScope, '
+          'SignedHeaders=$signedHeaders, Signature=$signature';
+
+      final response = await http.get(
+        requestUri,
+        headers: {
+          'Host': endpointHost,
+          'x-amz-date': amzDate,
+          'x-amz-content-sha256': emptyPayloadHash,
+          'Authorization': authorization,
+        },
+      ).timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 200 && response.bodyBytes.isNotEmpty) {
+        debugPrint('✅ Cloudflare R2 Authenticated GET Success [$objectKey]');
+        return utf8.decode(response.bodyBytes);
+      }
+    } catch (e) {
+      debugPrint('R2 _getObjectAuthenticated [$objectKey] error: $e');
     }
     return null;
   }

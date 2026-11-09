@@ -94,6 +94,7 @@ class _UserAppRootViewState extends State<UserAppRootView> {
     if (!backend.isAuthenticated) {
       return AuthScreen(
         onAuthenticated: () {
+          context.read<PlayerProvider>().onUserAuthenticated();
           setState(() {});
         },
       );

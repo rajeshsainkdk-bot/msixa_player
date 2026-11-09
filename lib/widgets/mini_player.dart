@@ -5,6 +5,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../providers/player_provider.dart';
 import '../theme/app_colors.dart';
 import '../screens/now_playing_screen.dart';
+import 'song_thumbnail_widget.dart';
 
 class MiniPlayer extends StatelessWidget {
   const MiniPlayer({Key? key}) : super(key: key);
@@ -73,25 +74,12 @@ class MiniPlayer extends StatelessWidget {
                           // Thumbnail
                           Hero(
                             tag: 'current_song_art',
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: SizedBox(
-                                width: 46,
-                                height: 46,
-                                child: currentSong.coverUrl.startsWith('http')
-                                    ? CachedNetworkImage(
-                                        imageUrl: currentSong.coverUrl,
-                                        fit: BoxFit.cover,
-                                        errorWidget: (_, __, ___) => Container(
-                                          color: AppColors.card,
-                                          child: const Icon(Icons.music_note, color: AppColors.accentCyan),
-                                        ),
-                                      )
-                                    : Container(
-                                        color: AppColors.card,
-                                        child: const Icon(Icons.music_note, color: AppColors.accentCyan),
-                                      ),
-                              ),
+                            child: SongThumbnailWidget(
+                              song: currentSong,
+                              size: 46,
+                              borderRadius: 12,
+                              isPlaying: isPlaying,
+                              showVisualizerWhenPlaying: false,
                             ),
                           ),
                           const SizedBox(width: 12),

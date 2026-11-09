@@ -147,8 +147,7 @@ class CloudBackendService extends ChangeNotifier {
     _deletedSongIds.clear();
     _deletedSongIds.addAll(deletedRaw);
 
-    // 3. Load Songs (Pending + Approved)
-    final isCatalogSeeded = prefs.getBool(_keyCatalogSeeded) ?? false;
+    // 3. Load Songs from Local Cache first for instant display
     final songsRaw = prefs.getStringList(_keyCommunitySongs);
     _communitySongs.clear();
     if (songsRaw != null) {
@@ -162,7 +161,12 @@ class CloudBackendService extends ChangeNotifier {
       }
     }
 
-    // Seed initial curated catalog ONLY ONCE on very first fresh install
+    // 4. Synchronize with Cloudflare R2 Remote Cloud Database FIRST!
+    await _loadSharedUsers();
+    await _loadSharedSongs();
+
+    // 5. Seed initial curated catalog ONLY if BOTH local and cloud are completely empty
+    final isCatalogSeeded = prefs.getBool(_keyCatalogSeeded) ?? false;
     if (!isCatalogSeeded && _deletedSongIds.isEmpty && _communitySongs.isEmpty) {
       for (final s in CatalogService.getCuratedSongs()) {
         if (!_deletedSongIds.contains(s.id) && !_communitySongs.any((existing) => existing.id == s.id)) {
@@ -170,14 +174,12 @@ class CloudBackendService extends ChangeNotifier {
         }
       }
       await prefs.setBool(_keyCatalogSeeded, true);
-      await _persistSongs();
+      // ONLY save to local device cache - NEVER overwrite R2 on fresh install!
+      final rawList = _communitySongs.map((s) => jsonEncode(s.toJson())).toList();
+      await prefs.setStringList(_keyCommunitySongs, rawList);
     } else if (!isCatalogSeeded) {
       await prefs.setBool(_keyCatalogSeeded, true);
     }
-
-    // 4. Synchronize with cross-app shared storage on device
-    await _loadSharedUsers();
-    await _loadSharedSongs();
 
     // Heartbeat for current user
     if (_currentUser != null) {
@@ -265,6 +267,7 @@ class CloudBackendService extends ChangeNotifier {
     _allUsers.add(user);
     _currentUser = user;
     await _persistUsers();
+    await _loadSharedSongs(); // Instantly pull all cloud songs into memory
     notifyListeners();
     return user;
   }
@@ -308,6 +311,7 @@ class CloudBackendService extends ChangeNotifier {
     _currentUser = user;
 
     await _persistUsers();
+    await _loadSharedSongs(); // Instantly pull all cloud songs into memory
     notifyListeners();
     return user;
   }
@@ -371,6 +375,7 @@ class CloudBackendService extends ChangeNotifier {
 
     _currentUser = user;
     await _persistUsers();
+    await _loadSharedSongs(); // Instantly pull all cloud songs into memory
     notifyListeners();
     return user;
   }
@@ -807,9 +812,9 @@ class CloudBackendService extends ChangeNotifier {
         } catch (_) {}
       }
 
-      // 2. Sync to Cloudflare R2
+      // 2. Sync to Cloudflare R2 (Strictly Admin only to protect cloud catalog)
       final r2 = R2StorageService();
-      if (r2.isConfigured) {
+      if (r2.isConfigured && (isAdmin || _currentUser?.role == 'admin')) {
         await r2.putString('db/deleted_songs.json', jsonContent);
         debugPrint('✅ Persisted ${_deletedSongIds.length} deleted song IDs to Cloudflare R2');
       }
@@ -871,10 +876,10 @@ class CloudBackendService extends ChangeNotifier {
       }
     }
 
-    // Sync to Cloudflare R2 cloud database (Awaited)
+    // Sync to Cloudflare R2 cloud database (Awaited - STRICTLY Admin only to prevent user app overwrite!)
     try {
       final r2 = R2StorageService();
-      if (r2.isConfigured) {
+      if (r2.isConfigured && (isAdmin || _currentUser?.role == 'admin')) {
         final success = await r2.putString('db/songs.json', jsonContent);
         debugPrint('✅ Persisted ${_communitySongs.length} songs to Cloudflare R2: success=$success');
       }

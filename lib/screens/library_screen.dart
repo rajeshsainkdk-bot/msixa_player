@@ -8,6 +8,7 @@ import '../services/cloud_backend_service.dart';
 import '../services/language_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/song_list_tile.dart';
+import '../widgets/song_thumbnail_widget.dart';
 import 'profile_screen.dart';
 
 class LibraryScreen extends StatefulWidget {
@@ -222,21 +223,73 @@ class _LibraryScreenState extends State<LibraryScreen>
           ),
         ),
         Expanded(
-          child: _isGroupedByCategory
-              ? _buildCategorizedSongsList(context, provider, allSongs, lang)
-              : ListView.builder(
-                  padding: const EdgeInsets.only(bottom: 120),
-                  itemCount: allSongs.length,
-                  itemBuilder: (context, index) {
-                    final song = allSongs[index];
-                    final isCurrent = provider.currentSong?.id == song.id;
-
-                    return SongListTile(
-                      song: song,
-                      isCurrent: isCurrent,
-                      onTap: () => provider.playSong(song, queueContext: allSongs),
-                    );
+          child: allSongs.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: AppColors.card,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: AppColors.accentCyan.withOpacity(0.3)),
+                        ),
+                        child: const Icon(Icons.cloud_sync_rounded, color: AppColors.accentCyan, size: 48),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        lang.isHindi ? 'क्लाउड लाइब्रेरी लोड हो रही है...' : 'Connecting to Cloud Library...',
+                        style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        lang.isHindi ? 'गाने सिंक करने के लिए नीचे टैप करें' : 'Tap below to sync latest songs',
+                        style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                      ),
+                      const SizedBox(height: 20),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.accentCyan,
+                          foregroundColor: Colors.black,
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        icon: const Icon(Icons.refresh_rounded, size: 20),
+                        label: Text(
+                          lang.isHindi ? 'तुरंत गाने लोड करें' : 'Sync Songs Now',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        onPressed: () async {
+                          await provider.onUserAuthenticated();
+                        },
+                      ),
+                    ],
+                  ),
+                )
+              : RefreshIndicator(
+                  color: AppColors.accentCyan,
+                  backgroundColor: AppColors.card,
+                  onRefresh: () async {
+                    await provider.onUserAuthenticated();
                   },
+                  child: _isGroupedByCategory
+                      ? _buildCategorizedSongsList(context, provider, allSongs, lang)
+                      : ListView.builder(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.only(bottom: 120),
+                          itemCount: allSongs.length,
+                          itemBuilder: (context, index) {
+                            final song = allSongs[index];
+                            final isCurrent = provider.currentSong?.id == song.id;
+
+                            return SongListTile(
+                              song: song,
+                              isCurrent: isCurrent,
+                              onTap: () => provider.playSong(song, queueContext: allSongs),
+                            );
+                          },
+                        ),
                 ),
         ),
       ],
@@ -640,20 +693,11 @@ class _LibraryScreenState extends State<LibraryScreen>
                             child: ListTile(
                               dense: true,
                               contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-                              leading: ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: CachedNetworkImage(
-                                  imageUrl: song.coverUrl,
-                                  width: 40,
-                                  height: 40,
-                                  fit: BoxFit.cover,
-                                  errorWidget: (_, __, ___) => Container(
-                                    width: 40,
-                                    height: 40,
-                                    color: Colors.grey.shade900,
-                                    child: const Icon(Icons.music_note, color: Colors.white54, size: 20),
-                                  ),
-                                ),
+                              leading: SongThumbnailWidget(
+                                song: song,
+                                size: 40,
+                                borderRadius: 8,
+                                isPlaying: isCurrent && provider.isPlaying,
                               ),
                               title: Text(
                                 song.title,
@@ -787,20 +831,11 @@ class _LibraryScreenState extends State<LibraryScreen>
                           child: ListTile(
                             dense: true,
                             contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-                            leading: ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: CachedNetworkImage(
-                                imageUrl: song.coverUrl,
-                                width: 40,
-                                height: 40,
-                                fit: BoxFit.cover,
-                                errorWidget: (_, __, ___) => Container(
-                                  width: 40,
-                                  height: 40,
-                                  color: Colors.grey.shade900,
-                                  child: const Icon(Icons.music_note, color: Colors.white54, size: 20),
-                                ),
-                              ),
+                            leading: SongThumbnailWidget(
+                              song: song,
+                              size: 40,
+                              borderRadius: 8,
+                              isPlaying: isCurrent && provider.isPlaying,
                             ),
                             title: Text(
                               song.title,

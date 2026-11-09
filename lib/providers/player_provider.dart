@@ -141,6 +141,24 @@ class PlayerProvider extends ChangeNotifier {
 
     // 4. Load online catalog
     await refreshCatalog();
+
+    // 5. Automatically refresh catalog whenever CloudBackendService updates
+    CloudBackendService().addListener(() {
+      refreshCatalog();
+    });
+  }
+
+  /// Called immediately when a user registers or logs in on any device
+  Future<void> onUserAuthenticated() async {
+    final backend = CloudBackendService();
+    await backend.syncWithCloud();
+    await refreshCatalog();
+    final currentUserPhone = backend.currentUser?.phoneNumber;
+    _favorites = await _storageService.loadFavorites(currentUserPhone);
+    _recentlyPlayed = await _storageService.loadRecentlyPlayed(currentUserPhone);
+    _customPlaylists = await _storageService.loadCustomPlaylists(currentUserPhone);
+    _syncFavoritesFlag(_trendingSongs);
+    notifyListeners();
   }
 
   /// Scan local songs from device storage folders

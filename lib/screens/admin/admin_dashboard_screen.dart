@@ -956,6 +956,24 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                           final targetCategory = prefillGenre ?? (h.category.isNotEmpty ? h.category : selectedGenre);
                           final targetSubCategory = prefillSubCategory ?? (h.subCategory ?? (subCategoryCtrl.text.trim().isNotEmpty ? subCategoryCtrl.text.trim() : null));
 
+                          // Look for cover image in the same directory (e.g. cover.jpg, folder.jpg)
+                          String? discoveredCoverUrl;
+                          try {
+                            final parentDir = file.parent;
+                            final imageCandidates = parentDir.listSync().whereType<File>().where((f) {
+                              final name = f.path.split(Platform.pathSeparator).last.toLowerCase();
+                              return name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.png') || name.endsWith('.webp');
+                            }).toList();
+                            if (imageCandidates.isNotEmpty) {
+                              // If there is cover.jpg or folder.jpg, prefer it
+                              final preferred = imageCandidates.firstWhere(
+                                (f) => f.path.toLowerCase().contains('cover') || f.path.toLowerCase().contains('folder') || f.path.toLowerCase().contains('art'),
+                                orElse: () => imageCandidates.first,
+                              );
+                              discoveredCoverUrl = await r2.uploadImageFile(preferred);
+                            }
+                          } catch (_) {}
+
                           final newSong = await _backend.addAdminSong(
                             title: smartTitle,
                             artist: 'Various Artists',
@@ -963,6 +981,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                             genre: targetCategory,
                             subCategory: targetSubCategory,
                             audioPath: cloudUrl,
+                            coverUrl: discoveredCoverUrl,
                           );
                           uploadedSongsList.add(newSong);
                           successCount++;
@@ -972,20 +991,50 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                       }
                     }
 
-                    // 2. Auto-Create Playlist with Folder Name if Enabled
+                    // 2. Auto-Create Playlists with Folder Hierarchy if Enabled
                     if (createPlaylistWithFolder && playlistTitleCtrl.text.trim().isNotEmpty && uploadedSongsList.isNotEmpty) {
                       try {
-                        final pl = Playlist(
-                          id: 'pl_${DateTime.now().millisecondsSinceEpoch}',
-                          title: playlistTitleCtrl.text.trim(),
-                          description: 'Folder bulk upload (${uploadedSongsList.length} tracks)',
-                          coverUrl: uploadedSongsList.first.coverUrl,
-                          songs: uploadedSongsList,
-                        );
                         final storage = StorageService();
                         final existingPlaylists = await storage.loadCustomPlaylists();
-                        final updated = [pl, ...existingPlaylists];
+                        final List<Playlist> newGeneratedPlaylists = [];
+
+                        // Group by subcategory/subfolder
+                        final Map<String, List<Song>> subFolderMap = {};
+                        for (final s in uploadedSongsList) {
+                          final sub = s.subCategory?.trim();
+                          if (sub != null && sub.isNotEmpty) {
+                            subFolderMap.putIfAbsent(sub, () => []).add(s);
+                          }
+                        }
+
+                        // Create distinct playlist for each subfolder
+                        for (final entry in subFolderMap.entries) {
+                          newGeneratedPlaylists.add(Playlist(
+                            id: 'pl_${DateTime.now().millisecondsSinceEpoch}_${entry.key.hashCode.abs()}',
+                            title: '${playlistTitleCtrl.text.trim()} › ${entry.key}',
+                            description: 'Sub-folder collection (${entry.value.length} tracks)',
+                            coverUrl: entry.value.first.coverUrl,
+                            songs: entry.value,
+                          ));
+                        }
+
+                        // Master playlist containing all songs of root folder
+                        newGeneratedPlaylists.add(Playlist(
+                          id: 'pl_${DateTime.now().millisecondsSinceEpoch}',
+                          title: playlistTitleCtrl.text.trim(),
+                          description: 'Full folder collection (${uploadedSongsList.length} tracks)',
+                          coverUrl: uploadedSongsList.first.coverUrl,
+                          songs: uploadedSongsList,
+                        ));
+
+                        final updated = [...newGeneratedPlaylists, ...existingPlaylists];
                         await storage.saveCustomPlaylists(updated);
+
+                        // Also persist playlists to Cloudflare R2 so all devices receive them!
+                        try {
+                          final plJson = jsonEncode(updated.map((p) => p.toJson()).toList());
+                          await r2.putString('db/playlists.json', plJson);
+                        } catch (_) {}
                       } catch (pe) {
                         debugPrint('Playlist create error: $pe');
                       }
@@ -1525,6 +1574,20 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
               _refreshStorageStats();
             },
             child: const Text('रिफ्रेश (Refresh)', style: TextStyle(color: Color(0xFF00E5FF))),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981), foregroundColor: Colors.black),
+            icon: const Icon(Icons.cloud_sync_rounded, size: 16),
+            label: const Text('क्लाउड गाने सिंक करें', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⏳ Cloudflare R2 से गाने लोड हो रहे हैं...')));
+              await _backend.syncWithCloud();
+              setState(() {});
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('✅ R2 से ${_backend.approvedSongs.length} गाने लोड हो गए!')));
+              }
+            },
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFFB300), foregroundColor: Colors.black),

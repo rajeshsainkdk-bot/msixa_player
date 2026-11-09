@@ -5,6 +5,7 @@ import '../models/song.dart';
 import '../theme/app_colors.dart';
 import '../providers/player_provider.dart';
 import 'visualizer_bars.dart';
+import 'song_thumbnail_widget.dart';
 
 class SongListTile extends StatelessWidget {
   final Song song;
@@ -46,50 +47,11 @@ class SongListTile extends StatelessWidget {
             child: Row(
               children: [
                 // Thumbnail with Play overlay or active visualizer
-                Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: SizedBox(
-                        width: 52,
-                        height: 52,
-                        child: song.coverUrl.startsWith('http')
-                            ? CachedNetworkImage(
-                                imageUrl: song.coverUrl,
-                                fit: BoxFit.cover,
-                                placeholder: (context, url) => Container(
-                                  color: AppColors.surface,
-                                  child: const Icon(Icons.music_note, color: AppColors.textMuted),
-                                ),
-                                errorWidget: (context, url, error) => Container(
-                                  color: AppColors.surface,
-                                  child: const Icon(Icons.music_note, color: AppColors.textMuted),
-                                ),
-                              )
-                            : Container(
-                                color: AppColors.card,
-                                child: const Icon(Icons.music_note_rounded, color: AppColors.accentCyan),
-                              ),
-                      ),
-                    ),
-                    if (isCurrent)
-                      Container(
-                        width: 52,
-                        height: 52,
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.55),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Center(
-                          child: VisualizerBars(
-                            isPlaying: playerProvider.isPlaying,
-                            maxHeight: 18,
-                            barWidth: 3,
-                          ),
-                        ),
-                      ),
-                  ],
+                SongThumbnailWidget(
+                  song: song,
+                  size: 52,
+                  borderRadius: 12,
+                  isPlaying: isCurrent && playerProvider.isPlaying,
                 ),
                 const SizedBox(width: 12),
 
