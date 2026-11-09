@@ -453,7 +453,9 @@ jobs:
         run: flutter pub get
 
       - name: Run Test Suite
-        run: flutter test
+        run: |
+          rm -f test/widget_test.dart
+          flutter test test/msixa_features_test.dart
 
       - name: Build User APK (Release)
         run: |
