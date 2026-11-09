@@ -308,10 +308,46 @@ class ProfileScreen extends StatelessWidget {
               ),
               icon: const Icon(Icons.system_update_rounded, size: 18),
               label: Text(
-                'अपडेट जांचें (Check for Updates)',
+                lang.isHindi ? 'अपडेट जांचें (Check for Updates)' : 'Check for Updates',
                 style: GoogleFonts.syne(fontSize: 14, fontWeight: FontWeight.bold),
               ),
               onPressed: () => UpdateService.checkForUpdate(context, autoPrompt: false),
+            ),
+            const SizedBox(height: 12),
+
+            // Live Installed Version Badge
+            FutureBuilder<Map<String, dynamic>>(
+              future: UpdateService.getInstalledVersion(),
+              builder: (context, snapshot) {
+                final vName = snapshot.data?['versionName'] ?? '1.0.60';
+                final vCode = snapshot.data?['versionCode'] ?? 60;
+                return Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF131B2C),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFF00E5FF).withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.verified_rounded, color: Color(0xFF00E5FF), size: 16),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${lang.isHindi ? "वर्तमान वर्ज़न" : "Running Version"}: v$vName (Build $vCode)',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
             ),
             const SizedBox(height: 12),
 
@@ -335,7 +371,7 @@ class ProfileScreen extends StatelessWidget {
             // App Version Footer
             Center(
               child: Text(
-                'Msixa Player • v2.0 (Dual-APK Edition)',
+                'Msixa Player • Dedicated Private Cloud Edition',
                 style: TextStyle(color: Colors.grey.shade600, fontSize: 11),
               ),
             ),

@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'language_service.dart';
 
 /// App Auto-Updater Service
 /// Features:
@@ -40,6 +41,8 @@ class UpdateService {
     if (autoPrompt && _hasCheckedThisSession) return;
     if (autoPrompt) _hasCheckedThisSession = true;
 
+    final isHindi = LanguageService().isHindi;
+
     // 1. Show immediate progress feedback for manual button click
     if (!autoPrompt && context.mounted) {
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
@@ -54,7 +57,9 @@ class UpdateService {
               ),
               const SizedBox(width: 12),
               Text(
-                isAdmin ? '🔍 Msixa Admin अपडेट चेक किया जा रहा है...' : '🔍 अपडेट चेक किया जा रहा है...',
+                isAdmin
+                    ? (isHindi ? '🔍 Msixa Admin अपडेट चेक किया जा रहा है...' : '🔍 Checking Msixa Admin updates...')
+                    : (isHindi ? '🔍 अपडेट चेक किया जा रहा है...' : '🔍 Checking for updates...'),
                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
               ),
             ],
@@ -81,7 +86,12 @@ class UpdateService {
       if (resp.statusCode != 200) {
         if (!autoPrompt && context.mounted) {
           ScaffoldMessenger.of(context).hideCurrentSnackBar();
-          _showToast(context, '⚠️ अपडेट सर्वर से कनेक्ट नहीं हो सका (HTTP ${resp.statusCode})');
+          _showToast(
+            context,
+            isHindi
+                ? '⚠️ अपडेट सर्वर से कनेक्ट नहीं हो सका (HTTP ${resp.statusCode})'
+                : '⚠️ Could not connect to update server (HTTP ${resp.statusCode})',
+          );
         }
         return;
       }
@@ -91,7 +101,7 @@ class UpdateService {
       final remoteName = data['version_name'] as String? ?? '1.0.0';
       final apkUrl = data['apk_url'] as String? ?? '';
       final sizeMb = (data['file_size_mb'] as num?)?.toDouble() ?? 23.0;
-      final releaseNotes = data['release_notes'] as String? ?? 'नए फीचर्स और बग फिक्स!';
+      final releaseNotes = data['release_notes'] as String? ?? (isHindi ? 'नए फीचर्स और बग फिक्स!' : 'New features & bug fixes!');
       final forceUpdate = data['force_update'] as bool? ?? false;
 
       final prefs = await SharedPreferences.getInstance();
@@ -146,7 +156,10 @@ class UpdateService {
     } catch (e) {
       if (!autoPrompt && context.mounted) {
         ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        _showToast(context, '⚠️ अपडेट चेक करने में त्रुटि: $e');
+        _showToast(
+          context,
+          isHindi ? '⚠️ अपडेट चेक करने में त्रुटि: $e' : '⚠️ Error checking for updates: $e',
+        );
       }
     }
   }
@@ -157,6 +170,7 @@ class UpdateService {
     required int installedCode,
     bool isAdmin = false,
   }) {
+    final isHindi = LanguageService().isHindi;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -166,10 +180,13 @@ class UpdateService {
           side: const BorderSide(color: Color(0xFF00E5FF), width: 1.5),
         ),
         title: Row(
-          children: const [
-            Icon(Icons.check_circle_rounded, color: Color(0xFF00E5FF), size: 26),
-            SizedBox(width: 10),
-            Text('ऐप अप-टू-डेट है!', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+          children: [
+            const Icon(Icons.check_circle_rounded, color: Color(0xFF00E5FF), size: 26),
+            const SizedBox(width: 10),
+            Text(
+              isHindi ? 'ऐप अप-टू-डेट है!' : 'App is Up to Date!',
+              style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+            ),
           ],
         ),
         content: Column(
@@ -177,7 +194,9 @@ class UpdateService {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '🎉 ${isAdmin ? "Msixa Player Admin" : "Msixa Player"} पहले से नवीनतम वर्ज़न पर चल रहा है!',
+              isHindi
+                  ? '🎉 ${isAdmin ? "Msixa Player Admin" : "Msixa Player"} पहले से नवीनतम वर्ज़न पर चल रहा है!'
+                  : '🎉 ${isAdmin ? "Msixa Player Admin" : "Msixa Player"} is already running on the latest version!',
               style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 10),
@@ -193,16 +212,18 @@ class UpdateService {
                   const Icon(Icons.verified_rounded, color: Color(0xFF00E5FF), size: 18),
                   const SizedBox(width: 8),
                   Text(
-                    'वर्ज़न: v$installedName (Build $installedCode)',
+                    '${isHindi ? "वर्ज़न" : "Version"}: v$installedName (Build $installedCode)',
                     style: const TextStyle(color: Color(0xFF00E5FF), fontSize: 12, fontWeight: FontWeight.bold),
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 10),
-            const Text(
-              'क्लाउड पर कोई नया अपडेट पेंडिंग नहीं है। आपका ऐप पूरी तरह से अप-टू-डेट है।',
-              style: TextStyle(color: Colors.white70, fontSize: 12, height: 1.4),
+            Text(
+              isHindi
+                  ? 'क्लाउड पर कोई नया अपडेट पेंडिंग नहीं है। आपका ऐप पूरी तरह से अप-टू-डेट है।'
+                  : 'No new updates pending on cloud. Your app is completely up to date.',
+              style: const TextStyle(color: Colors.white70, fontSize: 12, height: 1.4),
             ),
           ],
         ),
@@ -214,7 +235,7 @@ class UpdateService {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('ठीक है (OK)', style: TextStyle(fontWeight: FontWeight.bold)),
+            child: Text(isHindi ? 'ठीक है (OK)' : 'OK', style: const TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -253,6 +274,7 @@ class UpdateService {
         int totalBytes = (sizeMb * 1024 * 1024).toInt();
         final prefKeyDismissed = isAdmin ? '${_prefKeyDismissedVersion}_admin' : _prefKeyDismissedVersion;
         final prefKeyPrompt = isAdmin ? '${_prefKeyLastPromptTime}_admin' : _prefKeyLastPromptTime;
+        final isHindi = LanguageService().isHindi;
 
         return StatefulBuilder(
           builder: (dialogContext, setState) {
@@ -280,7 +302,9 @@ class UpdateService {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            isAdmin ? 'नया एडमिन अपडेट उपलब्ध है!' : 'नया अपडेट उपलब्ध है!',
+                            isAdmin
+                                ? (isHindi ? 'नया एडमिन अपडेट उपलब्ध है!' : 'New Admin Update Available!')
+                                : (isHindi ? 'नया अपडेट उपलब्ध है!' : 'New Update Available!'),
                             style: GoogleFonts.syne(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
                           ),
                           Text(
@@ -307,9 +331,9 @@ class UpdateService {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            '✨ क्या नया है (What\'s New):',
-                            style: TextStyle(color: Color(0xFFFFB300), fontSize: 12, fontWeight: FontWeight.bold),
+                          Text(
+                            isHindi ? '✨ क्या नया है (What\'s New):' : '✨ What\'s New:',
+                            style: const TextStyle(color: Color(0xFFFFB300), fontSize: 12, fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 4),
                           Text(
@@ -343,9 +367,11 @@ class UpdateService {
                         ],
                       ),
                     ] else ...[
-                      const Text(
-                        'यह अपडेट 1-क्लिक में बिना प्ले स्टोर के सीधे आपके फोन में इंस्टॉल हो जाएगा।',
-                        style: TextStyle(color: Colors.grey, fontSize: 11),
+                      Text(
+                        isHindi
+                            ? 'यह अपडेट 1-क्लिक में बिना प्ले स्टोर के सीधे आपके फोन में इंस्टॉल हो जाएगा।'
+                            : 'This update will install directly on your phone with 1-click OTA.',
+                        style: const TextStyle(color: Colors.grey, fontSize: 11),
                       ),
                     ],
                   ],
@@ -363,7 +389,7 @@ class UpdateService {
                           Navigator.pop(dialogContext);
                         }
                       },
-                      child: const Text('बाद में (Later)', style: TextStyle(color: Colors.grey)),
+                      child: Text(isHindi ? 'बाद में (Later)' : 'Later', style: const TextStyle(color: Colors.grey)),
                     ),
                   if (!isDownloading)
                     ElevatedButton.icon(
@@ -374,9 +400,9 @@ class UpdateService {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       ),
                       icon: const Icon(Icons.download_rounded, size: 18),
-                      label: const Text(
-                        'तुरंत अपडेट करें (Update Now)',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                      label: Text(
+                        isHindi ? 'तुरंत अपडेट करें (Update Now)' : 'Update Now',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                       ),
                       onPressed: () async {
                         // 1. Check if Android "Install Unknown Apps" permission is granted BEFORE starting download
@@ -390,25 +416,27 @@ class UpdateService {
                                   backgroundColor: const Color(0xFF131B2C),
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                                   title: Row(
-                                    children: const [
-                                      Icon(Icons.security_rounded, color: Color(0xFFFFB300), size: 24),
-                                      SizedBox(width: 8),
+                                    children: [
+                                      const Icon(Icons.security_rounded, color: Color(0xFFFFB300), size: 24),
+                                      const SizedBox(width: 8),
                                       Expanded(
                                         child: Text(
-                                          'अनुमति आवश्यक है',
-                                          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                                          isHindi ? 'अनुमति आवश्यक है' : 'Permission Required',
+                                          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
                                         ),
                                       ),
                                     ],
                                   ),
-                                  content: const Text(
-                                    'ऐप को बिना प्ले स्टोर के सीधे अपडेट करने के लिए कृपया सेटिंग्स में "Allow from this source" (अज्ञात ऐप्स इंस्टॉल करें) की अनुमति चालू करें।\n\nअनुमति देने के बाद तुरंत अपडेट शुरू हो जाएगा।',
-                                    style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
+                                  content: Text(
+                                    isHindi
+                                        ? 'ऐप को बिना प्ले स्टोर के सीधे अपडेट करने के लिए कृपया सेटिंग्स में "Allow from this source" (अज्ञात ऐप्स इंस्टॉल करें) की अनुमति चालू करें।\n\nअनुमति देने के बाद तुरंत अपडेट शुरू हो जाएगा।'
+                                        : 'To update the app directly without Play Store, please enable "Allow from this source" (Install unknown apps) in Android settings.\n\nUpdate will resume immediately after enabling.',
+                                    style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
                                   ),
                                   actions: [
                                     TextButton(
                                       onPressed: () => Navigator.pop(permCtx, false),
-                                      child: const Text('रद्द करें (Cancel)', style: TextStyle(color: Colors.grey)),
+                                      child: Text(isHindi ? 'रद्द करें (Cancel)' : 'Cancel', style: const TextStyle(color: Colors.grey)),
                                     ),
                                     ElevatedButton(
                                       style: ElevatedButton.styleFrom(
@@ -416,7 +444,10 @@ class UpdateService {
                                         foregroundColor: Colors.black,
                                       ),
                                       onPressed: () => Navigator.pop(permCtx, true),
-                                      child: const Text('सेटिंग्स खोलें (Open Settings)', style: TextStyle(fontWeight: FontWeight.bold)),
+                                      child: Text(
+                                        isHindi ? 'सेटिंग्स खोलें (Open Settings)' : 'Open Settings',
+                                        style: const TextStyle(fontWeight: FontWeight.bold),
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -432,7 +463,7 @@ class UpdateService {
 
                         setState(() {
                           isDownloading = true;
-                          statusText = 'डाउनलोड शुरू हो रहा है...';
+                          statusText = isHindi ? 'डाउनलोड शुरू हो रहा है...' : 'Starting download...';
                         });
 
                         try {
@@ -463,7 +494,9 @@ class UpdateService {
                               downloadProgress = totalBytes > 0 ? downloadedBytes / totalBytes : 0.5;
                               final mbDown = (downloadedBytes / (1024 * 1024)).toStringAsFixed(1);
                               final mbTot = (totalBytes / (1024 * 1024)).toStringAsFixed(1);
-                              statusText = 'डाउनलोड हो रहा है: $mbDown / $mbTot MB';
+                              statusText = isHindi
+                                  ? 'डाउनलोड हो रहा है: $mbDown / $mbTot MB'
+                                  : 'Downloading: $mbDown / $mbTot MB';
                             });
                           }).asFuture();
 
@@ -474,7 +507,7 @@ class UpdateService {
                           setState(() {
                             isDownloading = false;
                             downloadProgress = 1.0;
-                            statusText = 'डाउनलोड पूरा हुआ! इंस्टॉलेशन...';
+                            statusText = isHindi ? 'डाउनलोड पूरा हुआ! इंस्टॉलेशन...' : 'Download complete! Installing...';
                           });
 
                           // 2. Remember dismissed version code to avoid nagging on immediate restart
@@ -496,13 +529,15 @@ class UpdateService {
                           // 4. Show floating success notification
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
+                              SnackBar(
                                 content: Text(
-                                  '✅ डाउनलोड पूरा हुआ! इंस्टॉलेशन शुरू हो रहा है...',
-                                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+                                  isHindi
+                                      ? '✅ डाउनलोड पूरा हुआ! इंस्टॉलेशन शुरू हो रहा है...'
+                                      : '✅ Download complete! Starting installation...',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
                                 ),
-                                backgroundColor: Color(0xFF00E5FF),
-                                duration: Duration(seconds: 4),
+                                backgroundColor: const Color(0xFF00E5FF),
+                                duration: const Duration(seconds: 4),
                                 behavior: SnackBarBehavior.floating,
                               ),
                             );
@@ -515,17 +550,21 @@ class UpdateService {
                             if (context.mounted) {
                               if (pe.code == 'NEED_PERMISSION') {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('कृपया सेटिंग्स में "Allow from this source" चालू करें और पुनः अपडेट दबाएं।'),
+                                  SnackBar(
+                                    content: Text(
+                                      isHindi
+                                          ? 'कृपया सेटिंग्स में "Allow from this source" चालू करें और पुनः अपडेट दबाएं।'
+                                          : 'Please enable "Allow from this source" in settings and tap update again.',
+                                    ),
                                     backgroundColor: Colors.amber,
-                                    duration: Duration(seconds: 5),
+                                    duration: const Duration(seconds: 5),
                                     behavior: SnackBarBehavior.floating,
                                   ),
                                 );
                               } else {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
-                                    content: Text('इंस्टॉलर त्रुटि: ${pe.message}'),
+                                    content: Text(isHindi ? 'इंस्टॉलर त्रुटि: ${pe.message}' : 'Installer error: ${pe.message}'),
                                     backgroundColor: Colors.redAccent,
                                     behavior: SnackBarBehavior.floating,
                                   ),
@@ -536,7 +575,7 @@ class UpdateService {
                         } catch (err) {
                           setState(() {
                             isDownloading = false;
-                            statusText = 'डाउनलोड त्रुटि: $err';
+                            statusText = isHindi ? 'डाउनलोड त्रुटि: $err' : 'Download error: $err';
                           });
                         }
                       },
