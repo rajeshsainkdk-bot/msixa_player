@@ -353,6 +353,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
 
     if (!context.mounted) return;
 
+    final Set<String> selectedFolders = {};
+
     showModalBottomSheet(
       context: context,
       backgroundColor: const Color(0xFF131A2A),
@@ -360,102 +362,197 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       isScrollControlled: true,
-      builder: (bCtx) => DraggableScrollableSheet(
-        initialChildSize: 0.65,
-        minChildSize: 0.4,
-        maxChildSize: 0.9,
-        expand: false,
-        builder: (ctx, scrollCtrl) => Column(
-          children: [
-            Container(
-              margin: const EdgeInsets.symmetric(vertical: 10),
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                children: [
-                  const Icon(Icons.folder_special_rounded, color: Color(0xFFFFB300), size: 22),
-                  const SizedBox(width: 10),
-                  const Expanded(
-                    child: Text(
-                      'डिवाइस पर मिले गानों वाले फ़ोल्डर',
-                      style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                    ),
+      builder: (bCtx) => StatefulBuilder(
+        builder: (ctx, setSheetState) {
+          int totalSelectedSongs = 0;
+          for (final f in selectedFolders) {
+            for (final entry in folderMap.entries) {
+              if (entry.key == f || entry.key.startsWith('$f/')) {
+                totalSelectedSongs += entry.value.length;
+              }
+            }
+          }
+
+          return DraggableScrollableSheet(
+            initialChildSize: 0.75,
+            minChildSize: 0.4,
+            maxChildSize: 0.95,
+            expand: false,
+            builder: (ctx, scrollCtrl) => Column(
+              children: [
+                Container(
+                  margin: const EdgeInsets.symmetric(vertical: 10),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.folder_special_rounded, color: Color(0xFFFFB300), size: 22),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          selectedFolders.isEmpty
+                              ? 'डिवाइस पर मिले फ़ोल्डर (${sortedFolders.length})'
+                              : 'चयनित: ${selectedFolders.length} फ़ोल्डर ($totalSelectedSongs गाने)',
+                          style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      TextButton.icon(
+                        style: TextButton.styleFrom(
+                          foregroundColor: const Color(0xFF00E5FF),
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                        ),
+                        icon: Icon(
+                          selectedFolders.length == sortedFolders.length ? Icons.deselect_rounded : Icons.select_all_rounded,
+                          size: 18,
+                        ),
+                        label: Text(
+                          selectedFolders.length == sortedFolders.length ? 'सभी हटाएं' : 'सभी चुनें',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                        ),
+                        onPressed: () {
+                          setSheetState(() {
+                            if (selectedFolders.length == sortedFolders.length) {
+                              selectedFolders.clear();
+                            } else {
+                              selectedFolders.addAll(sortedFolders);
+                            }
+                          });
+                        },
+                      ),
+                    ],
                   ),
-                  Text(
-                    '${sortedFolders.length} फ़ोल्डर',
-                    style: const TextStyle(color: Colors.grey, fontSize: 12),
-                  ),
-                ],
-              ),
-            ),
-            const Divider(color: Colors.white12),
-            Expanded(
-              child: ListView.separated(
-                controller: scrollCtrl,
-                itemCount: sortedFolders.length,
-                separatorBuilder: (_, __) => const Divider(color: Colors.white10, height: 1),
-                itemBuilder: (ctx, i) {
-                  final folderPath = sortedFolders[i];
-                  final cleanPath = folderPath.replaceAll(r'\', '/');
-                  final folderName = cleanPath.split('/').lastWhere((s) => s.isNotEmpty, orElse: () => 'Folder');
+                ),
+                const Divider(color: Colors.white12, height: 1),
+                Expanded(
+                  child: ListView.separated(
+                    controller: scrollCtrl,
+                    itemCount: sortedFolders.length,
+                    separatorBuilder: (_, __) => const Divider(color: Colors.white10, height: 1),
+                    itemBuilder: (ctx, i) {
+                      final folderPath = sortedFolders[i];
+                      final isSelected = selectedFolders.contains(folderPath);
+                      final cleanPath = folderPath.replaceAll(r'\', '/');
+                      final folderName = cleanPath.split('/').lastWhere((s) => s.isNotEmpty, orElse: () => 'Folder');
 
-                  final List<PlatformFile> allInFolderAndSub = [];
-                  for (final entry in folderMap.entries) {
-                    if (entry.key == folderPath || entry.key.startsWith('$folderPath/')) {
-                      allInFolderAndSub.addAll(entry.value);
-                    }
-                  }
+                      final List<PlatformFile> allInFolderAndSub = [];
+                      for (final entry in folderMap.entries) {
+                        if (entry.key == folderPath || entry.key.startsWith('$folderPath/')) {
+                          allInFolderAndSub.addAll(entry.value);
+                        }
+                      }
 
-                  final rel = cleanPath
-                      .replaceFirst(RegExp(r'^/storage/emulated/[0-9]+/?'), '')
-                      .replaceFirst(RegExp(r'^/storage/[^/]+/?'), '')
-                      .replaceFirst(RegExp(r'^[A-Za-z]:/[^/]+/[^/]+/?'), '');
+                      final rel = cleanPath
+                          .replaceFirst(RegExp(r'^/storage/emulated/[0-9]+/?'), '')
+                          .replaceFirst(RegExp(r'^/storage/[^/]+/?'), '')
+                          .replaceFirst(RegExp(r'^[A-Za-z]:/[^/]+/[^/]+/?'), '');
 
-                  return ListTile(
-                    leading: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFB300).withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(Icons.folder_rounded, color: Color(0xFFFFB300), size: 22),
-                    ),
-                    title: Text(
-                      folderName,
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
-                    ),
-                    subtitle: Text(
-                      rel.isNotEmpty ? rel : cleanPath,
-                      style: const TextStyle(color: Colors.grey, fontSize: 11),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    trailing: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF00E5FF).withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFF00E5FF).withOpacity(0.3)),
-                      ),
-                      child: Text(
-                        '${allInFolderAndSub.length} गाने',
-                        style: const TextStyle(color: Color(0xFF00E5FF), fontSize: 11, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                    onTap: () {
-                      Navigator.pop(bCtx);
-                      onFolderSelected(allInFolderAndSub, folderName, folderPath);
+                      return CheckboxListTile(
+                        value: isSelected,
+                        activeColor: const Color(0xFF00E5FF),
+                        checkColor: Colors.black,
+                        tileColor: isSelected ? const Color(0xFF00E5FF).withOpacity(0.08) : null,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                        secondary: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: (isSelected ? const Color(0xFF00E5FF) : const Color(0xFFFFB300)).withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            isSelected ? Icons.folder_shared_rounded : Icons.folder_rounded,
+                            color: isSelected ? const Color(0xFF00E5FF) : const Color(0xFFFFB300),
+                            size: 22,
+                          ),
+                        ),
+                        title: Text(
+                          folderName,
+                          style: TextStyle(
+                            color: isSelected ? const Color(0xFF00E5FF) : Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                        subtitle: Text(
+                          '${allInFolderAndSub.length} गाने • ${rel.isNotEmpty ? rel : cleanPath}',
+                          style: const TextStyle(color: Colors.grey, fontSize: 11),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        onChanged: (val) {
+                          setSheetState(() {
+                            if (val == true) {
+                              selectedFolders.add(folderPath);
+                            } else {
+                              selectedFolders.remove(folderPath);
+                            }
+                          });
+                        },
+                      );
                     },
-                  );
-                },
-              ),
+                  ),
+                ),
+                // Bottom Sticky Confirm Button
+                Container(
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF0F1626),
+                    border: Border(top: BorderSide(color: Colors.white12)),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: selectedFolders.isNotEmpty ? const Color(0xFF00E5FF) : Colors.white12,
+                            foregroundColor: selectedFolders.isNotEmpty ? Colors.black : Colors.white38,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          icon: const Icon(Icons.check_circle_rounded, size: 20),
+                          label: Text(
+                            selectedFolders.isEmpty
+                                ? 'कम से कम एक फ़ोल्डर चुनें'
+                                : 'चयनित ${selectedFolders.length} फ़ोल्डर जोड़ें ($totalSelectedSongs गाने)',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                          ),
+                          onPressed: selectedFolders.isEmpty
+                              ? null
+                              : () {
+                                  Navigator.pop(bCtx);
+                                  final List<PlatformFile> combinedFiles = [];
+                                  for (final fp in selectedFolders) {
+                                    for (final entry in folderMap.entries) {
+                                      if (entry.key == fp || entry.key.startsWith('$fp/')) {
+                                        combinedFiles.addAll(entry.value);
+                                      }
+                                    }
+                                  }
+                                  // Deduplicate by path
+                                  final seenPaths = <String>{};
+                                  final uniqueFiles = <PlatformFile>[];
+                                  for (final f in combinedFiles) {
+                                    if (f.path != null && seenPaths.add(f.path!)) {
+                                      uniqueFiles.add(f);
+                                    }
+                                  }
+                                  final titleLabel = selectedFolders.length == 1
+                                      ? selectedFolders.first.split('/').lastWhere((s) => s.isNotEmpty, orElse: () => 'Folder')
+                                      : '${selectedFolders.length} फ़ोल्डर्स (${uniqueFiles.length} गाने)';
+                                  onFolderSelected(uniqueFiles, titleLabel, selectedFolders.first);
+                                },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -558,7 +655,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                             ),
                             icon: const Icon(Icons.folder_special_rounded, size: 15),
                             label: const Text(
-                              '📁 डिवाइस फ़ोल्डर',
+                              '📁 फ़ोल्डर्स चुनें (Multi)',
                               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10),
                             ),
                             onPressed: () {
@@ -566,11 +663,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                                 context,
                                 onFolderSelected: (files, folderName, folderPath) {
                                   setDialogState(() {
+                                    if (playlistTitleCtrl.text.isEmpty) {
+                                      playlistTitleCtrl.text = folderName;
+                                    }
                                     updateFilesHierarchy(files, rootFolderPath: folderPath);
                                   });
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
-                                      content: Text('✅ फ़ोल्डर "$folderName" से ${files.length} गाने लोड हुए!'),
+                                      content: Text('✅ "$folderName" से ${files.length} गाने लोड हुए!'),
                                       backgroundColor: const Color(0xFF1E293B),
                                     ),
                                   );
