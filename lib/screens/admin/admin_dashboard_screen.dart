@@ -16,6 +16,7 @@ import '../../models/song.dart';
 import '../../models/user_profile.dart';
 import '../../models/playlist.dart';
 import '../../models/folder_hierarchy.dart';
+import '../../widgets/song_thumbnail_widget.dart';
 export '../../models/folder_hierarchy.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
