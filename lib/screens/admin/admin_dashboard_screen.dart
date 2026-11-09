@@ -1868,9 +1868,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
           ),
         ],
       ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _buildMetricCard({
     required String title,
