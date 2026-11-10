@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../models/song.dart';
+import '../services/ai_artwork_service.dart';
 import '../theme/app_colors.dart';
 import 'visualizer_bars.dart';
 
@@ -282,17 +283,11 @@ class SongThumbnailWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     Widget content;
     final url = song.coverUrl.trim();
+    final effectiveHttpUrl = (url.startsWith('http') && !isGenericMicUrl(url))
+        ? url
+        : AiArtworkService().getAiCoverForSong(song);
 
-    if (url.startsWith('http') && !isGenericMicUrl(url)) {
-      content = CachedNetworkImage(
-        imageUrl: url,
-        width: size,
-        height: size,
-        fit: BoxFit.cover,
-        placeholder: (_, __) => _buildProceduralArt(context),
-        errorWidget: (_, __, ___) => _buildProceduralArt(context),
-      );
-    } else if ((url.startsWith('/') || url.startsWith('file://')) && !isGenericMicUrl(url)) {
+    if ((url.startsWith('/') || url.startsWith('file://')) && !isGenericMicUrl(url)) {
       final filePath = url.replaceFirst('file://', '');
       final f = File(filePath);
       if (f.existsSync()) {
@@ -301,13 +296,34 @@ class SongThumbnailWidget extends StatelessWidget {
           width: size,
           height: size,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => _buildProceduralArt(context),
+          errorBuilder: (_, __, ___) => CachedNetworkImage(
+            imageUrl: effectiveHttpUrl,
+            width: size,
+            height: size,
+            fit: BoxFit.cover,
+            placeholder: (_, __) => _buildProceduralArt(context),
+            errorWidget: (_, __, ___) => _buildProceduralArt(context),
+          ),
         );
       } else {
-        content = _buildProceduralArt(context);
+        content = CachedNetworkImage(
+          imageUrl: effectiveHttpUrl,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          placeholder: (_, __) => _buildProceduralArt(context),
+          errorWidget: (_, __, ___) => _buildProceduralArt(context),
+        );
       }
     } else {
-      content = _buildProceduralArt(context);
+      content = CachedNetworkImage(
+        imageUrl: effectiveHttpUrl,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        placeholder: (_, __) => _buildProceduralArt(context),
+        errorWidget: (_, __, ___) => _buildProceduralArt(context),
+      );
     }
 
     return Stack(

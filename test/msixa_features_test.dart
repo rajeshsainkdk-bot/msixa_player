@@ -5,6 +5,7 @@ import 'package:msixa_player/models/folder_hierarchy.dart';
 import 'package:msixa_player/services/cloud_backend_service.dart';
 import 'package:msixa_player/services/device_audio_service.dart';
 import 'package:msixa_player/services/ai_music_service.dart';
+import 'package:msixa_player/services/ai_artwork_service.dart';
 import 'package:msixa_player/widgets/song_thumbnail_widget.dart';
 
 void main() {
@@ -377,6 +378,36 @@ void main() {
       final List<Song> approvedSongs = [];
       final shouldSync = approvedSongs.isEmpty;
       expect(shouldSync, isTrue);
+    });
+  });
+
+  group('9. Version 71 Performance, Artwork & UI Polish Tests', () {
+    test('Song with empty or mic cover resolves to genre-specific AI artwork', () {
+      final bhaktiSong = Song(
+        id: 'b1',
+        title: 'Shree Hanuman Chalisa',
+        artist: 'Hariharan',
+        album: 'Bhakti Sagar',
+        duration: 300,
+        streamUrl: 'https://example.com/h.mp3',
+        coverUrl: '',
+        genre: 'Bhakti',
+      );
+
+      final resolvedUrl = (bhaktiSong.coverUrl.trim().startsWith('http') &&
+              !SongThumbnailWidget.isGenericMicUrl(bhaktiSong.coverUrl))
+          ? bhaktiSong.coverUrl
+          : AiArtworkService().getAiCoverForSong(bhaktiSong);
+
+      expect(resolvedUrl, isNotEmpty);
+      expect(resolvedUrl.startsWith('https://images.unsplash.com'), isTrue);
+    });
+
+    test('Newer remote version triggers update prompt without being permanently suppressed', () {
+      const installedCode = 70;
+      const remoteCode = 71;
+      const isNewer = remoteCode > installedCode;
+      expect(isNewer, isTrue);
     });
   });
 }

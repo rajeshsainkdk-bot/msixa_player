@@ -21,6 +21,8 @@ class UpdateService {
   static const String _prefKeyDismissedVersion = 'msixa_dismissed_update_version';
   static const String _prefKeyLastPromptTime = 'msixa_last_update_prompt_time';
   static bool _hasCheckedThisSession = false;
+  static final ValueNotifier<Map<String, dynamic>?> availableUpdateNotifier = ValueNotifier(null);
+  static final ValueNotifier<Map<String, dynamic>?> adminAvailableUpdateNotifier = ValueNotifier(null);
 
   /// Read exact installed package version dynamically from Android PackageManager
   static Future<Map<String, dynamic>> getInstalledVersion() async {
@@ -117,17 +119,31 @@ class UpdateService {
 
       debugPrint('📱 ${isAdmin ? "Admin" : "Player"} Version Check: Installed=$installedCode (v$installedName), Remote=$remoteCode (v$remoteName)');
 
-      // If user dismissed this version or was prompted recently, don't show auto-prompt again
-      if (autoPrompt && !forceUpdate) {
-        final dismissedCode = prefs.getInt(prefKeyDismissed) ?? 0;
-        final lastPromptTime = prefs.getInt(prefKeyPrompt) ?? 0;
-        if (dismissedCode >= remoteCode || (ts - lastPromptTime) < 2 * 3600 * 1000) {
-          return;
-        }
-      }
-
-      // ONLY prompt if remote version is strictly newer than installed version
+      // If remote version is newer, register available update & prompt
       if (remoteCode > installedCode && apkUrl.isNotEmpty) {
+        final updateInfo = {
+          'remoteCode': remoteCode,
+          'remoteName': remoteName,
+          'sizeMb': sizeMb,
+          'releaseNotes': releaseNotes,
+          'apkUrl': apkUrl,
+          'forceUpdate': forceUpdate,
+        };
+        if (isAdmin) {
+          adminAvailableUpdateNotifier.value = updateInfo;
+        } else {
+          availableUpdateNotifier.value = updateInfo;
+        }
+
+        if (autoPrompt && !forceUpdate) {
+          final dismissedCode = prefs.getInt(prefKeyDismissed) ?? 0;
+          final lastPromptTime = prefs.getInt(prefKeyPrompt) ?? 0;
+          // Only suppress if user clicked Later in this exact 10-minute active testing window
+          if (dismissedCode >= remoteCode && (ts - lastPromptTime) < 10 * 60 * 1000) {
+            return;
+          }
+        }
+
         await prefs.setInt(prefKeyPrompt, ts);
         if (context.mounted) {
           ScaffoldMessenger.of(context).hideCurrentSnackBar();
@@ -143,6 +159,11 @@ class UpdateService {
           );
         }
       } else {
+        if (isAdmin) {
+          adminAvailableUpdateNotifier.value = null;
+        } else {
+          availableUpdateNotifier.value = null;
+        }
         if (!autoPrompt && context.mounted) {
           ScaffoldMessenger.of(context).hideCurrentSnackBar();
           _showUpToDateDialog(

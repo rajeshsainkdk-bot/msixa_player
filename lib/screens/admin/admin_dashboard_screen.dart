@@ -1452,26 +1452,32 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                     size: 18,
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(
-                            'Cloudflare R2 Storage (10 GB Free)',
-                            style: GoogleFonts.syne(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                          Flexible(
+                            child: Text(
+                              'Cloudflare R2 Storage',
+                              style: GoogleFonts.syne(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                           const SizedBox(width: 6),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                             decoration: BoxDecoration(
                               color: isConnected ? progressColor.withOpacity(0.2) : Colors.amber.withOpacity(0.2),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
-                              isConnected ? '${usedPercentage.toStringAsFixed(1)}% Used' : '⚠️ Setup',
+                              isConnected ? '${usedPercentage.toStringAsFixed(1)}%' : 'Setup',
                               style: TextStyle(
                                 color: isConnected ? progressColor : Colors.amberAccent,
                                 fontSize: 9,
@@ -1483,7 +1489,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Bucket: ${r2.bucketName ?? "msixa-music"} • CDN Live Edge',
+                        'Bucket: ${r2.bucketName ?? "msixa-music"} • CDN Live',
                         style: const TextStyle(color: Colors.white60, fontSize: 10),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -1491,29 +1497,40 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                     ],
                   ),
                 ),
+                const SizedBox(width: 6),
                 IconButton(
                   icon: _isLoadingStorageStats
                       ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF00E5FF)))
-                      : const Icon(Icons.refresh_rounded, size: 16, color: Color(0xFF00E5FF)),
-                  tooltip: 'स्टोरेज रिफ्रेश करें',
+                      : const Icon(Icons.refresh_rounded, size: 18, color: Color(0xFF00E5FF)),
+                  tooltip: _lang.isHindi ? 'स्टोरेज रिफ्रेश करें' : 'Refresh Storage',
                   visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                   onPressed: _refreshStorageStats,
                 ),
-                ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1E293B),
-                    foregroundColor: const Color(0xFF00E5FF),
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    shape: RoundedRectangleBorder(
+                const SizedBox(width: 4),
+                InkWell(
+                  onTap: _showR2SettingsDialog,
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1E293B),
                       borderRadius: BorderRadius.circular(8),
-                      side: BorderSide(color: const Color(0xFF00E5FF).withOpacity(0.3)),
+                      border: Border.all(color: const Color(0xFF00E5FF).withOpacity(0.35)),
                     ),
-                    elevation: 0,
-                    visualDensity: VisualDensity.compact,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Icon(Icons.settings_rounded, size: 13, color: Color(0xFF00E5FF)),
+                        SizedBox(width: 4),
+                        Text(
+                          'Settings',
+                          style: TextStyle(color: Color(0xFF00E5FF), fontSize: 10, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
                   ),
-                  icon: const Icon(Icons.settings_rounded, size: 12),
-                  label: const Text('Settings', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-                  onPressed: _showR2SettingsDialog,
                 ),
               ],
             ),
@@ -1531,7 +1548,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
             ),
             const SizedBox(height: 8),
 
-            // Used & Remaining Metrics
+            // Used & Remaining Metrics (respects English/Hindi language mode)
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -1539,7 +1556,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                   text: TextSpan(
                     style: const TextStyle(fontSize: 11, color: Colors.white70),
                     children: [
-                      const TextSpan(text: 'उपयोग (Used): ', style: TextStyle(color: Colors.grey)),
+                      TextSpan(
+                        text: _lang.isHindi ? 'उपयोग (Used): ' : 'Used: ',
+                        style: const TextStyle(color: Colors.grey),
+                      ),
                       TextSpan(
                         text: usedMb < 1024 ? '${usedMb.toStringAsFixed(1)} MB' : '${usedGb.toStringAsFixed(2)} GB',
                         style: TextStyle(color: progressColor, fontWeight: FontWeight.bold),
@@ -1552,13 +1572,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                   text: TextSpan(
                     style: const TextStyle(fontSize: 11, color: Colors.white70),
                     children: [
-                      const TextSpan(text: 'बची हुई (Free): ', style: TextStyle(color: Colors.grey)),
+                      TextSpan(
+                        text: _lang.isHindi ? 'बची हुई (Free): ' : 'Free: ',
+                        style: const TextStyle(color: Colors.grey),
+                      ),
                       TextSpan(
                         text: '${remainingGb.toStringAsFixed(2)} GB',
                         style: const TextStyle(color: Color(0xFF00E5FF), fontWeight: FontWeight.bold),
                       ),
                       TextSpan(
-                        text: ' (~$estimatedSongsRemaining गाने)',
+                        text: ' (~$estimatedSongsRemaining ${_lang.isHindi ? "गाने" : "Songs"})',
                         style: const TextStyle(color: Colors.white54, fontSize: 10),
                       ),
                     ],
@@ -1587,36 +1610,44 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
         backgroundColor: const Color(0xFF131A2A),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
-          children: const [
-            Icon(Icons.pie_chart_rounded, color: Color(0xFF00E5FF), size: 22),
-            SizedBox(width: 8),
+          children: [
+            const Icon(Icons.pie_chart_rounded, color: Color(0xFF00E5FF), size: 22),
+            const SizedBox(width: 8),
             Text(
-              'Cloudflare R2 स्टोरेज विवरण',
-              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+              _lang.isHindi ? 'Cloudflare R2 स्टोरेज विवरण' : 'Cloudflare R2 Storage Details',
+              style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
             ),
           ],
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _buildStorageDetailRow('कुल मुफ़्त कोटा (Free Plan):', '10.00 GB (10,240 MB)', Colors.white),
+            _buildStorageDetailRow(
+              _lang.isHindi ? 'कुल मुफ़्त कोटा (Free Plan):' : 'Total Free Quota (Free Plan):',
+              '10.00 GB (10,240 MB)',
+              Colors.white,
+            ),
             const Divider(color: Colors.white10),
             _buildStorageDetailRow(
-              'उपयोग की गई स्टोरेज (Used):',
+              _lang.isHindi ? 'उपयोग की गई स्टोरेज (Used):' : 'Used Storage:',
               '${usedMb < 1024 ? "${usedMb.toStringAsFixed(1)} MB" : "${usedGb.toStringAsFixed(2)} GB"} (${usedPercentage.toStringAsFixed(1)}%)',
               const Color(0xFFFFB300),
             ),
             const Divider(color: Colors.white10),
             _buildStorageDetailRow(
-              'बची हुई मुफ़्त स्टोरेज (Remaining):',
+              _lang.isHindi ? 'बची हुई मुफ़्त स्टोरेज (Remaining):' : 'Remaining Free Storage:',
               '${remainingGb.toStringAsFixed(2)} GB (${(100 - usedPercentage).toStringAsFixed(1)}% Free)',
               const Color(0xFF10B981),
             ),
             const Divider(color: Colors.white10),
-            _buildStorageDetailRow('कुल क्लाउड फ़ाइलें (Files):', '$totalObjects Objects', Colors.cyanAccent),
+            _buildStorageDetailRow(
+              _lang.isHindi ? 'कुल क्लाउड फ़ाइलें (Files):' : 'Total Cloud Files:',
+              '$totalObjects Objects',
+              Colors.cyanAccent,
+            ),
             const Divider(color: Colors.white10),
             _buildStorageDetailRow(
-              'अनुमानित शेष गाने (Can Upload):',
+              _lang.isHindi ? 'अनुमानित शेष गाने (Can Upload):' : 'Estimated Songs Remaining:',
               '~$estimatedSongsRemaining MP3 Songs',
               const Color(0xFF00E5FF),
             ),
@@ -1628,19 +1659,29 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
               Navigator.pop(ctx);
               _refreshStorageStats();
             },
-            child: const Text('रिफ्रेश (Refresh)', style: TextStyle(color: Color(0xFF00E5FF))),
+            child: Text(
+              _lang.isHindi ? 'रिफ्रेश (Refresh)' : 'Refresh',
+              style: const TextStyle(color: Color(0xFF00E5FF)),
+            ),
           ),
           ElevatedButton.icon(
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981), foregroundColor: Colors.black),
             icon: const Icon(Icons.cloud_sync_rounded, size: 16),
-            label: const Text('क्लाउड गाने सिंक करें', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+            label: Text(
+              _lang.isHindi ? 'क्लाउड गाने सिंक करें' : 'Sync Cloud Songs',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+            ),
             onPressed: () async {
               Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⏳ Cloudflare R2 से गाने लोड हो रहे हैं...')));
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Text(_lang.isHindi ? '⏳ Cloudflare R2 से गाने लोड हो रहे हैं...' : '⏳ Loading songs from Cloudflare R2...'),
+              ));
               await _backend.syncWithCloud();
               setState(() {});
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('✅ R2 से ${_backend.approvedSongs.length} गाने लोड हो गए!')));
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text(_lang.isHindi ? '✅ R2 से ${_backend.approvedSongs.length} गाने लोड हो गए!' : '✅ Loaded ${_backend.approvedSongs.length} songs from R2!'),
+                ));
               }
             },
           ),
@@ -1650,7 +1691,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
               Navigator.pop(ctx);
               _showR2SettingsDialog();
             },
-            child: const Text('R2 सेटिंग्स', style: TextStyle(fontWeight: FontWeight.bold)),
+            child: Text(
+              _lang.isHindi ? 'R2 सेटिंग्स' : 'R2 Settings',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
@@ -1963,6 +2007,56 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                 ),
               ],
             ),
+          ),
+
+          // Admin Live OTA Update Banner
+          ValueListenableBuilder<Map<String, dynamic>?>(
+            valueListenable: UpdateService.adminAvailableUpdateNotifier,
+            builder: (context, updateData, _) {
+              if (updateData == null) return const SizedBox.shrink();
+              final vName = updateData['remoteName'] ?? '1.0.71';
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                child: InkWell(
+                  onTap: () => UpdateService.checkForUpdate(context, autoPrompt: false, isAdmin: true),
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFFFB300), Color(0xFFFF6D00)],
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.system_update_rounded, color: Colors.black, size: 20),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            _lang.isHindi
+                                ? '🚀 नया एडमिन वर्ज़न उपलब्ध है: v$vName (अपडेट करने के लिए टैप करें)'
+                                : '🚀 New Admin Update Available: v$vName (Tap to Install)',
+                            style: const TextStyle(color: Colors.black, fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.black,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            _lang.isHindi ? 'अपडेट' : 'Update',
+                            style: const TextStyle(color: Color(0xFFFFB300), fontSize: 11, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
           ),
 
           // Cloudflare R2 Cloud Server Status & Control Pill

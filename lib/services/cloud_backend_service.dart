@@ -9,6 +9,7 @@ import '../models/song.dart';
 import '../models/playlist.dart';
 import 'catalog_service.dart';
 import 'r2_storage_service.dart';
+import 'ai_artwork_service.dart';
 
 /// Central Cloud & Community Backend Service
 /// Handles User Registration with Phone OTP verification,
@@ -1105,10 +1106,21 @@ class CloudBackendService extends ChangeNotifier {
       final List<dynamic> jsonList = jsonDecode(content);
       for (final item in jsonList) {
         try {
-          final song = Song.fromJson(item as Map<String, dynamic>);
+          Song song = Song.fromJson(item as Map<String, dynamic>);
           // NEVER add back a deleted song!
           if (_deletedSongIds.contains(song.id)) {
             continue;
+          }
+          final cUrl = song.coverUrl.trim();
+          final isMicOrEmpty = cUrl.isEmpty ||
+              cUrl.contains('1511671782779') ||
+              cUrl.contains('photo-1511671782779') ||
+              cUrl.contains('1493225457124') ||
+              cUrl.contains('placeholder') ||
+              cUrl.contains('default_cover') ||
+              cUrl == 'null';
+          if (isMicOrEmpty) {
+            song = song.copyWith(coverUrl: AiArtworkService().getAiCoverForSong(song));
           }
           final idx = _communitySongs.indexWhere((s) => s.id == song.id);
           if (idx == -1) {

@@ -41,7 +41,7 @@ class MiniPlayer extends StatelessWidget {
           child: Container(
             margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: AppColors.surface.withOpacity(0.85),
+              color: const Color(0xFF131A2A),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
                 color: AppColors.primary.withOpacity(0.35),
@@ -62,11 +62,9 @@ class MiniPlayer extends StatelessWidget {
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(20),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       child: Row(
@@ -165,10 +163,19 @@ class MiniPlayer extends StatelessWidget {
                     // Neon Progress Indicator Strip at bottom of mini player
                     SizedBox(
                       height: 3,
-                      child: LinearProgressIndicator(
-                        value: progress,
-                        backgroundColor: AppColors.cardLight.withOpacity(0.3),
-                        valueColor: const AlwaysStoppedAnimation<Color>(AppColors.accentCyan),
+                      child: StreamBuilder<Duration>(
+                        stream: provider.positionStream,
+                        initialData: provider.currentPosition,
+                        builder: (context, snapshot) {
+                          final pos = snapshot.data ?? provider.currentPosition;
+                          final tot = provider.totalDuration.inMilliseconds;
+                          final p = tot > 0 ? (pos.inMilliseconds / tot).clamp(0.0, 1.0) : 0.0;
+                          return LinearProgressIndicator(
+                            value: p,
+                            backgroundColor: AppColors.cardLight.withOpacity(0.3),
+                            valueColor: const AlwaysStoppedAnimation<Color>(AppColors.accentCyan),
+                          );
+                        },
                       ),
                     ),
                   ],

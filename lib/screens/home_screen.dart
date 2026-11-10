@@ -13,6 +13,7 @@ import '../widgets/genre_card.dart';
 import '../widgets/song_list_tile.dart';
 import '../widgets/song_thumbnail_widget.dart';
 import '../services/language_service.dart';
+import '../services/update_service.dart';
 import 'upload_song_screen.dart';
 import 'profile_screen.dart';
 import 'artist_detail_screen.dart';
@@ -253,6 +254,70 @@ class _HomeScreenState extends State<HomeScreen> {
                         ],
                       ),
                     ),
+
+                // Available Live OTA Update Banner
+                ValueListenableBuilder<Map<String, dynamic>?>(
+                  valueListenable: UpdateService.availableUpdateNotifier,
+                  builder: (context, updateData, _) {
+                    if (updateData == null) return const SizedBox.shrink();
+                    final vName = updateData['remoteName'] ?? '1.0.71';
+                    return Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+                      child: InkWell(
+                        onTap: () => UpdateService.checkForUpdate(context, autoPrompt: false),
+                        borderRadius: BorderRadius.circular(14),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFFFFB300), Color(0xFFFF6D00)],
+                            ),
+                            borderRadius: BorderRadius.circular(14),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFFFFB300).withOpacity(0.3),
+                                blurRadius: 10,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.system_update_rounded, color: Colors.black, size: 20),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      lang.isHindi ? '🚀 नया वर्ज़न उपलब्ध है: v$vName' : '🚀 New Update Available: v$vName',
+                                      style: const TextStyle(color: Colors.black, fontSize: 12, fontWeight: FontWeight.bold),
+                                    ),
+                                    Text(
+                                      lang.isHindi ? '1-क्लिक में तुरंत अपडेट करें' : 'Tap to install OTA update directly',
+                                      style: const TextStyle(color: Colors.black87, fontSize: 10),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                decoration: BoxDecoration(
+                                  color: Colors.black,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  lang.isHindi ? 'अपडेट' : 'Update',
+                                  style: const TextStyle(color: Color(0xFFFFB300), fontSize: 11, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
 
                 // Discover Quick Category Tabs: All, Artists, Albums, Playlists
                 _buildDiscoverFilterChips(lang),
