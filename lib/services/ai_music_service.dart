@@ -47,7 +47,7 @@ class AiMusicService {
 
   /// High-resolution verified portraits for top artists
   static const Map<String, String> _artistImages = {
-    'Satinder Sartaaj': 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&q=80',
+    'Satinder Sartaaj': 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=600&q=80',
     'Arijit Singh': 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&q=80',
     'Hariharan': 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=600&q=80',
     'Shreya Ghoshal': 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&q=80',
@@ -109,11 +109,11 @@ class AiMusicService {
     // 6. Detect known Indian artist if mentioned in title or artist string
     for (final artist in _knownArtists) {
       if (rawTitle.toLowerCase().contains(artist.toLowerCase())) {
-        if (rawArtist.isEmpty || rawArtist.toLowerCase() == 'msixa artist' || rawArtist.toLowerCase() == 'unknown artist') {
+        if (rawArtist.isEmpty ||
+            rawArtist.toLowerCase() == 'msixa artist' ||
+            rawArtist.toLowerCase() == 'unknown artist' ||
+            rawArtist.toLowerCase() == 'various artists') {
           rawArtist = artist;
-          // Clean artist name out of title if it was an artifact
-          rawTitle = rawTitle.replaceAll(RegExp(artist, caseSensitive: false), '').trim();
-          rawTitle = rawTitle.replaceAll(RegExp(r'^[\s\-_]+|[\s\-_]+$'), '');
         }
       }
     }

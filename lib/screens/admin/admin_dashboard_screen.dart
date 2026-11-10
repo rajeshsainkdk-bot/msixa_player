@@ -1008,9 +1008,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                             }
                           } catch (_) {}
 
+                          String detectedArtist = 'Various Artists';
+                          String detectedTitle = smartTitle;
+                          if (smartTitle.contains(' - ')) {
+                            final split = smartTitle.split(' - ');
+                            if (split.length >= 2) {
+                              detectedArtist = split[0].trim();
+                              detectedTitle = split.sublist(1).join(' - ').trim();
+                            }
+                          }
+
                           final newSong = await _backend.addAdminSong(
-                            title: smartTitle,
-                            artist: 'Various Artists',
+                            title: detectedTitle,
+                            artist: detectedArtist,
                             album: playlistTitleCtrl.text.trim().isNotEmpty ? playlistTitleCtrl.text.trim() : 'Msixa Cloud Hits',
                             genre: targetCategory,
                             subCategory: targetSubCategory,

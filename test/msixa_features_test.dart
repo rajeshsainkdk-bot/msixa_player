@@ -4,6 +4,7 @@ import 'package:msixa_player/models/song.dart';
 import 'package:msixa_player/models/folder_hierarchy.dart';
 import 'package:msixa_player/services/cloud_backend_service.dart';
 import 'package:msixa_player/services/device_audio_service.dart';
+import 'package:msixa_player/widgets/song_thumbnail_widget.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -272,6 +273,32 @@ void main() {
       final afterCatDelete = testSongs.where((s) => s.genre.toLowerCase() != 'rajasthani').toList();
       expect(afterCatDelete.length, 1);
       expect(afterCatDelete.first.id, 's4');
+    });
+  });
+
+  group('6. SongThumbnailWidget & Mic Removal Tests', () {
+    test('isGenericMicUrl properly identifies mic URLs and empty covers', () {
+      expect(SongThumbnailWidget.isGenericMicUrl(null), isTrue);
+      expect(SongThumbnailWidget.isGenericMicUrl(''), isTrue);
+      expect(SongThumbnailWidget.isGenericMicUrl('https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&q=80'), isTrue);
+      expect(SongThumbnailWidget.isGenericMicUrl('https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=600&q=80'), isTrue);
+      expect(SongThumbnailWidget.isGenericMicUrl('https://example.com/custom_cover.jpg'), isFalse);
+    });
+
+    test('getGradientForSong produces genre-specific distinct palettes', () {
+      final bhaktiSong = Song(id: '1', title: 'Radhe', artist: 'Artist', album: '', duration: 100, streamUrl: '', coverUrl: '', genre: 'Bhakti');
+      final djSong = Song(id: '2', title: 'Bass', artist: 'Artist', album: '', duration: 100, streamUrl: '', coverUrl: '', genre: 'DJ Remix');
+      final rajasthaniSong = Song(id: '3', title: 'Ghoomar', artist: 'Artist', album: '', duration: 100, streamUrl: '', coverUrl: '', genre: 'Rajasthani');
+
+      final bhaktiColors = SongThumbnailWidget.getGradientForSong(bhaktiSong);
+      final djColors = SongThumbnailWidget.getGradientForSong(djSong);
+      final rajColors = SongThumbnailWidget.getGradientForSong(rajasthaniSong);
+
+      expect(bhaktiColors, isNotEmpty);
+      expect(djColors, isNotEmpty);
+      expect(rajColors, isNotEmpty);
+      expect(bhaktiColors, isNot(equals(djColors)));
+      expect(djColors, isNot(equals(rajColors)));
     });
   });
 }

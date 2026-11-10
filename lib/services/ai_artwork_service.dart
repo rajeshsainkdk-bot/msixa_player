@@ -20,18 +20,19 @@ class AiArtworkService {
       'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600&q=80', // Divine trance night
     ],
     'Punjabi': [
-      'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&q=80', // Vintage acoustic live
+      'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&q=80', // Stage lights
       'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=600&q=80', // Golden studio vibe
       'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=600&q=80', // Crowd concert lights
       'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=600&q=80', // Vibrant live festival
     ],
     'Sufi': [
-      'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&q=80', // Sufi acoustic instrument
+      'https://images.unsplash.com/photo-1511192336575-5a79af67a629?w=600&q=80', // Classical acoustic mehfil
       'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=600&q=80', // Soulful music aesthetic
+      'https://images.unsplash.com/photo-1445985543470-41fdd5c31447?w=600&q=80', // Classical strings
     ],
     'Bollywood': [
       'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&q=80', // Cinema stage lighting
-      'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=600&q=80', // Classic microphone studio
+      'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600&q=80', // Midnight romance purple
       'https://images.unsplash.com/photo-1465847899084-d164df4dedc6?w=600&q=80', // Romantic dusk sky
     ],
     'Desi Lo-Fi': [
@@ -61,12 +62,13 @@ class AiArtworkService {
 
   /// Fallback high-res music artwork
   static const String _defaultMusicCover =
-      'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&q=80';
+      'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&q=80';
 
   /// Suggests a professional AI curated cover for a song based on its genre and title hash
   String getAiCoverForSong(Song song) {
-    if (song.coverUrl.trim().startsWith('http')) {
-      return song.coverUrl.trim();
+    final url = song.coverUrl.trim();
+    if (url.startsWith('http') && !url.contains('1511671782779') && !url.contains('1493225457124')) {
+      return url;
     }
 
     final genreList = _genreArtworkCollections[song.genre];

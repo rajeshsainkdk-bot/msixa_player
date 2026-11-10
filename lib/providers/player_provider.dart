@@ -323,7 +323,7 @@ class PlayerProvider extends ChangeNotifier {
       description: 'Created by you',
       coverUrl: initialSongs?.isNotEmpty == true
           ? initialSongs!.first.coverUrl
-          : 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&q=80',
+          : '',
       songs: initialSongs ?? [],
     );
     _customPlaylists.insert(0, newPlaylist);

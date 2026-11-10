@@ -664,9 +664,9 @@ class CloudBackendService extends ChangeNotifier {
       album: album.trim().isEmpty ? 'Community Uploads' : album.trim(),
       duration: 210,
       streamUrl: audioPath,
-      coverUrl: coverUrl?.trim().isNotEmpty == true
-          ? coverUrl!.trim()
-          : 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&q=80',
+      coverUrl: (coverUrl != null && coverUrl.trim().isNotEmpty && !coverUrl.contains('1511671782779'))
+          ? coverUrl.trim()
+          : '',
       genre: genre.trim().isEmpty ? 'Desi Chill' : genre.trim(),
       subCategory: subCategory?.trim(),
       status: 'pending', // Requires admin approval!
@@ -709,9 +709,9 @@ class CloudBackendService extends ChangeNotifier {
       album: album?.trim().isNotEmpty == true ? album!.trim() : 'Msixa Originals',
       duration: 220,
       streamUrl: audioPath.trim(),
-      coverUrl: coverUrl?.trim().isNotEmpty == true
-          ? coverUrl!.trim()
-          : 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&q=80',
+      coverUrl: (coverUrl != null && coverUrl.trim().isNotEmpty && !coverUrl.contains('1511671782779'))
+          ? coverUrl.trim()
+          : '',
       genre: genre.trim().isEmpty ? 'Bollywood' : genre.trim(),
       subCategory: subCategory?.trim(),
       status: 'approved', // Live immediately!
@@ -741,6 +741,10 @@ class CloudBackendService extends ChangeNotifier {
     final index = _communitySongs.indexWhere((s) => s.id == songId);
     if (index != -1) {
       final existing = _communitySongs[index];
+      final cleanCover = (coverUrl?.trim().isNotEmpty == true && !coverUrl!.contains('1511671782779'))
+          ? coverUrl!.trim()
+          : (existing.coverUrl.contains('1511671782779') ? '' : existing.coverUrl);
+
       _communitySongs[index] = existing.copyWith(
         title: title.trim(),
         artist: artist.trim(),
@@ -748,9 +752,16 @@ class CloudBackendService extends ChangeNotifier {
         genre: genre.trim(),
         subCategory: subCategory?.trim(),
         streamUrl: streamUrl.trim(),
-        coverUrl: coverUrl?.trim().isNotEmpty == true ? coverUrl!.trim() : existing.coverUrl,
+        coverUrl: cleanCover,
       );
       await _persistSongs();
+      try {
+        final r2 = R2StorageService();
+        if (r2.isConfigured) {
+          final jsonContent = jsonEncode(_communitySongs.map((s) => s.toJson()).toList());
+          await r2.putString('db/songs.json', jsonContent);
+        }
+      } catch (_) {}
       notifyListeners();
       return true;
     }
@@ -1103,8 +1114,16 @@ class CloudBackendService extends ChangeNotifier {
             _communitySongs.add(song);
             hasChanges = true;
           } else {
-            if (song.status != _communitySongs[idx].status ||
-                song.streamUrl != _communitySongs[idx].streamUrl) {
+            final cur = _communitySongs[idx];
+            if (cur.title != song.title ||
+                cur.artist != song.artist ||
+                cur.album != song.album ||
+                cur.genre != song.genre ||
+                cur.subCategory != song.subCategory ||
+                cur.coverUrl != song.coverUrl ||
+                cur.status != song.status ||
+                cur.streamUrl != song.streamUrl ||
+                cur.duration != song.duration) {
               _communitySongs[idx] = song;
               hasChanges = true;
             }

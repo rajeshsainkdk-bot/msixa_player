@@ -104,7 +104,7 @@ class DeviceAudioService {
           album: (s.album != null && s.album != '<unknown>') ? s.album! : folderLoc,
           duration: (s.duration ?? 0) ~/ 1000,
           streamUrl: s.uri ?? s.data,
-          coverUrl: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&q=80',
+          coverUrl: '',
           genre: 'Offline',
           subCategory: folderLoc,
           license: 'Personal Offline Audio',

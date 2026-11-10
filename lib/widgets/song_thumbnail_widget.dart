@@ -266,12 +266,24 @@ class SongThumbnailWidget extends StatelessWidget {
     );
   }
 
+  /// Detects legacy hardcoded microphone placeholder from Unsplash or generic fallbacks
+  static bool isGenericMicUrl(String? url) {
+    if (url == null || url.trim().isEmpty) return true;
+    final u = url.trim().toLowerCase();
+    return u.contains('1511671782779') ||
+        u.contains('photo-1511671782779') ||
+        u.contains('1493225457124') ||
+        u.contains('placeholder') ||
+        u.contains('default_cover') ||
+        u == 'null';
+  }
+
   @override
   Widget build(BuildContext context) {
     Widget content;
     final url = song.coverUrl.trim();
 
-    if (url.startsWith('http')) {
+    if (url.startsWith('http') && !isGenericMicUrl(url)) {
       content = CachedNetworkImage(
         imageUrl: url,
         width: size,
@@ -280,7 +292,7 @@ class SongThumbnailWidget extends StatelessWidget {
         placeholder: (_, __) => _buildProceduralArt(context),
         errorWidget: (_, __, ___) => _buildProceduralArt(context),
       );
-    } else if (url.startsWith('/') || url.startsWith('file://')) {
+    } else if ((url.startsWith('/') || url.startsWith('file://')) && !isGenericMicUrl(url)) {
       final filePath = url.replaceFirst('file://', '');
       final f = File(filePath);
       if (f.existsSync()) {
