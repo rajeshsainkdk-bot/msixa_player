@@ -66,12 +66,17 @@ class AudioPlayerService {
   }
 
   AudioSource _createAudioSource(Song song) {
+    Uri? artUri;
+    if (song.coverUrl.startsWith('http')) {
+      artUri = Uri.tryParse(song.coverUrl);
+    }
+
     final mediaItem = MediaItem(
       id: song.id,
       album: song.album,
       title: song.title,
       artist: song.artist,
-      artUri: song.coverUrl.startsWith('http') ? Uri.parse(song.coverUrl) : null,
+      artUri: artUri,
     );
 
     // 1. Asset audio bundled in APK
@@ -80,15 +85,18 @@ class AudioPlayerService {
     }
     // 2. Online streaming URL
     if (song.streamUrl.startsWith('http://') || song.streamUrl.startsWith('https://')) {
-      return AudioSource.uri(Uri.parse(song.streamUrl), tag: mediaItem);
+      final safeUri = Uri.tryParse(song.streamUrl) ?? Uri.parse(Uri.encodeFull(song.streamUrl));
+      return AudioSource.uri(safeUri, tag: mediaItem);
     }
     // 3. Android Content Provider (Device storage)
     if (song.streamUrl.startsWith('content://')) {
-      return AudioSource.uri(Uri.parse(song.streamUrl), tag: mediaItem);
+      final safeUri = Uri.tryParse(song.streamUrl) ?? Uri.parse(song.streamUrl);
+      return AudioSource.uri(safeUri, tag: mediaItem);
     }
     // 4. File Path (Device storage file)
     if (song.streamUrl.startsWith('file://')) {
-      return AudioSource.uri(Uri.parse(song.streamUrl), tag: mediaItem);
+      final cleanPath = song.streamUrl.replaceFirst('file://', '');
+      return AudioSource.file(cleanPath, tag: mediaItem);
     }
     return AudioSource.file(song.streamUrl, tag: mediaItem);
   }

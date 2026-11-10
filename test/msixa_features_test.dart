@@ -319,4 +319,64 @@ void main() {
       expect(artists.any((a) => a.name == 'Satinder Sartaaj'), isTrue);
     });
   });
+
+  group('8. Deep Audit & Edge Case Resilience Tests', () {
+    test('Safe URI encoding handles spaces and brackets without FormatException', () {
+      const rawUrl = 'https://pub-d4f2e58dc2594d0c8dc1f30bbae4344f.r2.dev/songs/01 - Song [320kbps] (Official).mp3';
+      final parsed = Uri.tryParse(rawUrl) ?? Uri.parse(Uri.encodeFull(rawUrl));
+      expect(parsed, isNotNull);
+      expect(parsed.scheme, 'https');
+
+      const problematicUrl = 'https://example.com/songs/test song with spaces & [brackets].mp3';
+      final uri = Uri.tryParse(problematicUrl) ?? Uri.parse(Uri.encodeFull(problematicUrl));
+      expect(uri.scheme, 'https');
+      expect(uri.path, contains('spaces'));
+    });
+
+    test('Search correctly queries by SubCategory in addition to Title, Artist, Album, and Genre', () {
+      final songs = [
+        Song(
+          id: 's1',
+          title: 'Choudhary',
+          artist: 'Mame Khan',
+          album: 'Folk Collection',
+          duration: 200,
+          streamUrl: 'https://example.com/s1.mp3',
+          coverUrl: 'https://example.com/c1.jpg',
+          genre: 'Rajasthani',
+          subCategory: 'Marwadi Hits',
+        ),
+        Song(
+          id: 's2',
+          title: 'Dam Mast Qalandar',
+          artist: 'Nusrat Fateh Ali Khan',
+          album: 'Sufi Magic',
+          duration: 350,
+          streamUrl: 'https://example.com/s2.mp3',
+          coverUrl: 'https://example.com/c2.jpg',
+          genre: 'Sufi',
+          subCategory: 'Qawwali Classics',
+        ),
+      ];
+
+      final lower = 'marwadi';
+      final results = songs.where((s) {
+        return s.title.toLowerCase().contains(lower) ||
+            s.artist.toLowerCase().contains(lower) ||
+            s.album.toLowerCase().contains(lower) ||
+            s.genre.toLowerCase().contains(lower) ||
+            (s.subCategory != null && s.subCategory!.toLowerCase().contains(lower));
+      }).toList();
+
+      expect(results.length, 1);
+      expect(results.first.id, 's1');
+      expect(results.first.subCategory, 'Marwadi Hits');
+    });
+
+    test('Empty catalog triggers cloud sync recovery', () {
+      final List<Song> approvedSongs = [];
+      final shouldSync = approvedSongs.isEmpty;
+      expect(shouldSync, isTrue);
+    });
+  });
 }

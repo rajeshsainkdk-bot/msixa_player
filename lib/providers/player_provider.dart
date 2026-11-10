@@ -418,7 +418,9 @@ class PlayerProvider extends ChangeNotifier {
     final deviceResults = _deviceSongs.where((s) =>
         s.title.toLowerCase().contains(lower) ||
         s.artist.toLowerCase().contains(lower) ||
-        s.album.toLowerCase().contains(lower)).toList();
+        s.album.toLowerCase().contains(lower) ||
+        s.genre.toLowerCase().contains(lower) ||
+        (s.subCategory != null && s.subCategory!.toLowerCase().contains(lower))).toList();
 
     _searchResults = [...catalogResults, ...deviceResults];
     _syncFavoritesFlag(_searchResults);

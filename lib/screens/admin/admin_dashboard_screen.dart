@@ -65,6 +65,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
   bool _isMultiSelectMode = false;
   final Set<String> _selectedSongIds = {};
 
+  DateTime _lastAdminPosTime = DateTime.fromMillisecondsSinceEpoch(0);
+
   @override
   void initState() {
     super.initState();
@@ -112,7 +114,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
 
     _posSub = _player.positionStream.listen((pos) {
       if (mounted) {
-        setState(() => _previewPosition = pos);
+        final now = DateTime.now();
+        if (now.difference(_lastAdminPosTime).inMilliseconds >= 400) {
+          _lastAdminPosTime = now;
+          setState(() => _previewPosition = pos);
+        }
       }
     });
 
