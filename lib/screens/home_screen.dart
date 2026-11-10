@@ -35,76 +35,91 @@ class _HomeScreenState extends State<HomeScreen> {
       'title': 'All Indian',
       'icon': Icons.music_note_rounded,
       'gradient': LinearGradient(colors: [Color(0xFFFF9933), Color(0xFF138808)]),
+      'image': 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&q=80',
     },
     {
       'title': 'Rajasthani',
       'icon': Icons.audiotrack_rounded,
       'gradient': LinearGradient(colors: [Color(0xFFFF6F00), Color(0xFFFFD54F)]),
+      'image': 'https://images.unsplash.com/photo-1599827552599-eeddd59551c6?w=600&q=80',
     },
     {
       'title': 'Bhakti',
       'icon': Icons.temple_hindu_rounded,
       'gradient': LinearGradient(colors: [Color(0xFFF59E0B), Color(0xFFD97706)]),
+      'image': 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=600&q=80',
     },
     {
       'title': 'Haryanvi',
       'icon': Icons.speaker_group_rounded,
       'gradient': LinearGradient(colors: [Color(0xFF10B981), Color(0xFF047857)]),
+      'image': 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=600&q=80',
     },
     {
       'title': 'Punjabi',
       'icon': Icons.speaker_group_rounded,
       'gradient': LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFFEC4899)]),
+      'image': 'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=600&q=80',
     },
     {
       'title': 'Sufi',
       'icon': Icons.self_improvement_rounded,
       'gradient': LinearGradient(colors: [Color(0xFF10B981), Color(0xFF06B6D4)]),
+      'image': 'https://images.unsplash.com/photo-1511192336575-5a79af67a629?w=600&q=80',
     },
     {
       'title': 'Bollywood',
       'icon': Icons.movie_filter_rounded,
       'gradient': LinearGradient(colors: [Color(0xFFE11D48), Color(0xFF9333EA)]),
+      'image': 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=600&q=80',
     },
     {
       'title': 'Spiritual',
       'icon': Icons.flare_rounded,
       'gradient': LinearGradient(colors: [Color(0xFF6366F1), Color(0xFF3B82F6)]),
+      'image': 'https://images.unsplash.com/photo-1507676184212-d03ab07a01bf?w=600&q=80',
     },
     {
       'title': 'Desi Lo-Fi',
       'icon': Icons.nightlife_rounded,
       'gradient': LinearGradient(colors: [Color(0xFF3B82F6), Color(0xFF06B6D4)]),
+      'image': 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600&q=80',
     },
     {
       'title': 'Ghazal',
       'icon': Icons.waves_rounded,
       'gradient': LinearGradient(colors: [Color(0xFFEC4899), Color(0xFFF43F5E)]),
+      'image': 'https://images.unsplash.com/photo-1445985543470-41fdd5c31447?w=600&q=80',
     },
     {
       'title': 'Folk Fusion',
       'icon': Icons.album_rounded,
       'gradient': LinearGradient(colors: [Color(0xFFD97706), Color(0xFFB45309)]),
+      'image': 'https://images.unsplash.com/photo-1524492412937-b28074a5d7da?w=600&q=80',
     },
     {
       'title': 'Bhojpuri',
       'icon': Icons.music_video_rounded,
       'gradient': LinearGradient(colors: [Color(0xFFF43F5E), Color(0xFFBE123C)]),
+      'image': 'https://images.unsplash.com/photo-1506157786151-b8491531f063?w=600&q=80',
     },
     {
       'title': 'DJ Remix',
       'icon': Icons.equalizer_rounded,
       'gradient': LinearGradient(colors: [Color(0xFF00E5FF), Color(0xFF4F46E5)]),
+      'image': 'https://images.unsplash.com/photo-1571266028243-3716f02d2d2e?w=600&q=80',
     },
     {
       'title': 'Classical',
       'icon': Icons.graphic_eq_rounded,
       'gradient': LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFF4338CA)]),
+      'image': 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=600&q=80',
     },
     {
       'title': 'Indie Pop',
       'icon': Icons.radio_rounded,
       'gradient': LinearGradient(colors: [Color(0xFF06B6D4), Color(0xFF0284C7)]),
+      'image': 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=600&q=80',
     },
   ];
 
@@ -696,6 +711,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         title: g['title'] as String,
                         icon: g['icon'] as IconData,
                         gradient: g['gradient'] as LinearGradient,
+                        imageUrl: g['image'] as String?,
                         isSelected: isSelected,
                         onTap: () {
                           provider.selectGenre(g['title'] as String);

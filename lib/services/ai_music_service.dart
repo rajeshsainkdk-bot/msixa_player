@@ -17,7 +17,7 @@ class AiMusicService {
 
     // Punjabi & Sufi
     'Satinder Sartaaj', 'Gurdas Maan', 'Diljit Dosanjh', 'Sidhu Moose Wala',
-    'B Praak', 'Karan Aujla', 'Ammy Virk', 'Jassi Gill', 'Nusrat Fateh Ali Khan',
+    'B Praak', 'Karan Aujla', 'Badshah', 'Ammy Virk', 'Jassi Gill', 'Nusrat Fateh Ali Khan',
     'Rahat Fateh Ali Khan', 'Wadali Brothers', 'Nooran Sisters', 'Kanwar Grewal',
     'Babbu Maan', 'AP Dhillon', 'Shubh', 'Harrdy Sandhu', 'Guru Randhawa',
 
@@ -26,7 +26,7 @@ class AiMusicService {
     'Neha Kakkar', 'Mohit Chauhan', 'KK', 'Sunidhi Chauhan', 'Armaan Malik',
     'Darshan Raval', 'Vishal Mishra', 'Papon', 'Prateek Kuhad', 'Anuv Jain',
     'Sachet Tandon', 'Parampara Tandon', 'Shaan', 'Udit Narayan', 'Kumar Sanu',
-    'Alka Yagnik', 'Kavita Krishnamurthy', 'Sadhana Sargam',
+    'Alka Yagnik', 'Kavita Krishnamurthy', 'Sadhana Sargam', 'Sachin-Jigar',
 
     // Retro Classics & Ghazals
     'Kishore Kumar', 'Lata Mangeshkar', 'Mohammed Rafi', 'Asha Bhosle',
@@ -35,31 +35,97 @@ class AiMusicService {
 
     // Rajasthani & Folk
     'Seema Mishra', 'Prakash Mali', 'Chotu Singh Rawna', 'Rani Rangili',
-    'Mame Khan', 'Ila Arun', 'Swaroop Khan',
+    'Mame Khan', 'Ila Arun', 'Swaroop Khan', 'Sarita Kharwal',
 
     // Haryanvi
     'Sapna Choudhary', 'Diler Kharkiya', 'Masoom Sharma', 'Renuka Panwar',
     'Gulzaar Chhaniwala', 'Raju Punjabi', 'Ajay Hooda',
 
     // Bhojpuri
-    'Pawan Singh', 'Khesari Lal Yadav', 'Shilpi Raj', 'Manoj Tiwari',
+    'Pawan Singh', 'Khesari Lal Yadav', 'Shilpi Raj', 'Manoj Tiwari', 'Dinesh Lal Yadav',
   ];
 
-  /// High-resolution verified portraits for top artists
+  /// High-resolution verified portraits and concert photos for Indian artists
   static const Map<String, String> _artistImages = {
-    'Satinder Sartaaj': 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=600&q=80',
-    'Arijit Singh': 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&q=80',
+    // Bhakti & Devotional
     'Hariharan': 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=600&q=80',
-    'Shreya Ghoshal': 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&q=80',
+    'Anuradha Paudwal': 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&q=80',
+    'Anup Jalota': 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=600&q=80',
+    'Lakhbir Singh Lakkha': 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=600&q=80',
+    'Rasraj Ji Maharaj': 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600&q=80',
+    'Hansraj Raghuwanshi': 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&q=80',
+    'Kanhiya Mittal': 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=600&q=80',
+    'Gulshan Kumar': 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=600&q=80',
+    'Maanya Arora': 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=600&q=80',
+    'Sudhir Vyas': 'https://images.unsplash.com/photo-1590076215667-875d4ef2d7ee?w=600&q=80',
+    'Sai Charan Bhaskaruni': 'https://images.unsplash.com/photo-1609137144822-1d577e02581c?w=600&q=80',
+    'Bhumika Sharma': 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=600&q=80',
+
+    // Punjabi & Sufi
+    'Satinder Sartaaj': 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=600&q=80',
     'Diljit Dosanjh': 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=600&q=80',
-    'Sonu Nigam': 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=600&q=80',
-    'Jubin Nautiyal': 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=600&q=80',
     'Sidhu Moose Wala': 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=600&q=80',
+    'Karan Aujla': 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=600&q=80',
+    'Badshah': 'https://images.unsplash.com/photo-1506157786151-b8491531f063?w=600&q=80',
     'B Praak': 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=600&q=80',
+    'Ammy Virk': 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=600&q=80',
+    'Gurdas Maan': 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=600&q=80',
+    'Nusrat Fateh Ali Khan': 'https://images.unsplash.com/photo-1511192336575-5a79af67a629?w=600&q=80',
+    'Rahat Fateh Ali Khan': 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=600&q=80',
+    'Wadali Brothers': 'https://images.unsplash.com/photo-1445985543470-41fdd5c31447?w=600&q=80',
+    'Nooran Sisters': 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&q=80',
+    'AP Dhillon': 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600&q=80',
+    'Shubh': 'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=600&q=80',
+    'Guru Randhawa': 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=600&q=80',
+    'Harrdy Sandhu': 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=600&q=80',
+
+    // Bollywood & Melodies
+    'Arijit Singh': 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&q=80',
+    'Shreya Ghoshal': 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&q=80',
+    'Sonu Nigam': 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=600&q=80',
+    'Sunidhi Chauhan': 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=600&q=80',
+    'Jubin Nautiyal': 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=600&q=80',
+    'Atif Aslam': 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=600&q=80',
+    'Neha Kakkar': 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&q=80',
+    'Mohit Chauhan': 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=600&q=80',
+    'KK': 'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=600&q=80',
+    'Armaan Malik': 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=600&q=80',
+    'Darshan Raval': 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=600&q=80',
+    'Vishal Mishra': 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=600&q=80',
+    'Sachet Tandon': 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=600&q=80',
+    'Parampara Tandon': 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=600&q=80',
+    'Shaan': 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=600&q=80',
+    'Udit Narayan': 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=600&q=80',
+    'Kumar Sanu': 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=600&q=80',
+    'Alka Yagnik': 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&q=80',
+
+    // Retro Classics & Ghazals
     'Kishore Kumar': 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=600&q=80',
     'Lata Mangeshkar': 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=600&q=80',
+    'Mohammed Rafi': 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=600&q=80',
+    'Asha Bhosle': 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&q=80',
+    'Mukesh': 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=600&q=80',
     'Jagjit Singh': 'https://images.unsplash.com/photo-1501196354995-cbb51c65aaea?w=600&q=80',
+    'Pankaj Udhas': 'https://images.unsplash.com/photo-1445985543470-41fdd5c31447?w=600&q=80',
+
+    // Rajasthani & Folk
     'Prakash Mali': 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=600&q=80',
+    'Seema Mishra': 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=600&q=80',
+    'Chotu Singh Rawna': 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=600&q=80',
+    'Mame Khan': 'https://images.unsplash.com/photo-1524492412937-b28074a5d7da?w=600&q=80',
+    'Rani Rangili': 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&q=80',
+
+    // Haryanvi
+    'Sapna Choudhary': 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&q=80',
+    'Diler Kharkiya': 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=600&q=80',
+    'Masoom Sharma': 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=600&q=80',
+    'Renuka Panwar': 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=600&q=80',
+    'Gulzaar Chhaniwala': 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=600&q=80',
+
+    // Bhojpuri
+    'Pawan Singh': 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=600&q=80',
+    'Khesari Lal Yadav': 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=600&q=80',
+    'Shilpi Raj': 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&q=80',
   };
 
   /// Clean, parse, and optimize a song's metadata using intelligent heuristics

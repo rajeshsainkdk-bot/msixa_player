@@ -50,6 +50,10 @@ class PlayerProvider extends ChangeNotifier {
   EqualizerPreset _currentEqPreset = EqualizerPreset.defaultPresets.first;
   List<double> _bandGains = [0.0, 0.0, 0.0, 0.0, 0.0];
 
+  List<Artist> _cachedArtists = [];
+  List<Album> _cachedAlbums = [];
+  DateTime _lastPositionNotify = DateTime.fromMillisecondsSinceEpoch(0);
+
   // Getters
   Song? get currentSong => _audioService.currentSong;
   List<Song> get queue => _audioService.queue;
@@ -66,8 +70,8 @@ class PlayerProvider extends ChangeNotifier {
 
   List<Song> get trendingSongs => _trendingSongs;
   List<Playlist> get curatedPlaylists => _curatedPlaylists;
-  List<Artist> get artists => AiMusicService().extractArtists(_trendingSongs);
-  List<Album> get albums => AiMusicService().extractAlbums(_trendingSongs);
+  List<Artist> get artists => _cachedArtists;
+  List<Album> get albums => _cachedAlbums;
   List<Song> get searchResults => _searchResults;
   List<Song> get favorites => _favorites;
   List<Song> get recentlyPlayed => _recentlyPlayed;
@@ -88,8 +92,8 @@ class PlayerProvider extends ChangeNotifier {
     // Realtime synchronization: listen to CloudBackendService so admin additions & deletions update user player immediately
     CloudBackendService().addListener(_onBackendCatalogUpdated);
 
-    // Periodic cloud poll every 3 seconds so User app instantly detects song deletion / new uploads from Admin app
-    _cloudSyncTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+    // Periodic cloud poll every 5 seconds so User app detects song updates without hammering battery/radio
+    _cloudSyncTimer = Timer.periodic(const Duration(seconds: 5), (_) {
       CloudBackendService().syncSharedData();
     });
   }
@@ -109,7 +113,11 @@ class PlayerProvider extends ChangeNotifier {
 
     _audioService.positionStream.listen((pos) {
       _currentPosition = pos;
-      notifyListeners();
+      final now = DateTime.now();
+      if (now.difference(_lastPositionNotify).inMilliseconds >= 500) {
+        _lastPositionNotify = now;
+        notifyListeners();
+      }
     });
 
     _audioService.durationStream.listen((dur) {
@@ -146,11 +154,6 @@ class PlayerProvider extends ChangeNotifier {
 
     // 4. Load online catalog
     await refreshCatalog();
-
-    // 5. Automatically refresh catalog whenever CloudBackendService updates
-    CloudBackendService().addListener(() {
-      refreshCatalog();
-    });
   }
 
   /// Called immediately when a user registers or logs in on any device
@@ -184,10 +187,20 @@ class PlayerProvider extends ChangeNotifier {
     notifyListeners();
 
     final backend = CloudBackendService();
+
+    // If backend has no songs yet on startup/new device, explicitly trigger cloud sync!
+    if (backend.approvedSongs.isEmpty) {
+      await backend.syncWithCloud(force: true, forceNotify: true);
+    }
+
     final deleted = backend.deletedSongIds;
 
     _trendingSongs = await _catalogService.fetchTrendingTracks();
     _curatedPlaylists = _catalogService.getCuratedPlaylists(songs: _trendingSongs);
+
+    // Cache artists and albums so getters don't loop/regex on 438 songs during playback!
+    _cachedArtists = AiMusicService().extractArtists(_trendingSongs);
+    _cachedAlbums = AiMusicService().extractAlbums(_trendingSongs);
 
     // If currently playing song was deleted by admin, immediately stop playback!
     if (_audioService.currentSong != null && deleted.contains(_audioService.currentSong!.id)) {
@@ -234,6 +247,9 @@ class PlayerProvider extends ChangeNotifier {
   }
 
   Future<void> seek(Duration pos) async {
+    _currentPosition = pos;
+    _lastPositionNotify = DateTime.now();
+    notifyListeners();
     await _audioService.seek(pos);
   }
 

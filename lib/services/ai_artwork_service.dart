@@ -58,6 +58,26 @@ class AiArtworkService {
       'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=600&q=80', // Neon club lasers
       'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=600&q=80', // EDM festival
     ],
+    'Bhojpuri': [
+      'https://images.unsplash.com/photo-1506157786151-b8491531f063?w=600&q=80', // Festival stage lights
+      'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=600&q=80', // High-energy desi dance
+      'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=600&q=80', // Party crowd
+    ],
+    'Classical': [
+      'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=600&q=80', // Sitar & strings
+      'https://images.unsplash.com/photo-1511192336575-5a79af67a629?w=600&q=80', // Classical mehfil
+      'https://images.unsplash.com/photo-1445985543470-41fdd5c31447?w=600&q=80', // Acoustic instruments
+    ],
+    'Folk Fusion': [
+      'https://images.unsplash.com/photo-1524492412937-b28074a5d7da?w=600&q=80', // Desert folk vibe
+      'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=600&q=80', // Traditional Rajasthani sunset
+      'https://images.unsplash.com/photo-1582510003544-4d00b7f74220?w=600&q=80', // Heritage folk arches
+    ],
+    'Indie Pop': [
+      'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=600&q=80', // Warm indie studio
+      'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&q=80', // Live indie stage
+      'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600&q=80', // Late night vibes
+    ],
   };
 
   /// Fallback high-res music artwork

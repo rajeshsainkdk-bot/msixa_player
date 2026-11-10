@@ -928,14 +928,14 @@ class CloudBackendService extends ChangeNotifier {
   bool _isSyncing = false;
 
   /// Public Sync Method: Reloads shared data across both User & Admin apps
-  Future<void> syncSharedData() async {
-    if (_isSyncing) return;
+  Future<void> syncSharedData({bool force = false, bool forceNotify = false}) async {
+    if (_isSyncing && !force) return;
     _isSyncing = true;
     try {
       final usersChanged = await _loadSharedUsers();
       final songsChanged = await _loadSharedSongs();
       final playlistsChanged = await _loadSharedPlaylists();
-      if (usersChanged || songsChanged || playlistsChanged) {
+      if (usersChanged || songsChanged || playlistsChanged || forceNotify) {
         notifyListeners();
       }
     } catch (e) {
@@ -945,7 +945,8 @@ class CloudBackendService extends ChangeNotifier {
     }
   }
 
-  Future<void> syncWithCloud() async => await syncSharedData();
+  Future<void> syncWithCloud({bool force = false, bool forceNotify = false}) async =>
+      await syncSharedData(force: force, forceNotify: forceNotify);
 
   Future<bool> _loadSharedUsers() async {
     bool hasChanges = false;

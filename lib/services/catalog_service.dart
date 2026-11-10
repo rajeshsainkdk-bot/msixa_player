@@ -254,8 +254,12 @@ class CatalogService {
   /// Fetch initial trending tracks (dynamically combines curated and approved community tracks, strictly filtering deleted tracks)
   Future<List<Song>> fetchTrendingTracks() async {
     final backend = CloudBackendService();
+    var approved = backend.approvedSongs;
+    if (approved.isEmpty) {
+      await backend.syncWithCloud(force: true);
+      approved = backend.approvedSongs;
+    }
     final deleted = backend.deletedSongIds;
-    final approved = backend.approvedSongs;
 
     final Map<String, Song> map = {};
     for (final s in approved) {
@@ -325,7 +329,7 @@ class CatalogService {
         id: 'pl_haryanvi',
         title: '🌾 Haryanvi & Desi Ragni',
         description: 'Top Haryanvi Hits, Folk & High-Energy Desi Beats',
-        coverUrl: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&q=80',
+        coverUrl: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=600&q=80',
         songs: haryanviSongs,
       ));
     }
@@ -335,7 +339,7 @@ class CatalogService {
         id: 'pl_sartaaj',
         title: '🪕 Sufi & Punjabi Classics (Satinder Sartaaj)',
         description: 'Guzarish, Udaarian, Sajjan Raazi, Tere Bina Na Guzara & Hit Jukebox',
-        coverUrl: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&q=80',
+        coverUrl: 'https://images.unsplash.com/photo-1511192336575-5a79af67a629?w=600&q=80',
         songs: sufiSongs,
       ));
     }

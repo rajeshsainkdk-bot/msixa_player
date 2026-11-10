@@ -4,6 +4,7 @@ import 'package:msixa_player/models/song.dart';
 import 'package:msixa_player/models/folder_hierarchy.dart';
 import 'package:msixa_player/services/cloud_backend_service.dart';
 import 'package:msixa_player/services/device_audio_service.dart';
+import 'package:msixa_player/services/ai_music_service.dart';
 import 'package:msixa_player/widgets/song_thumbnail_widget.dart';
 
 void main() {
@@ -299,6 +300,23 @@ void main() {
       expect(rajColors, isNotEmpty);
       expect(bhaktiColors, isNot(equals(djColors)));
       expect(djColors, isNot(equals(rajColors)));
+    });
+  });
+
+  group('7. Indian Singers & Performance Tests', () {
+    test('extractArtists groups songs by artist without lagging', () {
+      final songs = [
+        Song(id: '1', title: 'Kesariya', artist: 'Arijit Singh', album: 'Brahmastra', duration: 268, streamUrl: '', coverUrl: '', genre: 'Bollywood'),
+        Song(id: '2', title: 'Apna Bana Le', artist: 'Arijit Singh', album: 'Bhediya', duration: 260, streamUrl: '', coverUrl: '', genre: 'Bollywood'),
+        Song(id: '3', title: 'Guzarish', artist: 'Satinder Sartaaj', album: 'Afsaaney Sartaj De', duration: 300, streamUrl: '', coverUrl: '', genre: 'Sufi'),
+      ];
+
+      final artists = AiMusicService().extractArtists(songs);
+      expect(artists.length, 2);
+      expect(artists.first.name, 'Arijit Singh');
+      expect(artists.first.songCount, 2);
+      expect(artists.first.coverUrl, contains('unsplash.com'));
+      expect(artists.any((a) => a.name == 'Satinder Sartaaj'), isTrue);
     });
   });
 }

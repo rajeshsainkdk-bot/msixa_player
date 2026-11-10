@@ -41,28 +41,26 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       listenable: LanguageService(),
       builder: (context, _) {
         final lang = LanguageService();
-        return Consumer<PlayerProvider>(
-          builder: (context, provider, child) {
-            return Scaffold(
-              backgroundColor: AppColors.background,
-              body: Stack(
-                children: [
-                  // Active Tab Screen
-                  IndexedStack(
-                    index: _currentIndex,
-                    children: _screens,
-                  ),
-
-                  // Floating Persistent MiniPlayer above navigation
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    child: const MiniPlayer(),
-                  ),
-                ],
+        return Scaffold(
+          backgroundColor: AppColors.background,
+          body: Stack(
+            children: [
+              // Active Tab Screen
+              IndexedStack(
+                index: _currentIndex,
+                children: _screens,
               ),
-              bottomNavigationBar: Container(
+
+              // Floating Persistent MiniPlayer above navigation
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: const MiniPlayer(),
+              ),
+            ],
+          ),
+          bottomNavigationBar: Container(
                 decoration: BoxDecoration(
                   color: AppColors.surface,
                   border: Border(
@@ -109,7 +107,5 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             );
           },
         );
-      },
-    );
-  }
+      }
 }
