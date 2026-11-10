@@ -547,7 +547,33 @@ jobs:
                   ContentType='application/json'
               )
               print("Admin OTA Auto-Update successfully deployed!")
+
+          # 3. Deploy Master msixa.zip Backup to Cloudflare R2
+          msixa_zip = 'msixa.zip'
+          if os.path.exists(msixa_zip):
+              zip_size_mb = round(os.path.getsize(msixa_zip) / (1024 * 1024), 2)
+              print(f"Uploading {msixa_zip} ({zip_size_mb} MB) to R2 msixa.zip & backup/msixa.zip...")
+              s3.upload_file(
+                  msixa_zip,
+                  'msixa-music',
+                  'msixa.zip',
+                  ExtraArgs={'ContentType': 'application/zip'}
+              )
+              s3.upload_file(
+                  msixa_zip,
+                  'msixa-music',
+                  'backup/msixa.zip',
+                  ExtraArgs={'ContentType': 'application/zip'}
+              )
+              print("msixa.zip successfully deployed to Cloudflare R2!")
           EOF
+
+      - name: Upload Msixa Master Backup Zip Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Msixa-Master-Backup-Zip
+          path: msixa.zip
 
       - name: Upload User APK Artifact
         uses: actions/upload-artifact@v4
