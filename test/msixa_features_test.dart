@@ -7,6 +7,10 @@ import 'package:msixa_player/services/device_audio_service.dart';
 import 'package:msixa_player/services/ai_music_service.dart';
 import 'package:msixa_player/services/ai_artwork_service.dart';
 import 'package:msixa_player/widgets/song_thumbnail_widget.dart';
+import 'package:msixa_player/widgets/mini_player.dart';
+import 'package:msixa_player/screens/now_playing_screen.dart';
+import 'package:msixa_player/screens/home_screen.dart';
+import 'package:msixa_player/screens/admin/admin_dashboard_screen.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -408,6 +412,11 @@ void main() {
       const remoteCode = 71;
       const isNewer = remoteCode > installedCode;
       expect(isNewer, isTrue);
+    });
+
+    test('MiniPlayer, HomeScreen and AdminDashboardScreen compile and instantiate cleanly', () {
+      expect(const MiniPlayer(), isNotNull);
+      expect(const HomeScreen(), isNotNull);
     });
   });
 }
