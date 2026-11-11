@@ -4,6 +4,8 @@ import 'package:msixa_player/models/song.dart';
 import 'package:msixa_player/models/folder_hierarchy.dart';
 import 'package:msixa_player/services/cloud_backend_service.dart';
 import 'package:msixa_player/services/device_audio_service.dart';
+import 'package:msixa_player/models/video_item.dart';
+import 'package:msixa_player/services/device_video_service.dart';
 import 'package:msixa_player/services/ai_music_service.dart';
 import 'package:msixa_player/services/ai_artwork_service.dart';
 import 'package:msixa_player/widgets/song_thumbnail_widget.dart';
@@ -417,6 +419,41 @@ void main() {
     test('MiniPlayer, HomeScreen and AdminDashboardScreen compile and instantiate cleanly', () {
       expect(const MiniPlayer(), isNotNull);
       expect(const HomeScreen(), isNotNull);
+    });
+  });
+
+  group('10. Video Player & AI Clarity Super-Resolution Tests', () {
+    test('VideoItem model correctly calculates formatted duration & size', () {
+      final v1 = VideoItem(
+        id: 'vid_1',
+        title: 'Dance Performance',
+        displayName: 'Dance_Performance.mp4',
+        path: '/storage/emulated/0/DCIM/Camera/Dance_Performance.mp4',
+        duration: 255000,
+        size: 52428800,
+        resolution: '1080p',
+        folder: 'Camera',
+      );
+
+      expect(v1.formattedDuration, '04:15');
+      expect(v1.formattedSize, '50.0 MB');
+      expect(v1.resolution, '1080p');
+      expect(v1.folder, 'Camera');
+
+      final json = v1.toJson();
+      final restored = VideoItem.fromJson(json);
+      expect(restored.title, 'Dance Performance');
+      expect(restored.formattedDuration, '04:15');
+    });
+
+    test('DeviceVideoService groups videos by folder accurately', () {
+      final v1 = VideoItem(id: '1', title: 'V1', displayName: 'V1.mp4', path: '', duration: 0, size: 0, folder: 'Camera');
+      final v2 = VideoItem(id: '2', title: 'V2', displayName: 'V2.mp4', path: '', duration: 0, size: 0, folder: 'WhatsApp');
+
+      final map = DeviceVideoService.groupVideosByFolder([v1, v2]);
+      expect(map.keys.length, 2);
+      expect(map['Camera']!.length, 1);
+      expect(map['WhatsApp']!.length, 1);
     });
   });
 }

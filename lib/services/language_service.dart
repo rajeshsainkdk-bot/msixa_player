@@ -194,6 +194,7 @@ class LanguageService extends ChangeNotifier {
 
     // Navigation & Global UI
     'nav_discover': {'hi': 'डिस्कवर (Discover)', 'en': 'Discover'},
+    'nav_videos': {'hi': 'वीडियो (Videos)', 'en': 'Videos'},
     'nav_search': {'hi': 'सर्च (Search)', 'en': 'Search'},
     'nav_library': {'hi': 'लाइब्रेरी (Library)', 'en': 'Library'},
     'nav_sound_fx': {'hi': 'साउंड FX', 'en': 'Sound FX'},

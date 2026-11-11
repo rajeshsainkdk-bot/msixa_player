@@ -19,6 +19,9 @@ dependencies:
   on_audio_query: ^2.9.0
   permission_handler: ^11.3.1
 
+  # Video Playback Engine (All Formats Supported)
+  video_player: ^2.8.2
+
   # Native Sharing & File Picking
   share_plus: ^7.2.2
   file_picker: ^8.0.0

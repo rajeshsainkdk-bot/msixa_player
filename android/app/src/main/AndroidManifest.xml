@@ -10,8 +10,9 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- Permissions required to read offline songs from mobile device storage & shared cross-app data -->
+    <!-- Permissions required to read offline songs and videos from mobile device storage -->
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" tools:ignore="ScopedStorage" />
@@ -25,7 +26,7 @@
 
         <!-- AudioServiceActivity for Lock Screen & Notification Bar Playback Controls -->
         <activity
-            android:name="com.ryanheise.audioservice.AudioServiceActivity"
+            android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
             android:theme="@style/LaunchTheme"
@@ -39,6 +40,26 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+
+            <!-- Default Player Intent Filter: Audio Files -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:mimeType="audio/*" />
+                <data android:scheme="file" />
+                <data android:scheme="content" />
+            </intent-filter>
+
+            <!-- Default Player Intent Filter: Video Files -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:mimeType="video/*" />
+                <data android:scheme="file" />
+                <data android:scheme="content" />
             </intent-filter>
         </activity>
 

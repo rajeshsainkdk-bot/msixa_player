@@ -6,9 +6,11 @@ import '../widgets/mini_player.dart';
 import '../services/update_service.dart';
 import '../services/language_service.dart';
 import 'home_screen.dart';
+import 'videos_screen.dart';
 import 'search_screen.dart';
 import 'library_screen.dart';
 import 'equalizer_screen.dart';
+import '../services/intent_service.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({Key? key}) : super(key: key);
@@ -25,11 +27,13 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       UpdateService.checkForUpdate(context, autoPrompt: true);
+      IntentService.checkInitialMedia(context);
     });
   }
 
   final List<Widget> _screens = const [
     HomeScreen(),
+    VideosScreen(),
     SearchScreen(),
     LibraryScreen(),
     EqualizerScreen(),
@@ -88,6 +92,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                     BottomNavigationBarItem(
                       icon: const Icon(Icons.home_filled),
                       label: lang.t('nav_discover'),
+                    ),
+                    BottomNavigationBarItem(
+                      icon: const Icon(Icons.video_library_rounded),
+                      label: lang.t('nav_videos'),
                     ),
                     BottomNavigationBarItem(
                       icon: const Icon(Icons.search_rounded),
