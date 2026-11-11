@@ -69,3 +69,4 @@ class VideoItem {
     dateAdded: (json['dateAdded'] is num) ? (json['dateAdded'] as num).toInt() : 0,
   );
 }
+

@@ -303,10 +303,14 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                           foregroundColor: Colors.black,
                         ),
                         onPressed: () {
-                          DeviceVideoService.openExternalPlayer(widget.video.path, id: widget.video.id);
+                          setState(() {
+                            _hasError = false;
+                            _errorMessage = '';
+                          });
+                          _initializeVideo();
                         },
-                        icon: const Icon(Icons.open_in_new_rounded),
-                        label: const Text('Open with External Video Player'),
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: const Text('Retry Playback'),
                       ),
                     ],
                   ),
@@ -477,14 +481,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                               ),
                               onPressed: _cycleFitMode,
                             ),
-                            // External App Button
-                            IconButton(
-                              tooltip: 'Open with External Player (MX/VLC)',
-                              icon: const Icon(Icons.open_in_new_rounded, color: Colors.white70),
-                              onPressed: () {
-                                DeviceVideoService.openExternalPlayer(widget.video.path, id: widget.video.id);
-                              },
-                            ),
                           ],
                         ),
                       ),
@@ -604,3 +600,4 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     );
   }
 }
+

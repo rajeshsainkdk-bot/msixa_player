@@ -480,8 +480,6 @@ class _VideosScreenState extends State<VideosScreen> {
                 onSelected: (val) {
                   if (val == 'play_in') {
                     _openPlayer(video);
-                  } else if (val == 'play_ext') {
-                    DeviceVideoService.openExternalPlayer(video.path, id: video.id);
                   } else if (val == 'share') {
                     Share.shareXFiles([XFile(video.path)], text: video.title);
                   } else if (val == 'details') {
@@ -495,17 +493,7 @@ class _VideosScreenState extends State<VideosScreen> {
                       children: [
                         Icon(Icons.play_arrow_rounded, color: AppColors.accentCyan, size: 18),
                         SizedBox(width: 8),
-                        Text('Play In-App', style: TextStyle(color: Colors.white, fontSize: 13)),
-                      ],
-                    ),
-                  ),
-                  const PopupMenuItem(
-                    value: 'play_ext',
-                    child: Row(
-                      children: [
-                        Icon(Icons.open_in_new_rounded, color: Colors.white70, size: 18),
-                        SizedBox(width: 8),
-                        Text('Play in External App', style: TextStyle(color: Colors.white, fontSize: 13)),
+                        Text('Play Video', style: TextStyle(color: Colors.white, fontSize: 13)),
                       ],
                     ),
                   ),
@@ -538,3 +526,4 @@ class _VideosScreenState extends State<VideosScreen> {
     );
   }
 }
+

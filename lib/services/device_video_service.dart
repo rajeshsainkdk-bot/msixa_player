@@ -147,3 +147,4 @@ class DeviceVideoService {
     return map;
   }
 }
+
