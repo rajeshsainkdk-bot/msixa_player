@@ -563,6 +563,61 @@ jobs:
                           } catch (e: Exception) {
                               result.error("VERSION_ERROR", e.localizedMessage, null)
                           }
+                      } else if (call.method == "getVideoThumbnail") {
+                          val path = call.argument<String>("path") ?: ""
+                          val idStr = call.argument<String>("id")
+                          val id = idStr?.toLongOrNull()
+
+                          Thread {
+                              try {
+                                  var bitmap: android.graphics.Bitmap? = null
+
+                                  if (id != null && id > 0 && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                                      try {
+                                          val contentUri = ContentUris.withAppendedId(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, id)
+                                          bitmap = contentResolver.loadThumbnail(contentUri, android.util.Size(320, 240), null)
+                                      } catch (_: Throwable) {}
+                                  }
+
+                                  if (bitmap == null && path.isNotEmpty()) {
+                                      val retriever = android.media.MediaMetadataRetriever()
+                                      try {
+                                          if (path.startsWith("content://")) {
+                                              retriever.setDataSource(applicationContext, Uri.parse(path))
+                                          } else {
+                                              retriever.setDataSource(path)
+                                          }
+                                          bitmap = retriever.getFrameAtTime(1000000, android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                                              ?: retriever.frameAtTime
+                                      } catch (_: Throwable) {
+                                      } finally {
+                                          try { retriever.release() } catch (_: Throwable) {}
+                                      }
+                                  }
+
+                                  if (bitmap == null && path.isNotEmpty() && !path.startsWith("content://")) {
+                                      try {
+                                          @Suppress("DEPRECATION")
+                                          bitmap = android.media.ThumbnailUtils.createVideoThumbnail(
+                                              path,
+                                              MediaStore.Images.Thumbnails.MINI_KIND
+                                          )
+                                      } catch (_: Throwable) {}
+                                  }
+
+                                  if (bitmap != null) {
+                                      val stream = java.io.ByteArrayOutputStream()
+                                      bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 75, stream)
+                                      val bytes = stream.toByteArray()
+                                      bitmap.recycle()
+                                      runOnUiThread { result.success(bytes) }
+                                  } else {
+                                      runOnUiThread { result.success(null) }
+                                  }
+                              } catch (_: Throwable) {
+                                  runOnUiThread { result.success(null) }
+                              }
+                          }.start()
                       } else {
                           result.notImplemented()
                       }
@@ -755,7 +810,7 @@ jobs:
               print(f"Deploying Admin update manifest: {admin_manifest}")
               s3.put_object(
                   Bucket='msixa-music',
-                  Key='update/admin_version.json',
+                  Key='update/msixa_admin_version.json',
                   Body=json.dumps(admin_manifest),
                   ContentType='application/json'
               )

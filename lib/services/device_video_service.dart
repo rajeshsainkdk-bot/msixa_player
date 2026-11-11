@@ -137,6 +137,66 @@ class DeviceVideoService {
     } catch (_) {}
   }
 
+  static final Map<String, Uint8List?> _thumbnailMemoryCache = {};
+  static final Map<String, Future<Uint8List?>> _inFlightThumbnails = {};
+
+  /// Synchronously retrieve cached thumbnail if already loaded into memory
+  static Uint8List? getCachedThumbnail(String path, {String? id}) {
+    final key = '$id:$path';
+    return _thumbnailMemoryCache[key];
+  }
+
+  /// Asynchronously retrieve video thumbnail bytes from memory, disk cache, or native extractor
+  static Future<Uint8List?> getVideoThumbnail(String path, {String? id}) async {
+    final key = '$id:$path';
+    if (_thumbnailMemoryCache.containsKey(key)) {
+      return _thumbnailMemoryCache[key];
+    }
+    if (_inFlightThumbnails.containsKey(key)) {
+      return await _inFlightThumbnails[key];
+    }
+
+    final future = _loadThumbnailInternal(path, id: id, key: key);
+    _inFlightThumbnails[key] = future;
+    final res = await future;
+    _inFlightThumbnails.remove(key);
+    return res;
+  }
+
+  static Future<Uint8List?> _loadThumbnailInternal(String path, {String? id, required String key}) async {
+    try {
+      // 1. Check disk cache in system temporary directory
+      final tempDir = Directory.systemTemp;
+      final fileHash = (key.hashCode).abs();
+      final diskFile = File('${tempDir.path}/vthumb_$fileHash.jpg');
+
+      if (await diskFile.exists()) {
+        final bytes = await diskFile.readAsBytes();
+        if (bytes.isNotEmpty) {
+          _thumbnailMemoryCache[key] = bytes;
+          return bytes;
+        }
+      }
+
+      // 2. Request from native platform MethodChannel
+      final nativeBytes = await _channel.invokeMethod<Uint8List>('getVideoThumbnail', {
+        'path': path,
+        'id': id,
+      });
+
+      if (nativeBytes != null && nativeBytes.isNotEmpty) {
+        _thumbnailMemoryCache[key] = nativeBytes;
+        try {
+          await diskFile.writeAsBytes(nativeBytes, flush: true);
+        } catch (_) {}
+        return nativeBytes;
+      }
+    } catch (_) {}
+
+    _thumbnailMemoryCache[key] = null;
+    return null;
+  }
+
   /// Group video list by folder name with counts
   static Map<String, List<VideoItem>> groupVideosByFolder(List<VideoItem> videos) {
     final Map<String, List<VideoItem>> map = {};

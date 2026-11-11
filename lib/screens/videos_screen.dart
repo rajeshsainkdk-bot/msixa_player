@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/video_item.dart';
 import '../services/device_video_service.dart';
 import '../services/language_service.dart';
 import '../theme/app_colors.dart';
+import '../widgets/video_thumbnail_widget.dart';
 import 'video_player_screen.dart';
 
 /// Screen displaying all local device video files organized by folders
@@ -73,7 +75,7 @@ class _VideosScreenState extends State<VideosScreen> {
       MaterialPageRoute(
         builder: (_) => VideoPlayerScreen(
           video: video,
-          playlist: _videos,
+          playlist: _filteredVideos,
         ),
       ),
     );
@@ -352,70 +354,44 @@ class _VideosScreenState extends State<VideosScreen> {
           ],
         ),
       ),
+      floatingActionButton: displayList.isNotEmpty
+          ? FloatingActionButton(
+              backgroundColor: const Color(0xFF2563EB),
+              elevation: 6,
+              onPressed: () => _openPlayer(displayList.first),
+              child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 38),
+            )
+          : null,
     );
   }
 
   Widget _buildVideoCard(VideoItem video, LanguageService lang) {
+    final bool hasSrt = video.displayName.toLowerCase().contains('esub') ||
+        video.displayName.toLowerCase().contains('sub') ||
+        video.displayName.toLowerCase().contains('srt') ||
+        video.path.toLowerCase().endsWith('.mkv');
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withOpacity(0.06)),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.04)),
       ),
       child: InkWell(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
         onTap: () => _openPlayer(video),
         child: Padding(
-          padding: const EdgeInsets.all(10.0),
+          padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Video Thumbnail Box with Duration Badge
-              Stack(
-                alignment: Alignment.center,
-                children: [
-                  Container(
-                    width: 90,
-                    height: 64,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(10),
-                      gradient: LinearGradient(
-                        colors: [
-                          const Color(0xFF1B2438),
-                          AppColors.accentCyan.withOpacity(0.2),
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      border: Border.all(color: Colors.white10),
-                    ),
-                    child: const Center(
-                      child: Icon(Icons.play_circle_outline_rounded, color: Colors.white70, size: 28),
-                    ),
-                  ),
-                  if (video.formattedDuration.isNotEmpty)
-                    Positioned(
-                      bottom: 4,
-                      right: 4,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.85),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          video.formattedDuration,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            fontFamily: 'monospace',
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
+              // Video Thumbnail Box with Duration Badge (Screenshot 2)
+              VideoThumbnailWidget(
+                video: video,
+                width: 104,
+                height: 68,
+                borderRadius: 8,
               ),
               const SizedBox(width: 12),
 
@@ -423,6 +399,7 @@ class _VideosScreenState extends State<VideosScreen> {
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       video.title,
@@ -430,103 +407,322 @@ class _VideosScreenState extends State<VideosScreen> {
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w500,
+                        height: 1.25,
                       ),
                     ),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        // Folder Badge
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.08),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            video.folder,
-                            style: const TextStyle(color: Colors.white70, fontSize: 10),
+                    if (hasSrt) ...[
+                      const SizedBox(height: 5),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF10B981),
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                        child: const Text(
+                          'SRT',
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.5,
                           ),
                         ),
-                        const SizedBox(width: 6),
-                        // Resolution Badge
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: AppColors.accentCyan.withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            video.resolution,
-                            style: const TextStyle(color: AppColors.accentCyan, fontSize: 10, fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        // File Size
-                        if (video.formattedSize.isNotEmpty)
-                          Text(
-                            video.formattedSize,
-                            style: const TextStyle(color: Colors.white38, fontSize: 10),
-                          ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ],
                 ),
               ),
 
-              // Action Options Popup Menu
-              PopupMenuButton<String>(
-                icon: const Icon(Icons.more_vert_rounded, color: Colors.white54, size: 20),
-                color: AppColors.surface,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                onSelected: (val) {
-                  if (val == 'play_in') {
-                    _openPlayer(video);
-                  } else if (val == 'share') {
-                    Share.shareXFiles([XFile(video.path)], text: video.title);
-                  } else if (val == 'details') {
-                    _showVideoDetails(video);
-                  }
-                },
-                itemBuilder: (ctx) => [
-                  const PopupMenuItem(
-                    value: 'play_in',
-                    child: Row(
-                      children: [
-                        Icon(Icons.play_arrow_rounded, color: AppColors.accentCyan, size: 18),
-                        SizedBox(width: 8),
-                        Text('Play Video', style: TextStyle(color: Colors.white, fontSize: 13)),
-                      ],
-                    ),
-                  ),
-                  const PopupMenuItem(
-                    value: 'share',
-                    child: Row(
-                      children: [
-                        Icon(Icons.share_rounded, color: Colors.white70, size: 18),
-                        SizedBox(width: 8),
-                        Text('Share Video', style: TextStyle(color: Colors.white, fontSize: 13)),
-                      ],
-                    ),
-                  ),
-                  const PopupMenuItem(
-                    value: 'details',
-                    child: Row(
-                      children: [
-                        Icon(Icons.info_outline_rounded, color: Colors.white70, size: 18),
-                        SizedBox(width: 8),
-                        Text('Video Details', style: TextStyle(color: Colors.white, fontSize: 13)),
-                      ],
-                    ),
-                  ),
-                ],
+              // Right-side 3-Dots Menu Button (Screenshot 1 Options Menu)
+              IconButton(
+                icon: const Icon(Icons.more_vert_rounded, color: Colors.white70, size: 22),
+                splashRadius: 20,
+                onPressed: () => _showVideoOptionsMenu(video),
               ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  /// Authentic MX Player 3-Dots Video Options Menu Sheet (Screenshot 1)
+  void _showVideoOptionsMenu(VideoItem video) async {
+    final prefs = await SharedPreferences.getInstance();
+    final favList = prefs.getStringList('video_favorites_list') ?? [];
+    final isFav = favList.contains(video.id) || favList.contains(video.path);
+
+    if (!mounted) return;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1E2026),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Handle Bar
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.white24,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+
+                // 1. Favourite
+                ListTile(
+                  leading: Icon(
+                    isFav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                    color: isFav ? Colors.redAccent : Colors.white,
+                    size: 24,
+                  ),
+                  title: Text(
+                    isFav ? 'Remove from Favourite' : 'Favourite',
+                    style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500),
+                  ),
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    final p = await SharedPreferences.getInstance();
+                    final currentFavs = p.getStringList('video_favorites_list') ?? [];
+                    if (isFav) {
+                      currentFavs.remove(video.id);
+                      currentFavs.remove(video.path);
+                      _showSnackBar('Removed from Favourite');
+                    } else {
+                      currentFavs.add(video.id);
+                      _showSnackBar('❤️ Added to Favourite');
+                    }
+                    await p.setStringList('video_favorites_list', currentFavs);
+                  },
+                ),
+
+                // 2. Add To Playlist
+                ListTile(
+                  leading: const Icon(Icons.playlist_add_rounded, color: Colors.white, size: 24),
+                  title: const Text(
+                    'Add To Playlist',
+                    style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500),
+                  ),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _showAddToPlaylistDialog(video);
+                  },
+                ),
+
+                // 3. File Transfer
+                ListTile(
+                  leading: const Icon(Icons.phonelink_ring_rounded, color: Colors.white, size: 24),
+                  title: const Text(
+                    'File Transfer',
+                    style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500),
+                  ),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    Share.shareXFiles([XFile(video.path)], text: 'Sharing ${video.displayName}');
+                  },
+                ),
+
+                // 4. Lock in Private Folder
+                ListTile(
+                  leading: const Icon(Icons.lock_outline_rounded, color: Colors.white, size: 24),
+                  title: const Text(
+                    'Lock in Private Folder',
+                    style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500),
+                  ),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _showLockPrivateDialog(video);
+                  },
+                ),
+
+                // 5. Convert to MP3
+                ListTile(
+                  leading: const Icon(Icons.headphones_rounded, color: Colors.white, size: 24),
+                  title: const Text(
+                    'Convert to MP3',
+                    style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500),
+                  ),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _convertToMp3(video);
+                  },
+                ),
+
+                // 6. Share
+                ListTile(
+                  leading: const Icon(Icons.reply_rounded, color: Colors.white, size: 24),
+                  title: const Text(
+                    'Share',
+                    style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500),
+                  ),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    Share.shareXFiles([XFile(video.path)], text: video.displayName);
+                  },
+                ),
+
+                // 7. Information
+                ListTile(
+                  leading: const Icon(Icons.info_outline_rounded, color: Colors.white, size: 24),
+                  title: const Text(
+                    'Information',
+                    style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500),
+                  ),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _showVideoDetails(video);
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showSnackBar(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg, style: const TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: const Color(0xFF1E293B),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  void _showAddToPlaylistDialog(VideoItem video) async {
+    final prefs = await SharedPreferences.getInstance();
+    final playlists = prefs.getStringList('custom_video_playlists') ?? ['My Favorites', 'Watch Later'];
+    final textCtrl = TextEditingController();
+
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (dlgCtx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E2026),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: const [
+            Icon(Icons.playlist_add_rounded, color: AppColors.accentCyan),
+            SizedBox(width: 8),
+            Text('Add To Playlist', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ...playlists.map((pl) => ListTile(
+                    dense: true,
+                    leading: const Icon(Icons.playlist_play_rounded, color: Colors.white70),
+                    title: Text(pl, style: const TextStyle(color: Colors.white)),
+                    onTap: () async {
+                      Navigator.pop(dlgCtx);
+                      final pKey = 'playlist_videos_$pl';
+                      final current = prefs.getStringList(pKey) ?? [];
+                      if (!current.contains(video.id)) {
+                        current.add(video.id);
+                        await prefs.setStringList(pKey, current);
+                      }
+                      _showSnackBar('Added to "$pl"');
+                    },
+                  )),
+              const Divider(color: Colors.white12),
+              TextField(
+                controller: textCtrl,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  hintText: 'New Playlist Name...',
+                  hintStyle: const TextStyle(color: Colors.white38),
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.add_rounded, color: AppColors.accentCyan),
+                    onPressed: () async {
+                      final name = textCtrl.text.trim();
+                      if (name.isNotEmpty) {
+                        playlists.add(name);
+                        await prefs.setStringList('custom_video_playlists', playlists);
+                        final pKey = 'playlist_videos_$name';
+                        await prefs.setStringList(pKey, [video.id]);
+                        Navigator.pop(dlgCtx);
+                        _showSnackBar('Created and added to "$name"');
+                      }
+                    },
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showLockPrivateDialog(VideoItem video) {
+    showDialog(
+      context: context,
+      builder: (dlgCtx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E2026),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: const [
+            Icon(Icons.lock_outline_rounded, color: Colors.amber),
+            SizedBox(width: 8),
+            Text('Private Folder', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Text(
+          'Do you want to lock "${video.title}" in your secure Private Folder?',
+          style: const TextStyle(color: Colors.white70, fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dlgCtx),
+            child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.amber,
+              foregroundColor: Colors.black,
+            ),
+            onPressed: () async {
+              Navigator.pop(dlgCtx);
+              final p = await SharedPreferences.getInstance();
+              final privateIds = p.getStringList('private_video_ids') ?? [];
+              privateIds.add(video.id);
+              await p.setStringList('private_video_ids', privateIds);
+              setState(() {
+                _allVideos.removeWhere((v) => v.id == video.id);
+              });
+              _showSnackBar('🔒 Video secured in Private Folder');
+            },
+            child: const Text('Lock Now', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _convertToMp3(VideoItem video) {
+    _showSnackBar('🎧 Playing "${video.title}" as background audio');
   }
 }
 

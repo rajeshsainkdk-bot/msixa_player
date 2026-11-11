@@ -9,6 +9,7 @@ import '../models/video_item.dart';
 import '../providers/player_provider.dart';
 import '../services/device_video_service.dart';
 import '../theme/app_colors.dart';
+import '../widgets/video_thumbnail_widget.dart';
 
 /// Msixa Pro Video Player — Exact MX Player Look & Features:
 /// 1. Auto-rotation according to video aspect ratio (Landscape / Portrait)
@@ -667,9 +668,19 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                   final v = _videoList[i];
                   final isCurrent = v.id == _currentVideo.id;
                   return ListTile(
-                    leading: Icon(
-                      isCurrent ? Icons.play_circle_filled_rounded : Icons.video_file_rounded,
-                      color: isCurrent ? AppColors.accentCyan : Colors.white60,
+                    leading: ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: SizedBox(
+                        width: 56,
+                        height: 40,
+                        child: VideoThumbnailWidget(
+                          video: v,
+                          width: 56,
+                          height: 40,
+                          borderRadius: 6,
+                          showDurationBadge: false,
+                        ),
+                      ),
                     ),
                     title: Text(
                       v.title,

@@ -357,6 +357,65 @@ class MainActivity: AudioServiceActivity() {
                         result.error("VERSION_ERROR", e.localizedMessage, null)
                     }
                 }
+                "getVideoThumbnail" -> {
+                    val path = call.argument<String>("path") ?: ""
+                    val idStr = call.argument<String>("id")
+                    val id = idStr?.toLongOrNull()
+
+                    Thread {
+                        try {
+                            var bitmap: android.graphics.Bitmap? = null
+
+                            // 1. Android Q+ (API 29+) MediaStore thumbnail
+                            if (id != null && id > 0 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                try {
+                                    val contentUri = ContentUris.withAppendedId(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, id)
+                                    bitmap = contentResolver.loadThumbnail(contentUri, android.util.Size(320, 240), null)
+                                } catch (_: Throwable) {}
+                            }
+
+                            // 2. MediaMetadataRetriever (universal for any file path, mp4, mkv, avi, webm, etc.)
+                            if (bitmap == null && path.isNotEmpty()) {
+                                val retriever = android.media.MediaMetadataRetriever()
+                                try {
+                                    if (path.startsWith("content://")) {
+                                        retriever.setDataSource(applicationContext, Uri.parse(path))
+                                    } else {
+                                        retriever.setDataSource(path)
+                                    }
+                                    bitmap = retriever.getFrameAtTime(1000000, android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                                        ?: retriever.frameAtTime
+                                } catch (_: Throwable) {
+                                } finally {
+                                    try { retriever.release() } catch (_: Throwable) {}
+                                }
+                            }
+
+                            // 3. Fallback for older Android (ThumbnailUtils)
+                            if (bitmap == null && path.isNotEmpty() && !path.startsWith("content://")) {
+                                try {
+                                    @Suppress("DEPRECATION")
+                                    bitmap = android.media.ThumbnailUtils.createVideoThumbnail(
+                                        path,
+                                        MediaStore.Images.Thumbnails.MINI_KIND
+                                    )
+                                } catch (_: Throwable) {}
+                            }
+
+                            if (bitmap != null) {
+                                val stream = java.io.ByteArrayOutputStream()
+                                bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 75, stream)
+                                val bytes = stream.toByteArray()
+                                bitmap.recycle()
+                                runOnUiThread { result.success(bytes) }
+                            } else {
+                                runOnUiThread { result.success(null) }
+                            }
+                        } catch (_: Throwable) {
+                            runOnUiThread { result.success(null) }
+                        }
+                    }.start()
+                }
                 else -> result.notImplemented()
             }
         }
