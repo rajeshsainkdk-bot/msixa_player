@@ -71,7 +71,10 @@ class _VideosScreenState extends State<VideosScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => VideoPlayerScreen(video: video),
+        builder: (_) => VideoPlayerScreen(
+          video: video,
+          playlist: _videos,
+        ),
       ),
     );
   }

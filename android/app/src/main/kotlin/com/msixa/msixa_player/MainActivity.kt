@@ -53,6 +53,67 @@ class MainActivity: AudioServiceActivity() {
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
+                "keepScreenOn" -> {
+                    val enable = call.argument<Boolean>("enable") ?: true
+                    runOnUiThread {
+                        if (enable) {
+                            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                        } else {
+                            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                        }
+                    }
+                    result.success(true)
+                }
+                "setScreenBrightness" -> {
+                    val brightness = call.argument<Double>("brightness")?.toFloat() ?: -1.0f
+                    runOnUiThread {
+                        val lp = window.attributes
+                        lp.screenBrightness = brightness.coerceIn(0.01f, 1.0f)
+                        window.attributes = lp
+                    }
+                    result.success(true)
+                }
+                "getScreenBrightness" -> {
+                    val brightness = window.attributes.screenBrightness
+                    result.success(if (brightness < 0) 0.5 else brightness.toDouble())
+                }
+                "setDeviceVolume" -> {
+                    try {
+                        val volumePercent = call.argument<Double>("volume") ?: 0.5
+                        val audioManager = getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
+                        val maxVol = audioManager.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC)
+                        val targetVol = (volumePercent * maxVol).toInt().coerceIn(0, maxVol)
+                        audioManager.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, targetVol, 0)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.error("VOL_ERROR", e.message, null)
+                    }
+                }
+                "getDeviceVolume" -> {
+                    try {
+                        val audioManager = getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
+                        val maxVol = audioManager.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC)
+                        val curVol = audioManager.getStreamVolume(android.media.AudioManager.STREAM_MUSIC)
+                        result.success(if (maxVol > 0) curVol.toDouble() / maxVol.toDouble() else 0.5)
+                    } catch (e: Exception) {
+                        result.success(0.5)
+                    }
+                }
+                "enterPipMode" -> {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        try {
+                            val params = android.app.PictureInPictureParams.Builder()
+                                .setAspectRatio(android.util.Rational(16, 9))
+                                .build()
+                            enterPictureInPictureMode(params)
+                            result.success(true)
+                        } catch (e: Exception) {
+                            result.success(false)
+                        }
+                    } else {
+                        result.success(false)
+                    }
+                }
                 "getInitialMediaUri" -> {
                     if (initialMediaUri != null) {
                         val uriStr = initialMediaUri ?: ""
