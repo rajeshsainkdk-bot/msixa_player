@@ -141,3 +141,4 @@ class _VideoThumbnailWidgetState extends State<VideoThumbnailWidget> {
     );
   }
 }
+
