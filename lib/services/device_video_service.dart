@@ -7,18 +7,48 @@ import '../models/video_item.dart';
 /// Service responsible for scanning, filtering, and launching local device videos in Msixa.
 class DeviceVideoService {
   static const MethodChannel _channel = MethodChannel('com.msixa.player/app_share');
+  static bool _hasRequestedPermissionThisSession = false;
+
+  /// Check whether video or storage permission is already granted without prompting
+  static Future<bool> hasPermission() async {
+    if (!Platform.isAndroid) return true;
+    try {
+      final videoStatus = await Permission.videos.status;
+      if (videoStatus.isGranted) return true;
+      final storageStatus = await Permission.storage.status;
+      return storageStatus.isGranted;
+    } catch (_) {
+      return true;
+    }
+  }
 
   /// Request runtime permission for video access across Android versions
-  static Future<bool> requestVideoPermission() async {
+  /// Only prompts if not already granted and has not been prompted in this session
+  static Future<bool> requestVideoPermission({bool forcePrompt = false}) async {
     if (Platform.isAndroid) {
       try {
+        final alreadyGranted = await hasPermission();
+        if (alreadyGranted) return true;
+
+        if (!forcePrompt && _hasRequestedPermissionThisSession) {
+          return false;
+        }
+
         final videoStatus = await Permission.videos.status;
-        if (videoStatus.isGranted) return true;
+        final storageStatus = await Permission.storage.status;
+        if (!forcePrompt && (videoStatus.isPermanentlyDenied || storageStatus.isPermanentlyDenied)) {
+          return false;
+        }
+
+        _hasRequestedPermissionThisSession = true;
         final videoReq = await Permission.videos.request();
         if (videoReq.isGranted) return true;
 
-        final storageStatus = await Permission.storage.request();
-        return storageStatus.isGranted;
+        if (!videoReq.isPermanentlyDenied) {
+          final storageReq = await Permission.storage.request();
+          return storageReq.isGranted;
+        }
+        return false;
       } catch (_) {
         return true;
       }

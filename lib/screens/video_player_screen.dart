@@ -148,16 +148,26 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         _errorMessage = '';
       });
 
-      final file = File(_currentVideo.path);
-      if (!await file.exists()) {
-        setState(() {
-          _hasError = true;
-          _errorMessage = 'Video file does not exist at specified path:\n${_currentVideo.path}';
-        });
-        return;
+      if (_currentVideo.path.startsWith('content://') ||
+          _currentVideo.path.startsWith('http://') ||
+          _currentVideo.path.startsWith('https://')) {
+        _controller = VideoPlayerController.contentUri(Uri.parse(_currentVideo.path));
+      } else {
+        final file = File(_currentVideo.path);
+        if (!await file.exists()) {
+          if (_currentVideo.path.contains('://')) {
+            _controller = VideoPlayerController.contentUri(Uri.parse(_currentVideo.path));
+          } else {
+            setState(() {
+              _hasError = true;
+              _errorMessage = 'Video file does not exist at specified path:\n${_currentVideo.path}';
+            });
+            return;
+          }
+        } else {
+          _controller = VideoPlayerController.file(file);
+        }
       }
-
-      _controller = VideoPlayerController.file(file);
       await _controller.initialize();
       _controller.addListener(_videoListener);
       await _controller.setVolume(_isMuted ? 0.0 : _volume);
@@ -1328,98 +1338,31 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                             ),
                           ),
 
-                          // 2. QUICK ACTIONS BAR (Horizontally Scrollable - Exact Screenshot 6)
-                          if (_showShortcuts)
-                            SizedBox(
-                              height: 70,
-                              child: ListView(
-                                scrollDirection: Axis.horizontal,
-                                padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                                children: [
-                                  _buildQuickActionItem(
-                                    icon: Icons.nightlight_round,
-                                    label: 'Night Mode',
-                                    isActive: _isNightMode,
-                                    onTap: _toggleNightMode,
-                                  ),
-                                  _buildQuickActionItem(
-                                    icon: Icons.edit_rounded,
-                                    label: 'Customise',
-                                    onTap: () => _showToast('Customise Items'),
-                                  ),
-                                  _buildQuickActionItem(
-                                    icon: Icons.shuffle_rounded,
-                                    label: 'Shuffle',
-                                    onTap: () => _showToast('Shuffle Mode'),
-                                  ),
-                                  _buildQuickActionItem(
-                                    icon: Icons.repeat_rounded,
-                                    label: 'Loop',
-                                    isActive: _isLooping,
-                                    onTap: _toggleLoop,
-                                  ),
-                                  _buildQuickActionItem(
-                                    icon: _isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
-                                    label: _isMuted ? 'Unmute' : 'Mute',
-                                    isActive: _isMuted,
-                                    onTap: _toggleMute,
-                                  ),
-                                  _buildQuickActionItem(
-                                    icon: Icons.timer_rounded,
-                                    label: 'Sleep Timer',
-                                    onTap: () => _showToast('Sleep Timer: Off'),
-                                  ),
-                                  _buildQuickActionItem(
-                                    icon: Icons.repeat_one_rounded,
-                                    label: 'A - B Repeat',
-                                    onTap: () => _showToast('A-B Repeat: Tap to set Start'),
-                                  ),
-                                  _buildQuickActionItem(
-                                    icon: Icons.graphic_eq_rounded,
-                                    label: 'Audio Effect',
-                                    hasRedDot: true,
-                                    onTap: () => _showToast('Audio Boost 200% Active'),
-                                  ),
-                                  _buildQuickActionItem(
-                                    icon: Icons.tune_rounded,
-                                    label: 'Equalizer',
-                                    onTap: () => _showToast('Opening Equalizer...'),
-                                  ),
-                                  _buildQuickActionItem(
-                                    icon: Icons.speed_rounded,
-                                    label: 'Speed',
-                                    badgeText: '${_playbackSpeed.toStringAsFixed(1)}X',
-                                    isActive: _showSpeedSliderHud,
-                                    onTap: () {
-                                      setState(() => _showSpeedSliderHud = !_showSpeedSliderHud);
-                                    },
-                                  ),
-                                  _buildQuickActionItem(
-                                    icon: Icons.camera_alt_outlined,
-                                    label: 'Screenshot',
-                                    onTap: _takeScreenshot,
-                                  ),
-                                  _buildQuickActionItem(
-                                    icon: Icons.headphones_rounded,
-                                    label: 'Background',
-                                    onTap: () => _showToast('Background Play Enabled'),
-                                  ),
-                                  _buildQuickActionItem(
-                                    icon: Icons.screen_rotation_rounded,
-                                    label: 'Rotation',
-                                    onTap: _toggleOrientation,
-                                  ),
-                                  _buildQuickActionItem(
-                                    icon: Icons.auto_awesome_rounded,
-                                    label: 'AI 4K HDR',
-                                    isActive: _isAiClarityActive,
-                                    activeColor: const Color(0xFFFFD700),
-                                    onTap: _toggleAiClarity,
-                                  ),
-                                ],
-                              ),
-                            ),
+                          // 2. QUICK ACTIONS BAR (Expandable / Collapsible MX Player style)
+                          _buildTopQuickActions(),
                         ],
+                      ),
+                    ),
+
+                    // MIDDLE TOUCH & DOUBLE TAP SEEKING AREA (Works when controls are visible)
+                    Expanded(
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () {
+                          setState(() => _showControls = false);
+                        },
+                        onDoubleTapDown: (details) {
+                          if (_isScreenLocked) return;
+                          final x = details.globalPosition.dx;
+                          if (x < screenSize.width * 0.35) {
+                            _seekRelative(-10);
+                          } else if (x > screenSize.width * 0.65) {
+                            _seekRelative(10);
+                          } else {
+                            _togglePlayPause();
+                          }
+                        },
+                        child: Container(color: Colors.transparent),
                       ),
                     ),
 
@@ -1644,5 +1587,201 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildTopQuickActions() {
+    if (!_showShortcuts) return const SizedBox.shrink();
+
+    if (!_isQuickActionsExpanded) {
+      // Collapsed: Compact 5-icon circle bar with '>' expand button
+      return Container(
+        height: 46,
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.55),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.white12, width: 0.8),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            IconButton(
+              icon: Icon(
+                Icons.nightlight_round,
+                color: _isNightMode ? const Color(0xFF2196F3) : Colors.white,
+                size: 20,
+              ),
+              tooltip: 'Night Mode',
+              onPressed: _toggleNightMode,
+            ),
+            IconButton(
+              icon: Icon(
+                Icons.repeat_rounded,
+                color: _isLooping ? const Color(0xFF2196F3) : Colors.white,
+                size: 20,
+              ),
+              tooltip: 'Loop',
+              onPressed: _toggleLoop,
+            ),
+            IconButton(
+              icon: Icon(
+                _isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+                color: _isMuted ? Colors.redAccent : Colors.white,
+                size: 20,
+              ),
+              tooltip: 'Mute',
+              onPressed: _toggleMute,
+            ),
+            IconButton(
+              icon: Icon(
+                Icons.speed_rounded,
+                color: _playbackSpeed != 1.0 ? const Color(0xFF2196F3) : Colors.white,
+                size: 20,
+              ),
+              tooltip: 'Speed',
+              onPressed: () {
+                setState(() => _showSpeedSliderHud = !_showSpeedSliderHud);
+              },
+            ),
+            IconButton(
+              icon: Icon(
+                Icons.auto_awesome_rounded,
+                color: _isAiClarityActive ? const Color(0xFFFFD700) : Colors.white,
+                size: 20,
+              ),
+              tooltip: 'AI 4K HDR',
+              onPressed: _toggleAiClarity,
+            ),
+            InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: () {
+                setState(() => _isQuickActionsExpanded = true);
+              },
+              child: Container(
+                padding: const EdgeInsets.all(5),
+                decoration: const BoxDecoration(
+                  color: Colors.white12,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.chevron_right_rounded, color: Colors.white, size: 20),
+              ),
+            ),
+          ],
+        ),
+      );
+    } else {
+      // Expanded: Horizontally scrollable row with '<' collapse button
+      return SizedBox(
+        height: 70,
+        child: Row(
+          children: [
+            InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: () {
+                setState(() => _isQuickActionsExpanded = false);
+              },
+              child: Container(
+                margin: const EdgeInsets.only(left: 12, right: 4),
+                padding: const EdgeInsets.all(7),
+                decoration: const BoxDecoration(
+                  color: Colors.white12,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.chevron_left_rounded, color: Colors.white, size: 20),
+              ),
+            ),
+            Expanded(
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                children: [
+                  _buildQuickActionItem(
+                    icon: Icons.nightlight_round,
+                    label: 'Night Mode',
+                    isActive: _isNightMode,
+                    onTap: _toggleNightMode,
+                  ),
+                  _buildQuickActionItem(
+                    icon: Icons.edit_rounded,
+                    label: 'Customise',
+                    onTap: () => _showToast('Customise Items'),
+                  ),
+                  _buildQuickActionItem(
+                    icon: Icons.shuffle_rounded,
+                    label: 'Shuffle',
+                    onTap: () => _showToast('Shuffle Mode'),
+                  ),
+                  _buildQuickActionItem(
+                    icon: Icons.repeat_rounded,
+                    label: 'Loop',
+                    isActive: _isLooping,
+                    onTap: _toggleLoop,
+                  ),
+                  _buildQuickActionItem(
+                    icon: _isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+                    label: _isMuted ? 'Unmute' : 'Mute',
+                    isActive: _isMuted,
+                    onTap: _toggleMute,
+                  ),
+                  _buildQuickActionItem(
+                    icon: Icons.timer_rounded,
+                    label: 'Sleep Timer',
+                    onTap: () => _showToast('Sleep Timer: Off'),
+                  ),
+                  _buildQuickActionItem(
+                    icon: Icons.repeat_one_rounded,
+                    label: 'A - B Repeat',
+                    onTap: () => _showToast('A-B Repeat: Tap to set Start'),
+                  ),
+                  _buildQuickActionItem(
+                    icon: Icons.graphic_eq_rounded,
+                    label: 'Audio Effect',
+                    hasRedDot: true,
+                    onTap: () => _showToast('Audio Boost 200% Active'),
+                  ),
+                  _buildQuickActionItem(
+                    icon: Icons.tune_rounded,
+                    label: 'Equalizer',
+                    onTap: () => _showToast('Opening Equalizer...'),
+                  ),
+                  _buildQuickActionItem(
+                    icon: Icons.speed_rounded,
+                    label: 'Speed',
+                    badgeText: '${_playbackSpeed.toStringAsFixed(1)}X',
+                    isActive: _showSpeedSliderHud,
+                    onTap: () {
+                      setState(() => _showSpeedSliderHud = !_showSpeedSliderHud);
+                    },
+                  ),
+                  _buildQuickActionItem(
+                    icon: Icons.camera_alt_outlined,
+                    label: 'Screenshot',
+                    onTap: _takeScreenshot,
+                  ),
+                  _buildQuickActionItem(
+                    icon: Icons.headphones_rounded,
+                    label: 'Background',
+                    onTap: () => _showToast('Background Play Enabled'),
+                  ),
+                  _buildQuickActionItem(
+                    icon: Icons.screen_rotation_rounded,
+                    label: 'Rotation',
+                    onTap: _toggleOrientation,
+                  ),
+                  _buildQuickActionItem(
+                    icon: Icons.auto_awesome_rounded,
+                    label: 'AI 4K HDR',
+                    isActive: _isAiClarityActive,
+                    activeColor: const Color(0xFFFFD700),
+                    onTap: _toggleAiClarity,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
   }
 }

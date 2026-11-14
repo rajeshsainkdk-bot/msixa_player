@@ -153,7 +153,7 @@ class _VideosScreenState extends State<VideosScreen> {
     final displayList = _filteredVideos;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Colors.black,
       body: SafeArea(
         child: Column(
           children: [
@@ -343,7 +343,7 @@ class _VideosScreenState extends State<VideosScreen> {
                           ),
                         )
                       : ListView.builder(
-                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 120),
+                          padding: const EdgeInsets.only(top: 4, bottom: 120),
                           itemCount: displayList.length,
                           itemBuilder: (ctx, i) {
                             final video = displayList[i];
@@ -358,6 +358,7 @@ class _VideosScreenState extends State<VideosScreen> {
           ? FloatingActionButton(
               backgroundColor: const Color(0xFF2563EB),
               elevation: 6,
+              shape: const CircleBorder(),
               onPressed: () => _openPlayer(displayList.first),
               child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 38),
             )
@@ -371,84 +372,75 @@ class _VideosScreenState extends State<VideosScreen> {
         video.displayName.toLowerCase().contains('srt') ||
         video.path.toLowerCase().endsWith('.mkv');
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.04)),
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: () => _openPlayer(video),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // Video Thumbnail Box with Duration Badge (Screenshot 2)
-              VideoThumbnailWidget(
-                video: video,
-                width: 104,
-                height: 68,
-                borderRadius: 8,
-              ),
-              const SizedBox(width: 12),
+    return InkWell(
+      onTap: () => _openPlayer(video),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 7.0),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // Video Thumbnail Box with Duration Badge (Screenshot 2)
+            VideoThumbnailWidget(
+              video: video,
+              width: 110,
+              height: 68,
+              borderRadius: 6,
+            ),
+            const SizedBox(width: 14),
 
-              // Title and Meta
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      video.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w500,
-                        height: 1.25,
+            // Title and SRT Badge (Screenshot 2)
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    video.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w400,
+                      height: 1.25,
+                    ),
+                  ),
+                  if (hasSrt) ...[
+                    const SizedBox(height: 5),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10B981),
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                      child: const Text(
+                        'SRT',
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.5,
+                        ),
                       ),
                     ),
-                    if (hasSrt) ...[
-                      const SizedBox(height: 5),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF10B981),
-                          borderRadius: BorderRadius.circular(3),
-                        ),
-                        child: const Text(
-                          'SRT',
-                          style: TextStyle(
-                            color: Colors.black,
-                            fontSize: 9,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ),
-                    ],
                   ],
-                ),
+                ],
               ),
+            ),
 
-              // Right-side 3-Dots Menu Button (Screenshot 1 Options Menu)
-              IconButton(
-                icon: const Icon(Icons.more_vert_rounded, color: Colors.white70, size: 22),
-                splashRadius: 20,
-                onPressed: () => _showVideoOptionsMenu(video),
-              ),
-            ],
-          ),
+            // Right-side 3-Dots Menu Button (Screenshot 2)
+            IconButton(
+              icon: const Icon(Icons.more_vert_rounded, color: Colors.white70, size: 22),
+              splashRadius: 20,
+              onPressed: () => _showVideoOptionsMenu(video),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  /// Authentic MX Player 3-Dots Video Options Menu Sheet (Screenshot 1)
+  /// Authentic 3-Dots Video Options Menu Sheet (Screenshot 1)
   void _showVideoOptionsMenu(VideoItem video) async {
     final prefs = await SharedPreferences.getInstance();
     final favList = prefs.getStringList('video_favorites_list') ?? [];
@@ -458,9 +450,9 @@ class _VideosScreenState extends State<VideosScreen> {
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF1E2026),
+      backgroundColor: const Color(0xFF1E2024),
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (ctx) {
         return SafeArea(
@@ -469,21 +461,9 @@ class _VideosScreenState extends State<VideosScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Handle Bar
-                Center(
-                  child: Container(
-                    width: 36,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.white24,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
-
                 // 1. Favourite
                 ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
                   leading: Icon(
                     isFav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
                     color: isFav ? Colors.redAccent : Colors.white,
@@ -491,7 +471,7 @@ class _VideosScreenState extends State<VideosScreen> {
                   ),
                   title: Text(
                     isFav ? 'Remove from Favourite' : 'Favourite',
-                    style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500),
+                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w400),
                   ),
                   onTap: () async {
                     Navigator.pop(ctx);
@@ -511,10 +491,11 @@ class _VideosScreenState extends State<VideosScreen> {
 
                 // 2. Add To Playlist
                 ListTile(
-                  leading: const Icon(Icons.playlist_add_rounded, color: Colors.white, size: 24),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
+                  leading: const Icon(Icons.playlist_add_rounded, color: Colors.white, size: 26),
                   title: const Text(
                     'Add To Playlist',
-                    style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500),
+                    style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w400),
                   ),
                   onTap: () {
                     Navigator.pop(ctx);
@@ -524,10 +505,11 @@ class _VideosScreenState extends State<VideosScreen> {
 
                 // 3. File Transfer
                 ListTile(
-                  leading: const Icon(Icons.phonelink_ring_rounded, color: Colors.white, size: 24),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
+                  leading: _buildFileTransferIcon(),
                   title: const Text(
                     'File Transfer',
-                    style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500),
+                    style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w400),
                   ),
                   onTap: () {
                     Navigator.pop(ctx);
@@ -537,10 +519,11 @@ class _VideosScreenState extends State<VideosScreen> {
 
                 // 4. Lock in Private Folder
                 ListTile(
-                  leading: const Icon(Icons.lock_outline_rounded, color: Colors.white, size: 24),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
+                  leading: _buildLockFolderIcon(),
                   title: const Text(
                     'Lock in Private Folder',
-                    style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500),
+                    style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w400),
                   ),
                   onTap: () {
                     Navigator.pop(ctx);
@@ -550,10 +533,11 @@ class _VideosScreenState extends State<VideosScreen> {
 
                 // 5. Convert to MP3
                 ListTile(
-                  leading: const Icon(Icons.headphones_rounded, color: Colors.white, size: 24),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
+                  leading: const Icon(Icons.headphones_outlined, color: Colors.white, size: 24),
                   title: const Text(
                     'Convert to MP3',
-                    style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500),
+                    style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w400),
                   ),
                   onTap: () {
                     Navigator.pop(ctx);
@@ -563,27 +547,18 @@ class _VideosScreenState extends State<VideosScreen> {
 
                 // 6. Share
                 ListTile(
-                  leading: const Icon(Icons.reply_rounded, color: Colors.white, size: 24),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
+                  leading: Transform.flip(
+                    flipX: true,
+                    child: const Icon(Icons.reply_rounded, color: Colors.white, size: 24),
+                  ),
                   title: const Text(
                     'Share',
-                    style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500),
+                    style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w400),
                   ),
                   onTap: () {
                     Navigator.pop(ctx);
                     Share.shareXFiles([XFile(video.path)], text: video.displayName);
-                  },
-                ),
-
-                // 7. Information
-                ListTile(
-                  leading: const Icon(Icons.info_outline_rounded, color: Colors.white, size: 24),
-                  title: const Text(
-                    'Information',
-                    style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500),
-                  ),
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    _showVideoDetails(video);
                   },
                 ),
               ],
@@ -591,6 +566,54 @@ class _VideosScreenState extends State<VideosScreen> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildFileTransferIcon() {
+    return SizedBox(
+      width: 24,
+      height: 24,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Container(
+            width: 14,
+            height: 19,
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.white, width: 1.5),
+              borderRadius: BorderRadius.circular(2.5),
+            ),
+            child: const Center(
+              child: Icon(Icons.play_arrow_rounded, color: Colors.white, size: 9),
+            ),
+          ),
+          const Positioned(
+            left: 0,
+            child: Icon(Icons.arrow_left_rounded, color: Colors.white, size: 12),
+          ),
+          const Positioned(
+            right: 0,
+            child: Icon(Icons.arrow_right_rounded, color: Colors.white, size: 12),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLockFolderIcon() {
+    return SizedBox(
+      width: 24,
+      height: 24,
+      child: Stack(
+        alignment: Alignment.center,
+        children: const [
+          Icon(Icons.folder_outlined, color: Colors.white, size: 24),
+          Positioned(
+            bottom: 4,
+            child: Icon(Icons.lock_rounded, color: Colors.white, size: 10),
+          ),
+        ],
+      ),
     );
   }
 
