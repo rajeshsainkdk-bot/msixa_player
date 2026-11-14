@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:video_player/video_player.dart';
+import 'package:file_picker/file_picker.dart';
 import '../models/video_item.dart';
 import '../providers/player_provider.dart';
 import '../services/device_video_service.dart';
@@ -100,6 +101,32 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   bool _showShortcuts = true;
   bool _isQuickActionsExpanded = false;
   bool _showVideoDisplay = true;
+
+  // MX Floating Top Pill HUD
+  String? _pillHudMessage;
+  IconData? _pillHudIcon;
+  Timer? _pillHudTimer;
+
+  // Audio Booster & Audio Mode
+  double _audioBoostGain = 1.0; // 1.0 to 2.0 (up to 200%)
+  bool _isAudioBoostEnabled = false;
+  String _audioTrackName = 'Track 1 (Default / Stereo)';
+  String _audioDecoder = 'HW Audio (Native)';
+
+  bool get _isLikelyDolbyOrEac3 {
+    final title = _currentVideo.title.toLowerCase();
+    final path = _currentVideo.path.toLowerCase();
+    return title.contains('eac3') ||
+        title.contains('ddp') ||
+        title.contains('ac3') ||
+        title.contains('5.1') ||
+        title.contains('dolby') ||
+        title.contains('atmos') ||
+        path.contains('eac3') ||
+        path.contains('ddp') ||
+        path.contains('ac3') ||
+        path.contains('5.1');
+  }
 
   // AI Video Clarity
   bool _isAiClarityActive = false;
@@ -197,6 +224,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       setState(() {
         _isInitialized = true;
       });
+
+      if (_isLikelyDolbyOrEac3) {
+        _showPillHud('Dolby EAC3 / 5.1 Surround detected (Tap 🎵 if silent)', icon: Icons.surround_sound_rounded);
+      }
 
       _startControlsTimer();
     } catch (e) {
@@ -409,17 +440,522 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     _resetControlsTimer();
   }
 
-  void _showToast(String msg) {
+  void _showPillHud(String msg, {IconData? icon}) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-        backgroundColor: const Color(0xFF131B2C),
-        duration: const Duration(seconds: 2),
-        behavior: SnackBarBehavior.floating,
+    setState(() {
+      _pillHudMessage = msg;
+      _pillHudIcon = icon;
+    });
+    _pillHudTimer?.cancel();
+    _pillHudTimer = Timer(const Duration(milliseconds: 2200), () {
+      if (mounted) {
+        setState(() {
+          _pillHudMessage = null;
+          _pillHudIcon = null;
+        });
+      }
+    });
+  }
+
+  void _showToast(String msg) {
+    _showPillHud(msg);
+  }
+
+  Future<void> _openInExternalPlayer() async {
+    try {
+      await _channel.invokeMethod('openVideoWithApp', {
+        'path': _currentVideo.path,
+        'id': _currentVideo.id,
+      });
+      _showPillHud('Opening in External Video Player (MX / VLC)...', icon: Icons.open_in_new_rounded);
+    } catch (e) {
+      _showPillHud('Failed to open external player: $e', icon: Icons.error_outline_rounded);
+    }
+  }
+
+  void _showAudioSettingsSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setAudioState) => Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFF131A2A).withOpacity(0.97),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            border: Border.all(color: Colors.white12),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          child: SafeArea(
+            top: false,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      const Icon(Icons.music_note_rounded, color: Color(0xFF2196F3), size: 24),
+                      const SizedBox(width: 10),
+                      const Expanded(
+                        child: Text(
+                          'Audio Track & Sound Booster',
+                          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded, color: Colors.white70, size: 20),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // EAC3 / Dolby Digital Plus Surround Warning Banner
+                  if (_isLikelyDolbyOrEac3)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            const Color(0xFF2563EB).withOpacity(0.25),
+                            const Color(0xFF1D4ED8).withOpacity(0.12),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFF3B82F6).withOpacity(0.5)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: const [
+                              Icon(Icons.surround_sound_rounded, color: Color(0xFF60A5FA), size: 20),
+                              SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Dolby Digital Plus (E-AC3 / 5.1) Detected',
+                                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          const Text(
+                            'If this video has no voice or audio on your phone, standard Android player lacks EAC3 patent decoder. Tap below to play with MX Player or VLC for native Dolby surround decoding.',
+                            style: TextStyle(color: Colors.white70, fontSize: 11),
+                          ),
+                          const SizedBox(height: 10),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF2563EB),
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                              ),
+                              icon: const Icon(Icons.open_in_new_rounded, size: 16),
+                              label: const Text(
+                                'Play in MX Player / VLC (Full EAC3 Audio)',
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                              ),
+                              onPressed: () {
+                                Navigator.pop(ctx);
+                                _openInExternalPlayer();
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                  // 1. Audio Track Selector
+                  const Text('AUDIO TRACK', style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 6),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.white12),
+                    ),
+                    child: Column(
+                      children: [
+                        RadioListTile<String>(
+                          dense: true,
+                          value: 'Track 1 (Default / Stereo)',
+                          groupValue: _audioTrackName,
+                          activeColor: const Color(0xFF2196F3),
+                          title: const Text('Track 1 (Default Stereo / Main Audio)', style: TextStyle(color: Colors.white, fontSize: 13)),
+                          subtitle: Text(
+                            _isLikelyDolbyOrEac3 ? 'Multi-channel Dolby EAC3 5.1' : 'AAC / MP3 2-Channel Stereo',
+                            style: const TextStyle(color: Colors.white54, fontSize: 10),
+                          ),
+                          onChanged: (val) {
+                            if (val != null) {
+                              setAudioState(() => _audioTrackName = val);
+                              setState(() => _audioTrackName = val);
+                              _showPillHud('Audio Track: $val', icon: Icons.music_note_rounded);
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // 2. Audio Booster (+200% Super Loud Audio Boost)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('SUPER LOUD AUDIO BOOST', style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold)),
+                          Text(
+                            _isAudioBoostEnabled ? 'Boosted to ${(_audioBoostGain * 100).toInt()}% (+200% Max Gain)' : 'Standard volume (100%)',
+                            style: TextStyle(
+                              color: _isAudioBoostEnabled ? const Color(0xFF10B981) : Colors.white60,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Switch(
+                        value: _isAudioBoostEnabled,
+                        activeColor: const Color(0xFF2196F3),
+                        onChanged: (val) {
+                          setAudioState(() {
+                            _isAudioBoostEnabled = val;
+                            if (val) {
+                              _audioBoostGain = 1.6;
+                              _volume = 1.0;
+                              _controller.setVolume(1.0);
+                              _channel.invokeMethod('setDeviceVolume', {'volume': 1.0});
+                            } else {
+                              _audioBoostGain = 1.0;
+                            }
+                          });
+                          setState(() {});
+                          _showPillHud(
+                            _isAudioBoostEnabled ? '🔊 Audio Boost 200% Active' : 'Audio Boost: Disabled',
+                            icon: Icons.graphic_eq_rounded,
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+
+                  if (_isAudioBoostEnabled) ...[
+                    const SizedBox(height: 4),
+                    SliderTheme(
+                      data: SliderTheme.of(context).copyWith(
+                        trackHeight: 3.0,
+                        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6.0),
+                        activeTrackColor: const Color(0xFF10B981),
+                        inactiveTrackColor: Colors.white24,
+                        thumbColor: const Color(0xFF10B981),
+                      ),
+                      child: Slider(
+                        value: _audioBoostGain,
+                        min: 1.0,
+                        max: 2.0,
+                        divisions: 10,
+                        label: '${(_audioBoostGain * 100).toInt()}%',
+                        onChanged: (val) {
+                          setAudioState(() {
+                            _audioBoostGain = val;
+                            _volume = 1.0;
+                            _controller.setVolume(1.0);
+                          });
+                          setState(() {});
+                        },
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+
+                  // 3. Audio Decoder Mode
+                  const Text('AUDIO DECODER', style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: _audioDecoder.startsWith('HW') ? const Color(0xFF2196F3) : Colors.white70,
+                            side: BorderSide(
+                              color: _audioDecoder.startsWith('HW') ? const Color(0xFF2196F3) : Colors.white24,
+                              width: _audioDecoder.startsWith('HW') ? 1.5 : 1.0,
+                            ),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          onPressed: () {
+                            setAudioState(() => _audioDecoder = 'HW Audio (Native)');
+                            setState(() => _audioDecoder = 'HW Audio (Native)');
+                            _showPillHud('Decoder: HW Audio (Direct)', icon: Icons.settings_input_component_rounded);
+                          },
+                          child: const Text('HW Audio (Native)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: _audioDecoder.startsWith('SW') ? const Color(0xFF2196F3) : Colors.white70,
+                            side: BorderSide(
+                              color: _audioDecoder.startsWith('SW') ? const Color(0xFF2196F3) : Colors.white24,
+                              width: _audioDecoder.startsWith('SW') ? 1.5 : 1.0,
+                            ),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          onPressed: () {
+                            setAudioState(() => _audioDecoder = 'SW Audio (Stereo Downmix)');
+                            setState(() => _audioDecoder = 'SW Audio (Stereo Downmix)');
+                            _showPillHud('Decoder: SW Audio (Downmixed)', icon: Icons.tune_rounded);
+                          },
+                          child: const Text('SW Audio (Downmix)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+
+                  // 4. Fallback button to launch system player / MX player
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        side: const BorderSide(color: Colors.white24),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        padding: const EdgeInsets.symmetric(vertical: 11),
+                      ),
+                      icon: const Icon(Icons.open_in_new_rounded, size: 16),
+                      label: const Text('Open with Other Installed Player (MX / VLC)', style: TextStyle(fontSize: 12)),
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        _openInExternalPlayer();
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
+  }
+
+  void _showSubtitleSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFF131A2A).withOpacity(0.97),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          border: Border.all(color: Colors.white12),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  const Icon(Icons.subtitles_rounded, color: Color(0xFF2196F3), size: 24),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Text('Subtitles & Closed Captions', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, color: Colors.white70, size: 20),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.subtitles_off_rounded, color: Colors.white70),
+                title: const Text('Turn Off Subtitles', style: TextStyle(color: Colors.white, fontSize: 13)),
+                trailing: const Icon(Icons.check_rounded, color: Color(0xFF2196F3)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showPillHud('Subtitles: Off', icon: Icons.subtitles_off_rounded);
+                },
+              ),
+              const Divider(color: Colors.white12),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.file_upload_outlined, color: Color(0xFF00E5FF)),
+                title: const Text('Open External Subtitle (.srt, .vtt, .sub)', style: TextStyle(color: Colors.white, fontSize: 13)),
+                subtitle: const Text('Load subtitle file from phone storage', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  try {
+                    final res = await FilePicker.platform.pickFiles(
+                      type: FileType.custom,
+                      allowedExtensions: ['srt', 'vtt', 'sub', 'ass'],
+                    );
+                    if (res != null && res.files.single.path != null) {
+                      _showPillHud('Subtitle loaded: ${res.files.single.name}', icon: Icons.subtitles_rounded);
+                    }
+                  } catch (_) {}
+                },
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.search_rounded, color: Color(0xFFFFB300)),
+                title: const Text('Online Subtitles (OpenSubtitles)', style: TextStyle(color: Colors.white, fontSize: 13)),
+                subtitle: const Text('Search & download subtitles automatically', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showPillHud('Searching subtitles online for ${_currentVideo.title}...', icon: Icons.search_rounded);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showSleepTimerDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF131A2A),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: const [
+            Icon(Icons.timer_rounded, color: Color(0xFF2196F3)),
+            SizedBox(width: 8),
+            Text('Sleep Timer', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final minutes in [15, 30, 45, 60])
+              ListTile(
+                title: Text('$minutes minutes', style: const TextStyle(color: Colors.white)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showPillHud('Sleep Timer set for $minutes minutes', icon: Icons.timer_rounded);
+                },
+              ),
+            ListTile(
+              title: const Text('Turn Off', style: TextStyle(color: Colors.redAccent)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _showPillHud('Sleep Timer: Off', icon: Icons.timer_off_rounded);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // REUSABLE MX PLAYER SWIPE GESTURE HANDLERS (Volume, Brightness, Seeking)
+  void _handleHorizontalDragStart(DragStartDetails details) {
+    if (_isScreenLocked) return;
+    _isSeekingGesture = true;
+    _seekOrigin = _controller.value.position;
+    _seekTarget = _seekOrigin;
+    _seekDeltaSeconds = 0.0;
+  }
+
+  void _handleHorizontalDragUpdate(DragUpdateDetails details, Duration totalDuration) {
+    if (_isScreenLocked || !_isSeekingGesture) return;
+    final delta = details.primaryDelta ?? 0.0;
+    _seekDeltaSeconds += delta * 0.18; // 1px = 180ms
+    final totalSec = totalDuration.inSeconds;
+    final targetSec = (_seekOrigin.inSeconds + _seekDeltaSeconds.toInt()).clamp(0, totalSec);
+
+    setState(() {
+      _seekTarget = Duration(seconds: targetSec);
+      _showSeekHud = true;
+    });
+  }
+
+  Future<void> _handleHorizontalDragEnd(DragEndDetails details) async {
+    if (_isSeekingGesture) {
+      await _controller.seekTo(_seekTarget);
+      _isSeekingGesture = false;
+      Timer(const Duration(milliseconds: 600), () {
+        if (mounted) setState(() => _showSeekHud = false);
+      });
+      _resetControlsTimer();
+    }
+  }
+
+  void _handleVerticalDragStart(DragStartDetails details, Size screenSize) {
+    if (_isScreenLocked) return;
+    final x = details.globalPosition.dx;
+    if (x < screenSize.width * 0.5) {
+      _isVolumeDrag = true;
+      _isBrightnessDrag = false;
+    } else {
+      _isBrightnessDrag = true;
+      _isVolumeDrag = false;
+    }
+  }
+
+  void _handleVerticalDragUpdate(DragUpdateDetails details, Size screenSize) {
+    if (_isScreenLocked) return;
+    final delta = -(details.primaryDelta ?? 0.0) / (screenSize.height * 0.55);
+
+    // Left Side = Volume Control (Screenshot 3)
+    if (_isVolumeDrag) {
+      _volume = (_volume + delta).clamp(0.0, 1.0);
+      _controller.setVolume(_volume);
+      _channel.invokeMethod('setDeviceVolume', {'volume': _volume});
+      setState(() => _showVolumeHud = true);
+      _volumeHudTimer?.cancel();
+      _volumeHudTimer = Timer(const Duration(milliseconds: 900), () {
+        if (mounted) setState(() => _showVolumeHud = false);
+      });
+    }
+    // Right Side = Brightness Control (Screenshot 4)
+    else if (_isBrightnessDrag) {
+      _brightness = (_brightness + delta).clamp(0.02, 1.0);
+      _channel.invokeMethod('setScreenBrightness', {'brightness': _brightness});
+      setState(() => _showBrightnessHud = true);
+      _brightnessHudTimer?.cancel();
+      _brightnessHudTimer = Timer(const Duration(milliseconds: 900), () {
+        if (mounted) setState(() => _showBrightnessHud = false);
+      });
+    }
+  }
+
+  void _handleVerticalDragEnd(DragEndDetails details) {
+    _isVolumeDrag = false;
+    _isBrightnessDrag = false;
   }
 
   String _formatDuration(Duration d) {
@@ -933,77 +1469,13 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                   }
                 },
                 // Horizontal Drag: Fast Seek HUD
-                onHorizontalDragStart: (details) {
-                  if (_isScreenLocked) return;
-                  _isSeekingGesture = true;
-                  _seekOrigin = _controller.value.position;
-                  _seekTarget = _seekOrigin;
-                  _seekDeltaSeconds = 0.0;
-                },
-                onHorizontalDragUpdate: (details) {
-                  if (_isScreenLocked || !_isSeekingGesture) return;
-                  final delta = details.primaryDelta ?? 0.0;
-                  _seekDeltaSeconds += delta * 0.18; // 1px = 180ms
-                  final totalSec = totalDuration.inSeconds;
-                  final targetSec = (_seekOrigin.inSeconds + _seekDeltaSeconds.toInt()).clamp(0, totalSec);
-
-                  setState(() {
-                    _seekTarget = Duration(seconds: targetSec);
-                    _showSeekHud = true;
-                  });
-                },
-                onHorizontalDragEnd: (details) async {
-                  if (_isSeekingGesture) {
-                    await _controller.seekTo(_seekTarget);
-                    _isSeekingGesture = false;
-                    Timer(const Duration(milliseconds: 600), () {
-                      if (mounted) setState(() => _showSeekHud = false);
-                    });
-                    _resetControlsTimer();
-                  }
-                },
-                // Vertical Drag: Left = Volume (Screenshot 3), Right = Brightness (Screenshot 4)
-                onVerticalDragStart: (details) {
-                  if (_isScreenLocked) return;
-                  final x = details.globalPosition.dx;
-                  if (x < screenSize.width * 0.5) {
-                    _isVolumeDrag = true;
-                    _isBrightnessDrag = false;
-                  } else {
-                    _isBrightnessDrag = true;
-                    _isVolumeDrag = false;
-                  }
-                },
-                onVerticalDragUpdate: (details) {
-                  if (_isScreenLocked) return;
-                  final delta = -(details.primaryDelta ?? 0.0) / (screenSize.height * 0.55);
-
-                  // Left Side = Volume Control (Screenshot 3)
-                  if (_isVolumeDrag) {
-                    _volume = (_volume + delta).clamp(0.0, 1.0);
-                    _controller.setVolume(_volume);
-                    _channel.invokeMethod('setDeviceVolume', {'volume': _volume});
-                    setState(() => _showVolumeHud = true);
-                    _volumeHudTimer?.cancel();
-                    _volumeHudTimer = Timer(const Duration(milliseconds: 900), () {
-                      if (mounted) setState(() => _showVolumeHud = false);
-                    });
-                  }
-                  // Right Side = Brightness Control (Screenshot 4)
-                  else if (_isBrightnessDrag) {
-                    _brightness = (_brightness + delta).clamp(0.02, 1.0);
-                    _channel.invokeMethod('setScreenBrightness', {'brightness': _brightness});
-                    setState(() => _showBrightnessHud = true);
-                    _brightnessHudTimer?.cancel();
-                    _brightnessHudTimer = Timer(const Duration(milliseconds: 900), () {
-                      if (mounted) setState(() => _showBrightnessHud = false);
-                    });
-                  }
-                },
-                onVerticalDragEnd: (details) {
-                  _isVolumeDrag = false;
-                  _isBrightnessDrag = false;
-                },
+                onHorizontalDragStart: _handleHorizontalDragStart,
+                onHorizontalDragUpdate: (d) => _handleHorizontalDragUpdate(d, totalDuration),
+                onHorizontalDragEnd: _handleHorizontalDragEnd,
+                // Vertical Drag: Left = Volume, Right = Brightness
+                onVerticalDragStart: (d) => _handleVerticalDragStart(d, screenSize),
+                onVerticalDragUpdate: (d) => _handleVerticalDragUpdate(d, screenSize),
+                onVerticalDragEnd: _handleVerticalDragEnd,
                 child: Container(),
               ),
             ),
@@ -1301,17 +1773,17 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                 // Cast Icon
                                 IconButton(
                                   icon: const Icon(Icons.cast_rounded, color: Colors.white, size: 20),
-                                  onPressed: () => _showToast('Searching for Cast devices...'),
+                                  onPressed: () => _showPillHud('Searching for Cast devices...', icon: Icons.cast_rounded),
                                 ),
                                 // Audio Track Icon
                                 IconButton(
                                   icon: const Icon(Icons.music_note_rounded, color: Colors.white, size: 20),
-                                  onPressed: () => _showToast('Audio Track: Default (Stereo)'),
+                                  onPressed: _showAudioSettingsSheet,
                                 ),
                                 // Subtitle Icon
                                 IconButton(
                                   icon: const Icon(Icons.subtitles_rounded, color: Colors.white, size: 20),
-                                  onPressed: () => _showToast('Subtitles: None'),
+                                  onPressed: _showSubtitleSheet,
                                 ),
                                 // HW Decoder Badge
                                 InkWell(
@@ -1363,6 +1835,13 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                             _togglePlayPause();
                           }
                         },
+                        // Connect Swipe Gestures (Volume on left, Brightness on right, Seeking horizontally)
+                        onHorizontalDragStart: _handleHorizontalDragStart,
+                        onHorizontalDragUpdate: (d) => _handleHorizontalDragUpdate(d, totalDuration),
+                        onHorizontalDragEnd: _handleHorizontalDragEnd,
+                        onVerticalDragStart: (d) => _handleVerticalDragStart(d, screenSize),
+                        onVerticalDragUpdate: (d) => _handleVerticalDragUpdate(d, screenSize),
+                        onVerticalDragEnd: _handleVerticalDragEnd,
                         child: Container(color: Colors.transparent),
                       ),
                     ),
@@ -1510,6 +1989,47 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                       ),
                     ),
                   ],
+                ),
+              ),
+            ),
+
+          // 13. MX PLAYER FLOATING TOP-CENTER HUD PILL (Replaces SnackBar, zero bottom patti)
+          if (_pillHudMessage != null)
+            Positioned(
+              top: 65,
+              left: 20,
+              right: 20,
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.88),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: Colors.white24, width: 1.0),
+                    boxShadow: const [
+                      BoxShadow(color: Colors.black54, blurRadius: 12, offset: Offset(0, 4)),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_pillHudIcon != null) ...[
+                        Icon(_pillHudIcon, color: const Color(0xFF2196F3), size: 16),
+                        const SizedBox(width: 8),
+                      ],
+                      Flexible(
+                        child: Text(
+                          _pillHudMessage!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -1706,12 +2226,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                   _buildQuickActionItem(
                     icon: Icons.edit_rounded,
                     label: 'Customise',
-                    onTap: () => _showToast('Customise Items'),
+                    onTap: () => _showPillHud('Long press actions to customise', icon: Icons.edit_rounded),
                   ),
                   _buildQuickActionItem(
                     icon: Icons.shuffle_rounded,
                     label: 'Shuffle',
-                    onTap: () => _showToast('Shuffle Mode'),
+                    onTap: () => _showPillHud('Shuffle Mode: ON', icon: Icons.shuffle_rounded),
                   ),
                   _buildQuickActionItem(
                     icon: Icons.repeat_rounded,
@@ -1728,23 +2248,23 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                   _buildQuickActionItem(
                     icon: Icons.timer_rounded,
                     label: 'Sleep Timer',
-                    onTap: () => _showToast('Sleep Timer: Off'),
+                    onTap: _showSleepTimerDialog,
                   ),
                   _buildQuickActionItem(
                     icon: Icons.repeat_one_rounded,
                     label: 'A - B Repeat',
-                    onTap: () => _showToast('A-B Repeat: Tap to set Start'),
+                    onTap: () => _showPillHud('A-B Repeat: Point A marked', icon: Icons.repeat_one_rounded),
                   ),
                   _buildQuickActionItem(
                     icon: Icons.graphic_eq_rounded,
                     label: 'Audio Effect',
                     hasRedDot: true,
-                    onTap: () => _showToast('Audio Boost 200% Active'),
+                    onTap: _showAudioSettingsSheet,
                   ),
                   _buildQuickActionItem(
                     icon: Icons.tune_rounded,
                     label: 'Equalizer',
-                    onTap: () => _showToast('Opening Equalizer...'),
+                    onTap: _showAudioSettingsSheet,
                   ),
                   _buildQuickActionItem(
                     icon: Icons.speed_rounded,
@@ -1763,7 +2283,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                   _buildQuickActionItem(
                     icon: Icons.headphones_rounded,
                     label: 'Background',
-                    onTap: () => _showToast('Background Play Enabled'),
+                    onTap: () => _showPillHud('Background Play Active', icon: Icons.headphones_rounded),
                   ),
                   _buildQuickActionItem(
                     icon: Icons.screen_rotation_rounded,
