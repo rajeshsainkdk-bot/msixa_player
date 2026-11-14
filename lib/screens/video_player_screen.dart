@@ -98,6 +98,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   bool _isMuted = false;
   String _decoderMode = 'HW'; // HW, HW+, SW
   bool _showShortcuts = true;
+  bool _isQuickActionsExpanded = false;
   bool _showVideoDisplay = true;
 
   // AI Video Clarity
