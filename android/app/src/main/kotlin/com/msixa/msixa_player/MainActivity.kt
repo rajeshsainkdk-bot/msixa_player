@@ -402,11 +402,12 @@ class MainActivity: AudioServiceActivity() {
                                 } catch (_: Throwable) {}
                             }
 
-                            if (bitmap != null) {
+                            val bmp = bitmap
+                            if (bmp != null) {
                                 val stream = java.io.ByteArrayOutputStream()
-                                bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 75, stream)
+                                bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, 75, stream)
                                 val bytes = stream.toByteArray()
-                                bitmap.recycle()
+                                bmp.recycle()
                                 runOnUiThread { result.success(bytes) }
                             } else {
                                 runOnUiThread { result.success(null) }
