@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -200,6 +200,20 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   bool _isAudioBoostEnabled = false;
   String _audioTrackName = 'Track 1 (Default / Stereo)';
   String _audioDecoder = 'HW Audio (Native)';
+  List<Map<String, dynamic>> _audioTracks = [];
+  int _selectedAudioTrackIndex = 0;
+  bool _isSyncAudioPlaying = false;
+
+  /// Effective duration fallback: prefers ExoPlayer duration; falls back to MediaStore/metadata duration
+  Duration get _effectiveDuration {
+    if (_isInitialized && _controller.value.duration.inMilliseconds > 0) {
+      return _controller.value.duration;
+    }
+    if (_currentVideo.duration > 0) {
+      return Duration(milliseconds: _currentVideo.duration);
+    }
+    return Duration.zero;
+  }
 
   bool get _isLikelyDolbyOrEac3 {
     final title = _currentVideo.title.toLowerCase();
@@ -523,48 +537,146 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     } catch (_) {}
   }
 
+  Future<void> _loadNativeAudioTracks() async {
+    try {
+      final res = await _channel.invokeMethod<List>('getVideoAudioTracks', {
+        'path': _currentVideo.path,
+      });
+      if (res != null && res.isNotEmpty) {
+        final parsed = res.map((item) => Map<String, dynamic>.from(item as Map)).toList();
+        if (mounted) {
+          setState(() {
+            _audioTracks = parsed;
+            if (_audioTracks.isNotEmpty) {
+              _audioTrackName = _audioTracks[0]['name']?.toString() ?? 'Track 1 (Default)';
+            }
+          });
+          // If decoder is SW or if audio format requires fallback downmixing, auto-start SW audio sync
+          if (_decoderMode == 'SW' || (_isLikelyDolbyOrEac3 && _decoderMode != 'HW+')) {
+            await _switchAudioTrack(0);
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _switchAudioTrack(int index) async {
+    if (index < 0 || index >= _audioTracks.length) return;
+    setState(() => _selectedAudioTrackIndex = index);
+    final track = _audioTracks[index];
+    final name = track['name']?.toString() ?? 'Track ${index + 1}';
+    _audioTrackName = name;
+
+    try {
+      final posMs = _controller.value.position.inMilliseconds;
+      final res = await _channel.invokeMethod('playSyncAudio', {
+        'path': _currentVideo.path,
+        'trackIndex': track['index'],
+        'positionMs': posMs,
+        'volume': _isMuted ? 0.0 : _volume,
+      });
+      if (res == true) {
+        await _controller.setVolume(0.0); // Mute video player to prevent echo
+        _isSyncAudioPlaying = true;
+        _showPillHud('🔊 $name Active', icon: Icons.audiotrack_rounded);
+      }
+    } catch (e) {
+      await _controller.setVolume(_isMuted ? 0.0 : _volume);
+      _isSyncAudioPlaying = false;
+    }
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _startSwAudioSyncFallback() async {
+    try {
+      final posMs = _controller.value.position.inMilliseconds;
+      final res = await _channel.invokeMethod('playSyncAudio', {
+        'path': _currentVideo.path,
+        'trackIndex': null,
+        'positionMs': posMs,
+        'volume': _isMuted ? 0.0 : _volume,
+      });
+      if (res == true) {
+        await _controller.setVolume(0.0);
+        _isSyncAudioPlaying = true;
+        _showPillHud('🔊 SW Audio Engine Active', icon: Icons.audiotrack_rounded);
+      }
+    } catch (_) {}
+    if (mounted) setState(() {});
+  }
+
   Future<void> _initializeVideo() async {
     try {
+      if (_isSyncAudioPlaying) {
+        try {
+          await _channel.invokeMethod('stopSyncAudio');
+        } catch (_) {}
+        _isSyncAudioPlaying = false;
+      }
+
       setState(() {
         _isInitialized = false;
         _hasError = false;
         _errorMessage = '';
       });
 
-      if (_currentVideo.path.startsWith('content://') ||
-          _currentVideo.path.startsWith('http://') ||
-          _currentVideo.path.startsWith('https://')) {
-        _controller = VideoPlayerController.contentUri(Uri.parse(_currentVideo.path));
-      } else {
-        final file = File(_currentVideo.path);
-        if (!await file.exists()) {
-          if (_currentVideo.path.contains('://')) {
-            _controller = VideoPlayerController.contentUri(Uri.parse(_currentVideo.path));
-          } else {
-            setState(() {
-              _hasError = true;
-              _errorMessage = 'Video file does not exist at specified path:\n${_currentVideo.path}';
-            });
-            return;
-          }
-        } else {
-          _controller = VideoPlayerController.file(file);
+      bool initialized = false;
+      final numericId = int.tryParse(_currentVideo.id);
+      if (numericId != null && numericId > 0 && Platform.isAndroid && !_currentVideo.path.startsWith('http')) {
+        try {
+          _controller = VideoPlayerController.contentUri(Uri.parse('content://media/external/video/media/$numericId'));
+          await _controller.initialize();
+          initialized = true;
+        } catch (_) {
+          await _controller.dispose();
         }
       }
-      await _controller.initialize();
+
+      if (!initialized) {
+        if (_currentVideo.path.startsWith('content://') ||
+            _currentVideo.path.startsWith('http://') ||
+            _currentVideo.path.startsWith('https://')) {
+          _controller = VideoPlayerController.contentUri(Uri.parse(_currentVideo.path));
+        } else {
+          final file = File(_currentVideo.path);
+          if (!await file.exists()) {
+            if (_currentVideo.path.contains('://')) {
+              _controller = VideoPlayerController.contentUri(Uri.parse(_currentVideo.path));
+            } else {
+              setState(() {
+                _hasError = true;
+                _errorMessage = 'Video file does not exist at specified path:\n${_currentVideo.path}';
+              });
+              return;
+            }
+          } else {
+            _controller = VideoPlayerController.file(file);
+          }
+        }
+        await _controller.initialize();
+      }
+
       _controller.addListener(_videoListener);
       await _controller.setVolume(_isMuted ? 0.0 : _volume);
       await _controller.setPlaybackSpeed(_playbackSpeed);
       await _controller.setLooping(_repeatMode == 'one');
       await _controller.play();
 
+      // Load native audio tracks and dual-audio channels
+      await _loadNativeAudioTracks();
+
       // Resume video position if previously saved (FR-004, TC-006, MX-G06-004)
       try {
         final prefs = await SharedPreferences.getInstance();
         final savedMs = prefs.getInt('resume_${_currentVideo.id}') ?? 0;
-        final totalMs = _controller.value.duration.inMilliseconds;
+        final totalMs = _effectiveDuration.inMilliseconds;
         if (savedMs > 5000 && (totalMs == 0 || savedMs < totalMs - 8000)) {
           await _controller.seekTo(Duration(milliseconds: savedMs));
+          if (_isSyncAudioPlaying) {
+            try {
+              await _channel.invokeMethod('seekSyncAudio', {'positionMs': savedMs});
+            } catch (_) {}
+          }
           _showPillHud('Resumed from ${_formatDuration(Duration(milliseconds: savedMs))}', icon: Icons.history_rounded);
         }
       } catch (_) {}
@@ -679,8 +791,18 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     if (!_isInitialized || _isScreenLocked) return;
     if (_controller.value.isPlaying) {
       _controller.pause();
+      if (_isSyncAudioPlaying) {
+        try {
+          _channel.invokeMethod('pauseSyncAudio');
+        } catch (_) {}
+      }
     } else {
       _controller.play();
+      if (_isSyncAudioPlaying) {
+        try {
+          _channel.invokeMethod('resumeSyncAudio');
+        } catch (_) {}
+      }
     }
     _resetControlsTimer();
   }
@@ -696,6 +818,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     // If played more than 3 seconds, restart video
     if (_controller.value.position.inSeconds > 3) {
       _controller.seekTo(Duration.zero);
+      if (_isSyncAudioPlaying) {
+        try {
+          _channel.invokeMethod('seekSyncAudio', {'positionMs': 0});
+        } catch (_) {}
+      }
       return;
     }
     final prevIdx = (_currentIndex - 1 + _videoList.length) % _videoList.length;
@@ -704,6 +831,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   Future<void> _switchVideo(VideoItem targetVideo, int index) async {
     await _saveResumePosition();
+    if (_isSyncAudioPlaying) {
+      try {
+        await _channel.invokeMethod('stopSyncAudio');
+      } catch (_) {}
+      _isSyncAudioPlaying = false;
+    }
     _controller.removeListener(_videoListener);
     await _controller.dispose();
     setState(() {
@@ -711,6 +844,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       _currentIndex = index;
       _abRepeatA = null;
       _abRepeatB = null;
+      _audioTracks = [];
+      _selectedAudioTrackIndex = 0;
+      _audioTrackName = 'Track 1 (Default / Stereo)';
     });
     _initializeVideo();
   }
@@ -1091,8 +1227,20 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         _decoderMode = 'HW+';
       } else if (_decoderMode == 'HW+') {
         _decoderMode = 'SW';
+        if (_audioTracks.isNotEmpty) {
+          _switchAudioTrack(_selectedAudioTrackIndex);
+        } else {
+          _startSwAudioSyncFallback();
+        }
       } else {
         _decoderMode = 'HW';
+        if (_isSyncAudioPlaying) {
+          try {
+            _channel.invokeMethod('stopSyncAudio');
+          } catch (_) {}
+          _isSyncAudioPlaying = false;
+          _controller.setVolume(_isMuted ? 0.0 : _volume);
+        }
       }
     });
     _showPillHud('Decoder: $_decoderMode Active', icon: Icons.developer_board_rounded);
@@ -1112,14 +1260,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   void _seekRelative(int seconds) {
     if (!_isInitialized || _isScreenLocked) return;
 
-    if (_seekDebounceTimer == null || !_seekDebounceTimer!.isActive) {
-      _wasPlayingBeforeSeek = _controller.value.isPlaying;
-      if (_wasPlayingBeforeSeek) {
-        _controller.pause(); // Pause hardware decoder so high-bitrate 1080p/4K does not freeze
-      }
-      _accumulatedSeekSeconds = 0;
-    }
-
     _accumulatedSeekSeconds += seconds;
 
     _doubleTapTimer?.cancel();
@@ -1129,15 +1269,20 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     });
 
     _seekDebounceTimer?.cancel();
-    _seekDebounceTimer = Timer(const Duration(milliseconds: 260), () async {
+    _seekDebounceTimer = Timer(const Duration(milliseconds: 200), () async {
       final currentPos = _controller.value.position;
-      final totalDuration = _controller.value.duration;
-      final targetSeconds = (currentPos.inSeconds + _accumulatedSeekSeconds).clamp(0, totalDuration.inSeconds);
-      await _controller.seekTo(Duration(seconds: targetSeconds));
-
+      final duration = _effectiveDuration;
+      final totalMs = duration.inMilliseconds;
+      // Never clamp to 0; allow seeking forward up to 6 hours if duration metadata is pending
+      final maxMs = totalMs > 0 ? totalMs : 21600000;
+      final targetMs = (currentPos.inMilliseconds + _accumulatedSeekSeconds * 1000).clamp(0, maxMs);
       _accumulatedSeekSeconds = 0;
-      if (_wasPlayingBeforeSeek && mounted) {
-        await _controller.play();
+
+      await _controller.seekTo(Duration(milliseconds: targetMs));
+      if (_isSyncAudioPlaying) {
+        try {
+          await _channel.invokeMethod('seekSyncAudio', {'positionMs': targetMs});
+        } catch (_) {}
       }
     });
 
@@ -1415,32 +1560,138 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                               ],
                             ),
                             const SizedBox(height: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.06),
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: Colors.white12),
+                            if (_audioTracks.isNotEmpty)
+                              Column(
+                                children: List.generate(_audioTracks.length, (idx) {
+                                  final trk = _audioTracks[idx];
+                                  final name = trk['name']?.toString() ?? 'Track ${idx + 1}';
+                                  final isSel = _selectedAudioTrackIndex == idx;
+                                  final isDolby = trk['isDolby'] == true;
+                                  return Container(
+                                    margin: const EdgeInsets.only(bottom: 6),
+                                    decoration: BoxDecoration(
+                                      color: isSel ? const Color(0xFF2196F3).withOpacity(0.18) : Colors.white.withOpacity(0.04),
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(color: isSel ? const Color(0xFF2196F3) : Colors.white12),
+                                    ),
+                                    child: ListTile(
+                                      dense: true,
+                                      leading: Icon(
+                                        isSel ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
+                                        color: isSel ? const Color(0xFF2196F3) : Colors.white54,
+                                        size: 20,
+                                      ),
+                                      title: Text(
+                                        name,
+                                        style: TextStyle(
+                                          color: isSel ? Colors.white : Colors.white70,
+                                          fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                      trailing: isDolby
+                                          ? Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFF10B981).withOpacity(0.2),
+                                                borderRadius: BorderRadius.circular(4),
+                                                border: Border.all(color: const Color(0xFF10B981)),
+                                              ),
+                                              child: const Text('DOLBY', style: TextStyle(color: Color(0xFF10B981), fontSize: 9, fontWeight: FontWeight.bold)),
+                                            )
+                                          : null,
+                                      onTap: () async {
+                                        setAudioState(() {});
+                                        await _switchAudioTrack(idx);
+                                        setAudioState(() {});
+                                      },
+                                    ),
+                                  );
+                                }),
+                              )
+                            else
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.06),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: Colors.white12),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.audiotrack_rounded, color: Color(0xFF2196F3), size: 20),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Text(
+                                        _audioTrackName,
+                                        style: const TextStyle(color: Colors.white, fontSize: 13),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                              child: DropdownButton<String>(
-                                isExpanded: true,
-                                dropdownColor: const Color(0xFF131A2A),
-                                value: _audioTrackName,
-                                underline: const SizedBox.shrink(),
-                                style: const TextStyle(color: Colors.white, fontSize: 13),
-                                items: [
-                                  _audioTrackName,
-                                  if (_audioTrackName != 'Track 1 (Default / Stereo)') 'Track 1 (Default / Stereo)',
-                                  'Track 2 (Hindi / Surround)',
-                                  'Track 3 (English / 5.1 DD+)',
-                                ].toSet().map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
-                                onChanged: (val) {
-                                  if (val != null) {
-                                    setAudioState(() => _audioTrackName = val);
-                                    setState(() {});
-                                    _showPillHud('Audio Track: $val', icon: Icons.audiotrack_rounded);
-                                  }
-                                },
+                            const SizedBox(height: 10),
+
+                            // SW Multi-Channel Audio Engine Toggle (For movies with silent/unsupported audio codecs)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: _isSyncAudioPlaying ? const Color(0xFF10B981).withOpacity(0.12) : Colors.white.withOpacity(0.04),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: _isSyncAudioPlaying ? const Color(0xFF10B981).withOpacity(0.4) : Colors.white12),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.surround_sound_rounded,
+                                          color: _isSyncAudioPlaying ? const Color(0xFF10B981) : Colors.white70,
+                                          size: 22,
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              const Text(
+                                                'Software Audio Engine (SW)',
+                                                style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                                              ),
+                                              Text(
+                                                _isSyncAudioPlaying ? 'Active: All audio codecs decoded & synced' : 'Fixes movies with no sound / missing voice',
+                                                style: const TextStyle(color: Colors.white54, fontSize: 11),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Switch(
+                                    value: _isSyncAudioPlaying,
+                                    activeColor: const Color(0xFF10B981),
+                                    onChanged: (val) async {
+                                      if (val) {
+                                        if (_audioTracks.isNotEmpty) {
+                                          await _switchAudioTrack(_selectedAudioTrackIndex);
+                                        } else {
+                                          await _startSwAudioSyncFallback();
+                                        }
+                                      } else {
+                                        try {
+                                          await _channel.invokeMethod('stopSyncAudio');
+                                        } catch (_) {}
+                                        await _controller.setVolume(_isMuted ? 0.0 : _volume);
+                                        _isSyncAudioPlaying = false;
+                                      }
+                                      setAudioState(() {});
+                                      setState(() {});
+                                    },
+                                  ),
+                                ],
                               ),
                             ),
                             const SizedBox(height: 16),
@@ -2113,7 +2364,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     if (_isSeekingGesture) {
       _seekDeltaSeconds += details.focalPointDelta.dx * 0.18;
       final totalSec = totalDuration.inSeconds;
-      final targetSec = (_seekOrigin.inSeconds + _seekDeltaSeconds.toInt()).clamp(0, totalSec);
+      final maxSec = totalSec > 0 ? totalSec : 21600;
+      final targetSec = (_seekOrigin.inSeconds + _seekDeltaSeconds.toInt()).clamp(0, maxSec);
       setState(() {
         _seekTarget = Duration(seconds: targetSec);
         _showSeekHud = true;
@@ -2121,7 +2373,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     } else if (_isVolumeDrag) {
       final delta = -details.focalPointDelta.dy / (screenSize.height * 0.55);
       _volume = (_volume + delta).clamp(0.0, 1.0);
-      _controller.setVolume(_volume);
+      if (_isSyncAudioPlaying) {
+        _channel.invokeMethod('setSyncAudioVolume', {'volume': _isMuted ? 0.0 : _volume});
+      } else {
+        _controller.setVolume(_isMuted ? 0.0 : _volume);
+      }
       _channel.invokeMethod('setDeviceVolume', {'volume': _volume});
       setState(() => _showVolumeHud = true);
       _volumeHudTimer?.cancel();
@@ -2143,6 +2399,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   Future<void> _handleScaleEnd(ScaleEndDetails details) async {
     if (_isSeekingGesture) {
       await _controller.seekTo(_seekTarget);
+      if (_isSyncAudioPlaying) {
+        try {
+          await _channel.invokeMethod('seekSyncAudio', {'positionMs': _seekTarget.inMilliseconds});
+        } catch (_) {}
+      }
       setState(() {
         _isSeekingGesture = false;
         _showSeekHud = false;
@@ -2762,9 +3023,24 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       ),
       title: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13)),
       subtitle: Text(subtitle, style: const TextStyle(color: Colors.white54, fontSize: 11)),
-      onTap: () {
+      onTap: () async {
         Navigator.pop(ctx);
         setState(() => _decoderMode = code);
+        if (code == 'SW') {
+          if (_audioTracks.isNotEmpty) {
+            await _switchAudioTrack(_selectedAudioTrackIndex);
+          } else {
+            await _startSwAudioSyncFallback();
+          }
+        } else {
+          if (_isSyncAudioPlaying) {
+            try {
+              await _channel.invokeMethod('stopSyncAudio');
+            } catch (_) {}
+            _isSyncAudioPlaying = false;
+            await _controller.setVolume(_isMuted ? 0.0 : _volume);
+          }
+        }
         _showPillHud('Decoder: $code Active', icon: Icons.developer_board_rounded);
       },
     );
@@ -2822,6 +3098,13 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     // Release Screen Wakelock
     _setWakeLock(false);
 
+    if (_isSyncAudioPlaying) {
+      try {
+        _channel.invokeMethod('stopSyncAudio');
+      } catch (_) {}
+      _isSyncAudioPlaying = false;
+    }
+
     if (_isInitialized) {
       _saveResumePosition();
       _controller.removeListener(_videoListener);
@@ -2840,7 +3123,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   @override
   Widget build(BuildContext context) {
     final screenSize = MediaQuery.of(context).size;
-    final totalDuration = _isInitialized ? _controller.value.duration : Duration.zero;
+    final totalDuration = _isInitialized ? _effectiveDuration : Duration.zero;
     final totalMs = totalDuration.inMilliseconds.toDouble();
     final currentPos = _isScrubbing
         ? Duration(milliseconds: _scrubValue.toInt())
@@ -3384,44 +3667,47 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                               style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600, fontFamily: 'monospace'),
                             ),
                             Expanded(
-                              child: SliderTheme(
-                                data: SliderTheme.of(context).copyWith(
-                                  trackHeight: 3.0,
-                                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6.0),
-                                  overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
-                                  activeTrackColor: const Color(0xFF2196F3),
-                                  inactiveTrackColor: Colors.white24,
-                                  thumbColor: const Color(0xFF2196F3),
-                                ),
-                                child: Slider(
-                                  value: _isScrubbing
-                                      ? _scrubValue.clamp(0.0, totalMs > 0 ? totalMs : 1.0)
-                                      : _controller.value.position.inMilliseconds.clamp(0, totalMs > 0 ? totalMs.toInt() : 1).toDouble(),
-                                  min: 0.0,
-                                  max: totalMs > 0 ? totalMs : 1.0,
-                                  onChangeStart: (val) {
-                                    _controlsTimer?.cancel();
-                                    _wasPlayingBeforeScrub = _controller.value.isPlaying;
-                                    if (_wasPlayingBeforeScrub) {
-                                      _controller.pause();
-                                    }
-                                    setState(() {
-                                      _isScrubbing = true;
-                                      _scrubValue = val;
-                                    });
-                                  },
-                                  onChanged: (val) {
-                                    setState(() => _scrubValue = val);
-                                  },
-                                  onChangeEnd: (val) async {
-                                    await _controller.seekTo(Duration(milliseconds: val.toInt()));
-                                    setState(() => _isScrubbing = false);
-                                    if (_wasPlayingBeforeScrub && mounted) {
-                                      await _controller.play();
-                                    }
-                                    _startControlsTimer();
-                                  },
-                                ),
+                              child: Builder(
+                                builder: (ctx) {
+                                  final effectiveTotalMs = totalMs > 0 ? totalMs : (_currentVideo.duration > 0 ? _currentVideo.duration.toDouble() : 1.0);
+                                  return SliderTheme(
+                                    data: SliderTheme.of(context).copyWith(
+                                      trackHeight: 3.0,
+                                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6.0),
+                                      overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+                                      activeTrackColor: const Color(0xFF2196F3),
+                                      inactiveTrackColor: Colors.white24,
+                                      thumbColor: const Color(0xFF2196F3),
+                                    ),
+                                    child: Slider(
+                                      value: _isScrubbing
+                                          ? _scrubValue.clamp(0.0, effectiveTotalMs)
+                                          : _controller.value.position.inMilliseconds.clamp(0, effectiveTotalMs.toInt()).toDouble(),
+                                      min: 0.0,
+                                      max: effectiveTotalMs > 0 ? effectiveTotalMs : 1.0,
+                                      onChangeStart: (val) {
+                                        _controlsTimer?.cancel();
+                                        setState(() {
+                                          _isScrubbing = true;
+                                          _scrubValue = val;
+                                        });
+                                      },
+                                      onChanged: (val) {
+                                        setState(() => _scrubValue = val);
+                                      },
+                                      onChangeEnd: (val) async {
+                                        await _controller.seekTo(Duration(milliseconds: val.toInt()));
+                                        if (_isSyncAudioPlaying) {
+                                          try {
+                                            await _channel.invokeMethod('seekSyncAudio', {'positionMs': val.toInt()});
+                                          } catch (_) {}
+                                        }
+                                        setState(() => _isScrubbing = false);
+                                        _startControlsTimer();
+                                      },
+                                    ),
+                                  );
+                                },
                               ),
                             ),
                             Text(

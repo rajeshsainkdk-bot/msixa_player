@@ -1,4 +1,4 @@
-name: Build Android APK
+﻿name: Build Android APK
 
 on:
   push:
@@ -177,6 +177,9 @@ jobs:
           import android.net.Uri
           import android.os.Bundle
           import android.provider.MediaStore
+          import android.media.MediaPlayer
+          import android.media.MediaExtractor
+          import android.media.MediaFormat
           import androidx.core.content.FileProvider
           import com.ryanheise.audioservice.AudioServiceActivity
           import io.flutter.embedding.engine.FlutterEngine
@@ -191,6 +194,7 @@ jobs:
               private var initialMediaUri: String? = null
               private var initialMediaMime: String? = null
               private var initialMediaName: String? = null
+              private var syncAudioPlayer: MediaPlayer? = null
 
               override fun onCreate(savedInstanceState: Bundle?) {
                   super.onCreate(savedInstanceState)
@@ -459,50 +463,6 @@ jobs:
                           } catch (e: Exception) {
                               result.error("SHARE_ERROR", e.localizedMessage, null)
                           }
-                      } else if (call.method == "captureVideoScreenshot") {
-                          try {
-                              val path = call.argument<String>("path") ?: ""
-                              val posMs = call.argument<Int>("positionMs") ?: 0
-                              val retriever = android.media.MediaMetadataRetriever()
-                              if (path.startsWith("http://") || path.startsWith("https://")) {
-                                  retriever.setDataSource(path, HashMap<String, String>())
-                              } else {
-                                  retriever.setDataSource(path)
-                              }
-                              val timeMicros = posMs.toLong() * 1000L
-                              val bitmap = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O_MR1) {
-                                  retriever.getScaledFrameAtTime(timeMicros, android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC, 1280, 720) 
-                                      ?: retriever.getFrameAtTime(timeMicros)
-                              } else {
-                                  retriever.getFrameAtTime(timeMicros)
-                              }
-                              retriever.release()
-
-                              if (bitmap != null) {
-                                  val picturesDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_PICTURES)
-                                  val appDir = java.io.File(picturesDir, "Msixa_Screenshots")
-                                  if (!appDir.exists()) appDir.mkdirs()
-                                  val fileName = "Screenshot_${System.currentTimeMillis()}.jpg"
-                                  val file = java.io.File(appDir, fileName)
-                                  val fos = java.io.FileOutputStream(file)
-                                  bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 92, fos)
-                                  fos.flush()
-                                  fos.close()
-
-                                  android.media.MediaScannerConnection.scanFile(
-                                      applicationContext,
-                                      arrayOf(file.absolutePath),
-                                      arrayOf("image/jpeg"),
-                                      null
-                                  )
-
-                                  result.success(mapOf("success" to true, "path" to file.absolutePath))
-                              } else {
-                                  result.success(mapOf("success" to false, "error" to "Frame extraction failed"))
-                              }
-                          } catch (e: Exception) {
-                              result.error("SCREENSHOT_ERROR", e.localizedMessage, null)
-                          }
                       } else if (call.method == "canInstallPackages") {
                           if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
                               result.success(packageManager.canRequestPackageInstalls())
@@ -731,11 +691,189 @@ jobs:
                                   runOnUiThread { result.success(mapOf("success" to false, "error" to e.localizedMessage)) }
                               }
                           }.start()
+                       } else if (call.method == "getVideoAudioTracks") {
+                           val path = call.argument<String>("path") ?: ""
+                           Thread {
+                               val trackList = mutableListOf<Map<String, Any?>>()
+                               if (path.isNotEmpty()) {
+                                   val extractor = MediaExtractor()
+                                   try {
+                                       if (path.startsWith("content://")) {
+                                           extractor.setDataSource(applicationContext, Uri.parse(path), null)
+                                       } else {
+                                           extractor.setDataSource(path)
+                                       }
+                                       val count = extractor.trackCount
+                                       var audioIdx = 0
+                                       for (i in 0 until count) {
+                                           val format = extractor.getTrackFormat(i)
+                                           val mime = if (format.containsKey(MediaFormat.KEY_MIME)) format.getString(MediaFormat.KEY_MIME) else ""
+                                           if (mime?.startsWith("audio/") == true) {
+                                               val lang = if (format.containsKey(MediaFormat.KEY_LANGUAGE)) format.getString(MediaFormat.KEY_LANGUAGE) else "und"
+                                               val channels = if (format.containsKey(MediaFormat.KEY_CHANNEL_COUNT)) format.getInteger(MediaFormat.KEY_CHANNEL_COUNT) else 2
+                                               val sampleRate = if (format.containsKey(MediaFormat.KEY_SAMPLE_RATE)) format.getInteger(MediaFormat.KEY_SAMPLE_RATE) else 44100
+                                               val title = if (format.containsKey(MediaFormat.KEY_TITLE)) format.getString(MediaFormat.KEY_TITLE) else ""
+                                               val isDolby = mime.contains("eac3") || mime.contains("ac3") || mime.contains("dts")
+                                               val channelLabel = when (channels) {
+                                                   6 -> "5.1 Surround"
+                                                   8 -> "7.1 Surround"
+                                                   1 -> "Mono"
+                                                   else -> "Stereo 2.0"
+                                               }
+                                               val langName = when (lang?.lowercase()) {
+                                                   "hin" -> "Hindi"
+                                                   "eng" -> "English"
+                                                   "tam" -> "Tamil"
+                                                   "tel" -> "Telugu"
+                                                   "mal" -> "Malayalam"
+                                                   "kan" -> "Kannada"
+                                                   "pan" -> "Punjabi"
+                                                   "ben" -> "Bengali"
+                                                   "mar" -> "Marathi"
+                                                   "guj" -> "Gujarati"
+                                                   "spa" -> "Spanish"
+                                                   "fra" -> "French"
+                                                   "deu", "ger" -> "German"
+                                                   "und", "" -> if (title.isNotEmpty()) title else "Track ${audioIdx + 1}"
+                                                   else -> lang.uppercase()
+                                               }
+                                               val codecLabel = when {
+                                                   mime.contains("eac3") -> "Dolby Digital Plus (E-AC3)"
+                                                   mime.contains("ac3") -> "Dolby Digital (AC-3)"
+                                                   mime.contains("mp4a") || mime.contains("aac") -> "AAC"
+                                                   mime.contains("opus") -> "Opus"
+                                                   mime.contains("vorbis") -> "Vorbis"
+                                                   mime.contains("dts") -> "DTS Surround"
+                                                   mime.contains("flac") -> "FLAC"
+                                                   else -> mime.replace("audio/", "").uppercase()
+                                               }
+                                               val displayName = if (title.isNotEmpty()) {
+                                                   "$title ($codecLabel, $channelLabel)"
+                                               } else {
+                                                   "Track ${audioIdx + 1}: $langName ($codecLabel $channelLabel)"
+                                               }
+                                               trackList.add(mapOf(
+                                                   "index" to i,
+                                                   "audioIndex" to audioIdx,
+                                                   "name" to displayName,
+                                                   "language" to lang,
+                                                   "mime" to mime,
+                                                   "channels" to channels,
+                                                   "sampleRate" to sampleRate,
+                                                   "isDolby" to isDolby
+                                               ))
+                                               audioIdx++
+                                           }
+                                       }
+                                   } catch (_: Throwable) {
+                                   } finally {
+                                       try { extractor.release() } catch (_: Throwable) {}
+                                   }
+                               }
+                               runOnUiThread { result.success(trackList) }
+                           }.start()
+                       } else if (call.method == "playSyncAudio") {
+                           val path = call.argument<String>("path") ?: ""
+                           val trackIndex = call.argument<Int>("trackIndex")
+                           val positionMs = (call.argument<Number>("positionMs"))?.toLong() ?: 0L
+                           val volume = call.argument<Double>("volume") ?: 1.0
+                           try {
+                               syncAudioPlayer?.stop()
+                               syncAudioPlayer?.release()
+                               syncAudioPlayer = null
+                               val player = MediaPlayer()
+                               if (path.startsWith("content://")) {
+                                   player.setDataSource(applicationContext, Uri.parse(path))
+                               } else {
+                                   player.setDataSource(path)
+                               }
+                               player.prepare()
+                               if (trackIndex != null && trackIndex >= 0) {
+                                   try {
+                                       val trackInfos = player.trackInfo
+                                       for (i in trackInfos.indices) {
+                                           if (trackInfos[i].trackType == MediaPlayer.TrackInfo.MEDIA_TRACK_TYPE_AUDIO) {
+                                               if (i == trackIndex) {
+                                                   player.selectTrack(i)
+                                                   break
+                                               }
+                                           }
+                                       }
+                                   } catch (_: Throwable) {}
+                               }
+                               if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                                   player.seekTo(positionMs, MediaPlayer.SEEK_CLOSEST_SYNC)
+                               } else {
+                                   player.seekTo(positionMs.toInt())
+                               }
+                               val vol = volume.toFloat().coerceIn(0f, 1f)
+                               player.setVolume(vol, vol)
+                               player.start()
+                               syncAudioPlayer = player
+                               result.success(true)
+                           } catch (e: Throwable) {
+                               result.error("AUDIO_SYNC_ERROR", e.localizedMessage, null)
+                           }
+                       } else if (call.method == "seekSyncAudio") {
+                           val positionMs = (call.argument<Number>("positionMs"))?.toLong() ?: 0L
+                           try {
+                               syncAudioPlayer?.let { p ->
+                                   if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                                       p.seekTo(positionMs, MediaPlayer.SEEK_CLOSEST_SYNC)
+                                   } else {
+                                       p.seekTo(positionMs.toInt())
+                                   }
+                               }
+                               result.success(true)
+                           } catch (e: Throwable) {
+                               result.success(false)
+                           }
+                       } else if (call.method == "pauseSyncAudio") {
+                           try {
+                               syncAudioPlayer?.pause()
+                               result.success(true)
+                           } catch (e: Throwable) {
+                               result.success(false)
+                           }
+                       } else if (call.method == "resumeSyncAudio") {
+                           try {
+                               syncAudioPlayer?.start()
+                               result.success(true)
+                           } catch (e: Throwable) {
+                               result.success(false)
+                           }
+                       } else if (call.method == "stopSyncAudio") {
+                           try {
+                               syncAudioPlayer?.stop()
+                               syncAudioPlayer?.release()
+                               syncAudioPlayer = null
+                               result.success(true)
+                           } catch (e: Throwable) {
+                               result.success(false)
+                           }
+                       } else if (call.method == "setSyncAudioVolume") {
+                           val volume = call.argument<Double>("volume") ?: 1.0
+                           try {
+                               val vol = volume.toFloat().coerceIn(0f, 1f)
+                               syncAudioPlayer?.setVolume(vol, vol)
+                               result.success(true)
+                           } catch (e: Throwable) {
+                               result.success(false)
+                           }
                       } else {
                           result.notImplemented()
                       }
                   }
               }
+
+               override fun onDestroy() {
+                   super.onDestroy()
+                   try {
+                       syncAudioPlayer?.stop()
+                       syncAudioPlayer?.release()
+                       syncAudioPlayer = null
+                   } catch (_: Throwable) {}
+               }
           }
           EOF
 
@@ -832,6 +970,37 @@ jobs:
 
       - name: Get Dependencies
         run: flutter pub get
+
+      - name: Optimize ExoPlayer for Keyframe Seeking and Decoder Fallback
+        run: |
+          python3 - << 'EOF' || true
+          import os, glob
+
+          pub_cache = os.path.expanduser("~/.pub-cache/hosted/pub.dev")
+          vp_files = glob.glob(f"{pub_cache}/video_player_android-*/android/src/main/java/io/flutter/plugins/videoplayer/VideoPlayer.java")
+          for f in vp_files:
+              with open(f, 'r') as fp:
+                  content = fp.read()
+              modified = False
+              if "androidx.media3.exoplayer.ExoPlayer" in content or "DefaultRenderersFactory" in content:
+                  if "setEnableDecoderFallback(true)" not in content and "new ExoPlayer.Builder(context)" in content:
+                      content = content.replace(
+                          "new ExoPlayer.Builder(context)",
+                          "new ExoPlayer.Builder(context, new androidx.media3.exoplayer.DefaultRenderersFactory(context).setEnableDecoderFallback(true).setExtensionRendererMode(androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)).setSeekParameters(androidx.media3.exoplayer.SeekParameters.CLOSEST_SYNC)"
+                      )
+                      modified = True
+              elif "com.google.android.exoplayer2" in content:
+                  if "setEnableDecoderFallback(true)" not in content and "new ExoPlayer.Builder(context)" in content:
+                      content = content.replace(
+                          "new ExoPlayer.Builder(context)",
+                          "new ExoPlayer.Builder(context, new com.google.android.exoplayer2.DefaultRenderersFactory(context).setEnableDecoderFallback(true)).setSeekParameters(com.google.android.exoplayer2.SeekParameters.CLOSEST_SYNC)"
+                      )
+                      modified = True
+              if modified:
+                  with open(f, 'w') as fp:
+                      fp.write(content)
+                  print(f"Successfully patched {f}")
+          EOF
 
       - name: Run Test Suite
         run: |

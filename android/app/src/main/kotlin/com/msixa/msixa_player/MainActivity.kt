@@ -11,6 +11,9 @@ import android.os.Bundle
 import android.os.PowerManager
 import android.provider.MediaStore
 import android.view.WindowManager
+import android.media.MediaPlayer
+import android.media.MediaExtractor
+import android.media.MediaFormat
 import androidx.core.content.FileProvider
 import com.ryanheise.audioservice.AudioServiceActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -25,6 +28,7 @@ class MainActivity: AudioServiceActivity() {
     private var initialMediaUri: String? = null
     private var initialMediaMime: String? = null
     private var initialMediaName: String? = null
+    private var syncAudioPlayer: MediaPlayer? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -530,8 +534,199 @@ class MainActivity: AudioServiceActivity() {
                         }
                     }.start()
                 }
+                "getVideoAudioTracks" -> {
+                    val path = call.argument<String>("path") ?: ""
+                    Thread {
+                        val trackList = mutableListOf<Map<String, Any?>>()
+                        if (path.isNotEmpty()) {
+                            val extractor = MediaExtractor()
+                            try {
+                                if (path.startsWith("content://")) {
+                                    extractor.setDataSource(applicationContext, Uri.parse(path), null)
+                                } else {
+                                    extractor.setDataSource(path)
+                                }
+                                val count = extractor.trackCount
+                                var audioIdx = 0
+                                for (i in 0 until count) {
+                                    val format = extractor.getTrackFormat(i)
+                                    val mime = if (format.containsKey(MediaFormat.KEY_MIME)) format.getString(MediaFormat.KEY_MIME) else ""
+                                    if (mime?.startsWith("audio/") == true) {
+                                        val lang = if (format.containsKey(MediaFormat.KEY_LANGUAGE)) format.getString(MediaFormat.KEY_LANGUAGE) else "und"
+                                        val channels = if (format.containsKey(MediaFormat.KEY_CHANNEL_COUNT)) format.getInteger(MediaFormat.KEY_CHANNEL_COUNT) else 2
+                                        val sampleRate = if (format.containsKey(MediaFormat.KEY_SAMPLE_RATE)) format.getInteger(MediaFormat.KEY_SAMPLE_RATE) else 44100
+                                        val title = if (format.containsKey(MediaFormat.KEY_TITLE)) format.getString(MediaFormat.KEY_TITLE) else ""
+
+                                        val isDolby = mime.contains("eac3") || mime.contains("ac3") || mime.contains("dts")
+                                        val channelLabel = when (channels) {
+                                            6 -> "5.1 Surround"
+                                            8 -> "7.1 Surround"
+                                            1 -> "Mono"
+                                            else -> "Stereo 2.0"
+                                        }
+                                        val langName = when (lang?.lowercase()) {
+                                            "hin" -> "Hindi"
+                                            "eng" -> "English"
+                                            "tam" -> "Tamil"
+                                            "tel" -> "Telugu"
+                                            "mal" -> "Malayalam"
+                                            "kan" -> "Kannada"
+                                            "pan" -> "Punjabi"
+                                            "ben" -> "Bengali"
+                                            "mar" -> "Marathi"
+                                            "guj" -> "Gujarati"
+                                            "spa" -> "Spanish"
+                                            "fra" -> "French"
+                                            "deu", "ger" -> "German"
+                                            "und", "" -> if (title.isNotEmpty()) title else "Track ${audioIdx + 1}"
+                                            else -> lang.uppercase()
+                                        }
+
+                                        val codecLabel = when {
+                                            mime.contains("eac3") -> "Dolby Digital Plus (E-AC3)"
+                                            mime.contains("ac3") -> "Dolby Digital (AC-3)"
+                                            mime.contains("mp4a") || mime.contains("aac") -> "AAC"
+                                            mime.contains("opus") -> "Opus"
+                                            mime.contains("vorbis") -> "Vorbis"
+                                            mime.contains("dts") -> "DTS Surround"
+                                            mime.contains("flac") -> "FLAC"
+                                            else -> mime.replace("audio/", "").uppercase()
+                                        }
+
+                                        val displayName = if (title.isNotEmpty()) {
+                                            "$title ($codecLabel, $channelLabel)"
+                                        } else {
+                                            "Track ${audioIdx + 1}: $langName ($codecLabel $channelLabel)"
+                                        }
+
+                                        trackList.add(mapOf(
+                                            "index" to i,
+                                            "audioIndex" to audioIdx,
+                                            "name" to displayName,
+                                            "language" to lang,
+                                            "mime" to mime,
+                                            "channels" to channels,
+                                            "sampleRate" to sampleRate,
+                                            "isDolby" to isDolby
+                                        ))
+                                        audioIdx++
+                                    }
+                                }
+                            } catch (_: Throwable) {
+                            } finally {
+                                try { extractor.release() } catch (_: Throwable) {}
+                            }
+                        }
+                        runOnUiThread { result.success(trackList) }
+                    }.start()
+                }
+                "playSyncAudio" -> {
+                    val path = call.argument<String>("path") ?: ""
+                    val trackIndex = call.argument<Int>("trackIndex")
+                    val positionMs = (call.argument<Number>("positionMs"))?.toLong() ?: 0L
+                    val volume = call.argument<Double>("volume") ?: 1.0
+
+                    try {
+                        syncAudioPlayer?.stop()
+                        syncAudioPlayer?.release()
+                        syncAudioPlayer = null
+
+                        val player = MediaPlayer()
+                        if (path.startsWith("content://")) {
+                            player.setDataSource(applicationContext, Uri.parse(path))
+                        } else {
+                            player.setDataSource(path)
+                        }
+                        player.prepare()
+                        if (trackIndex != null && trackIndex >= 0) {
+                            try {
+                                val trackInfos = player.trackInfo
+                                for (i in trackInfos.indices) {
+                                    if (trackInfos[i].trackType == MediaPlayer.TrackInfo.MEDIA_TRACK_TYPE_AUDIO) {
+                                        if (i == trackIndex) {
+                                            player.selectTrack(i)
+                                            break
+                                        }
+                                    }
+                                }
+                            } catch (_: Throwable) {}
+                        }
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            player.seekTo(positionMs, MediaPlayer.SEEK_CLOSEST_SYNC)
+                        } else {
+                            player.seekTo(positionMs.toInt())
+                        }
+                        val vol = volume.toFloat().coerceIn(0f, 1f)
+                        player.setVolume(vol, vol)
+                        player.start()
+                        syncAudioPlayer = player
+                        result.success(true)
+                    } catch (e: Throwable) {
+                        result.error("AUDIO_SYNC_ERROR", e.localizedMessage, null)
+                    }
+                }
+                "seekSyncAudio" -> {
+                    val positionMs = (call.argument<Number>("positionMs"))?.toLong() ?: 0L
+                    try {
+                        syncAudioPlayer?.let { p ->
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                p.seekTo(positionMs, MediaPlayer.SEEK_CLOSEST_SYNC)
+                            } else {
+                                p.seekTo(positionMs.toInt())
+                            }
+                        }
+                        result.success(true)
+                    } catch (e: Throwable) {
+                        result.success(false)
+                    }
+                }
+                "pauseSyncAudio" -> {
+                    try {
+                        syncAudioPlayer?.pause()
+                        result.success(true)
+                    } catch (e: Throwable) {
+                        result.success(false)
+                    }
+                }
+                "resumeSyncAudio" -> {
+                    try {
+                        syncAudioPlayer?.start()
+                        result.success(true)
+                    } catch (e: Throwable) {
+                        result.success(false)
+                    }
+                }
+                "stopSyncAudio" -> {
+                    try {
+                        syncAudioPlayer?.stop()
+                        syncAudioPlayer?.release()
+                        syncAudioPlayer = null
+                        result.success(true)
+                    } catch (e: Throwable) {
+                        result.success(false)
+                    }
+                }
+                "setSyncAudioVolume" -> {
+                    val volume = call.argument<Double>("volume") ?: 1.0
+                    try {
+                        val vol = volume.toFloat().coerceIn(0f, 1f)
+                        syncAudioPlayer?.setVolume(vol, vol)
+                        result.success(true)
+                    } catch (e: Throwable) {
+                        result.success(false)
+                    }
+                }
                 else -> result.notImplemented()
             }
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        try {
+            syncAudioPlayer?.stop()
+            syncAudioPlayer?.release()
+            syncAudioPlayer = null
+        } catch (_: Throwable) {}
     }
 }
