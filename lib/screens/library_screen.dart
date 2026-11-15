@@ -97,13 +97,13 @@ class _LibraryScreenState extends State<LibraryScreen>
               unselectedLabelColor: AppColors.textMuted,
               isScrollable: true,
               tabs: [
-                Tab(text: '${lang.isHindi ? "à¤¸à¤­à¥€ à¤—à¤¾à¤¨à¥‡" : "All Songs"} (${allSongs.length})'),
-                Tab(text: '${lang.isHindi ? "à¤•à¤²à¤¾à¤•à¤¾à¤°" : "Artists"} (${artists.length})'),
-                Tab(text: '${lang.isHindi ? "à¤à¤²à¥à¤¬à¤®" : "Albums"} (${albums.length})'),
-                Tab(text: '${lang.isHindi ? "à¤ªà¥à¤²à¥‡à¤²à¤¿à¤¸à¥à¤Ÿà¥à¤¸" : "Playlists"} (${provider.customPlaylists.length + provider.curatedPlaylists.length})'),
-                Tab(text: '${lang.isHindi ? "à¤ªà¤¸à¤‚à¤¦à¥€à¤¦à¤¾" : "Favorites"} (${provider.favorites.length})'),
-                Tab(text: '${lang.isHindi ? "à¤«à¤¼à¥‹à¤¨ à¤¸à¥à¤Ÿà¥‹à¤°à¥‡à¤œ" : "Device"} (${provider.deviceSongs.length})'),
-                Tab(text: '${lang.isHindi ? "à¤¹à¤¾à¤² à¤¹à¥€ à¤•à¥‡" : "Recent"} (${provider.recentlyPlayed.length})'),
+                Tab(text: '${lang.isHindi ? "सभी गाने" : "All Songs"} (${allSongs.length})'),
+                Tab(text: '${lang.isHindi ? "कलाकार" : "Artists"} (${artists.length})'),
+                Tab(text: '${lang.isHindi ? "एल्बम" : "Albums"} (${albums.length})'),
+                Tab(text: '${lang.isHindi ? "प्लेलिस्ट्स" : "Playlists"} (${provider.customPlaylists.length + provider.curatedPlaylists.length})'),
+                Tab(text: '${lang.isHindi ? "पसंदीदा" : "Favorites"} (${provider.favorites.length})'),
+                Tab(text: '${lang.isHindi ? "फ़ोन स्टोरेज" : "Device"} (${provider.deviceSongs.length})'),
+                Tab(text: '${lang.isHindi ? "हाल ही के" : "Recent"} (${provider.recentlyPlayed.length})'),
               ],
             ),
           ),
@@ -151,7 +151,7 @@ class _LibraryScreenState extends State<LibraryScreen>
             const Icon(Icons.music_off_rounded, size: 64, color: AppColors.textMuted),
             const SizedBox(height: 16),
             Text(
-              lang.isHindi ? 'à¤•à¥‹à¤ˆ à¤—à¤¾à¤¨à¤¾ à¤‰à¤ªà¤²à¤¬à¥à¤§ à¤¨à¤¹à¥€à¤‚ à¤¹à¥ˆ' : 'No Tracks Available',
+              lang.isHindi ? 'कोई गाना उपलब्ध नहीं है' : 'No Tracks Available',
               style: const TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.bold),
             ),
           ],
@@ -177,7 +177,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                     ),
                     icon: const Icon(Icons.play_arrow_rounded, size: 20),
                     label: Text(
-                      lang.isHindi ? 'à¤¸à¤­à¥€ à¤¬à¤œà¤¾à¤à¤‚' : 'Play All',
+                      lang.isHindi ? 'सभी बजाएं' : 'Play All',
                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                     ),
                     onPressed: () {
@@ -193,7 +193,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     ),
                     icon: const Icon(Icons.shuffle_rounded, size: 16),
-                    label: Text(lang.isHindi ? 'à¤¶à¤«à¤¼à¤²' : 'Shuffle', style: const TextStyle(fontSize: 12)),
+                    label: Text(lang.isHindi ? 'शफ़ल' : 'Shuffle', style: const TextStyle(fontSize: 12)),
                     onPressed: () {
                       final shuffled = List.of(allSongs)..shuffle();
                       provider.playSong(shuffled.first, queueContext: shuffled);
@@ -522,7 +522,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                 ),
               ),
               subtitle: Text(
-                '${songs.length} ${lang.isHindi ? "à¤—à¤¾à¤¨à¥‡ (à¤Ÿà¥ˆà¤ª à¤•à¤°à¤•à¥‡ à¤¦à¥‡à¤–à¥‡à¤‚/à¤›à¤¿à¤ªà¤¾à¤à¤‚)" : "Tracks (Tap to expand/collapse)"}',
+                '${songs.length} ${lang.isHindi ? "गाने (टैप करके देखें/छिपाएं)" : "Tracks (Tap to expand/collapse)"}',
                 style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
               ),
               trailing: Row(
@@ -530,7 +530,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                 children: [
                   IconButton(
                     icon: const Icon(Icons.play_circle_fill_rounded, color: AppColors.accentCyan, size: 28),
-                    tooltip: lang.isHindi ? '$category à¤•à¥‡ à¤¸à¤­à¥€ à¤—à¤¾à¤¨à¥‡ à¤¬à¤œà¤¾à¤à¤‚' : 'Play all in $category',
+                    tooltip: lang.isHindi ? '$category के सभी गाने बजाएं' : 'Play all in $category',
                     onPressed: () {
                       if (songs.isNotEmpty) {
                         provider.playSong(songs.first, queueContext: songs);
@@ -611,7 +611,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                                   ),
                                 ),
                                 subtitle: Text(
-                                  '${subSongs.length} ${lang.isHindi ? "à¤—à¤¾à¤¨à¥‡" : "Tracks"}',
+                                  '${subSongs.length} ${lang.isHindi ? "गाने" : "Tracks"}',
                                   style: const TextStyle(color: AppColors.textMuted, fontSize: 10),
                                 ),
                                 trailing: IconButton(
@@ -633,7 +633,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                           Padding(
                             padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
                             child: Text(
-                              lang.isHindi ? 'ðŸŽµ à¤®à¥à¤–à¥à¤¯ à¤Ÿà¥à¤°à¥ˆà¤•à¥à¤¸' : 'ðŸŽµ Main Tracks',
+                              lang.isHindi ? '🎵 मुख्य ट्रैक्स' : '🎵 Main Tracks',
                               style: const TextStyle(color: AppColors.textSecondary, fontSize: 11, fontWeight: FontWeight.bold),
                             ),
                           ),
@@ -670,7 +670,7 @@ class _LibraryScreenState extends State<LibraryScreen>
             const Icon(Icons.person_outline_rounded, size: 64, color: AppColors.textMuted),
             const SizedBox(height: 16),
             Text(
-              lang.isHindi ? 'à¤•à¥‹à¤ˆ à¤•à¤²à¤¾à¤•à¤¾à¤° à¤¨à¤¹à¥€à¤‚ à¤®à¤¿à¤²à¤¾' : 'No Artists Found',
+              lang.isHindi ? 'कोई कलाकार नहीं मिला' : 'No Artists Found',
               style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
             ),
           ],
@@ -751,7 +751,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                 ],
               ),
               Text(
-                '${artist.songCount} ${lang.isHindi ? "à¤—à¤¾à¤¨à¥‡" : "Tracks"}',
+                '${artist.songCount} ${lang.isHindi ? "गाने" : "Tracks"}',
                 style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 10),
               ),
             ],
@@ -1085,7 +1085,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                       style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary, fontSize: 15),
                     ),
                     subtitle: Text(
-                      '${pl.songs.length} ${lang.isHindi ? "à¤—à¤¾à¤¨à¥‡ (à¤Ÿà¥ˆà¤ª à¤•à¤°à¤•à¥‡ à¤¦à¥‡à¤–à¥‡à¤‚)" : "tracks (tap to expand)"}',
+                      '${pl.songs.length} ${lang.isHindi ? "गाने (टैप करके देखें)" : "tracks (tap to expand)"}',
                       style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
                     ),
                     trailing: Row(
@@ -1151,7 +1151,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                                 overflow: TextOverflow.ellipsis,
                               ),
                               subtitle: Text(
-                                '${song.artist} â€¢ ${song.formattedDuration}',
+                                '${song.artist} • ${song.formattedDuration}',
                                 style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
                                 maxLines: 1,
                               ),
@@ -1192,7 +1192,7 @@ class _LibraryScreenState extends State<LibraryScreen>
         Padding(
           padding: const EdgeInsets.only(bottom: 8, left: 4),
           child: Text(
-            lang.isHindi ? 'à¤µà¤¿à¤¶à¥‡à¤· à¤ªà¥à¤²à¥‡à¤²à¤¿à¤¸à¥à¤Ÿà¥à¤¸ (Featured Playlists)' : 'Featured Playlists',
+            lang.isHindi ? 'विशेष प्लेलिस्ट्स (Featured Playlists)' : 'Featured Playlists',
             style: const TextStyle(
               color: AppColors.textSecondary,
               fontWeight: FontWeight.bold,
@@ -1228,7 +1228,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                     style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary, fontSize: 15),
                   ),
                   subtitle: Text(
-                    '${pl.songs.length} ${lang.isHindi ? "à¤—à¤¾à¤¨à¥‡ â€¢ à¤Ÿà¥ˆà¤ª à¤•à¤°à¤•à¥‡ à¤µà¤¿à¤¸à¥à¤¤à¤¾à¤° à¤¸à¥‡ à¤¦à¥‡à¤–à¥‡à¤‚" : "tracks â€¢ tap to expand"}',
+                    '${pl.songs.length} ${lang.isHindi ? "गाने • टैप करके विस्तार से देखें" : "tracks • tap to expand"}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
@@ -1291,7 +1291,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                               overflow: TextOverflow.ellipsis,
                             ),
                             subtitle: Text(
-                              '${song.artist} â€¢ ${song.formattedDuration}',
+                              '${song.artist} • ${song.formattedDuration}',
                               style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
                               maxLines: 1,
                             ),
@@ -1554,7 +1554,7 @@ class _LibraryScreenState extends State<LibraryScreen>
               }
             },
             child: Text(
-              lang.isHindi ? 'à¤¬à¤¨à¤¾à¤à¤‚' : 'Create',
+              lang.isHindi ? 'बनाएं' : 'Create',
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
           ),

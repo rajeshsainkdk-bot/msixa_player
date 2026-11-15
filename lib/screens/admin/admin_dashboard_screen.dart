@@ -295,7 +295,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
     if (folderMap.isEmpty) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('à¤¡à¤¿à¤µà¤¾à¤‡à¤¸ à¤ªà¤° à¤•à¥‹à¤ˆ à¤‘à¤¡à¤¿à¤¯à¥‹ à¤«à¤¼à¥‹à¤²à¥à¤¡à¤° à¤¨à¤¹à¥€à¤‚ à¤®à¤¿à¤²à¤¾à¥¤ "à¤¸à¤¿à¤¸à¥à¤Ÿà¤® à¤«à¤¼à¥‹à¤²à¥à¤¡à¤°" à¤¯à¤¾ "à¤—à¤¾à¤¨à¥‡ à¤šà¥à¤¨à¥‡à¤‚" à¤†à¤œà¤¼à¤®à¤¾à¤à¤‚à¥¤')),
+          const SnackBar(content: Text('डिवाइस पर कोई ऑडियो फ़ोल्डर नहीं मिला। "सिस्टम फ़ोल्डर" या "गाने चुनें" आज़माएं।')),
         );
       }
       return;
@@ -348,8 +348,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                       Expanded(
                         child: Text(
                           selectedFolders.isEmpty
-                              ? 'à¤¡à¤¿à¤µà¤¾à¤‡à¤¸ à¤ªà¤° à¤®à¤¿à¤²à¥‡ à¤«à¤¼à¥‹à¤²à¥à¤¡à¤° (${sortedFolders.length})'
-                              : 'à¤šà¤¯à¤¨à¤¿à¤¤: ${selectedFolders.length} à¤«à¤¼à¥‹à¤²à¥à¤¡à¤° ($totalSelectedSongs à¤—à¤¾à¤¨à¥‡)',
+                              ? 'डिवाइस पर मिले फ़ोल्डर (${sortedFolders.length})'
+                              : 'चयनित: ${selectedFolders.length} फ़ोल्डर ($totalSelectedSongs गाने)',
                           style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
                         ),
                       ),
@@ -363,7 +363,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                           size: 18,
                         ),
                         label: Text(
-                          selectedFolders.length == sortedFolders.length ? 'à¤¸à¤­à¥€ à¤¹à¤Ÿà¤¾à¤à¤‚' : 'à¤¸à¤­à¥€ à¤šà¥à¤¨à¥‡à¤‚',
+                          selectedFolders.length == sortedFolders.length ? 'सभी हटाएं' : 'सभी चुनें',
                           style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                         ),
                         onPressed: () {
@@ -430,7 +430,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                           ),
                         ),
                         subtitle: Text(
-                          '${allInFolderAndSub.length} à¤—à¤¾à¤¨à¥‡ â€¢ ${rel.isNotEmpty ? rel : cleanPath}',
+                          '${allInFolderAndSub.length} गाने • ${rel.isNotEmpty ? rel : cleanPath}',
                           style: const TextStyle(color: Colors.grey, fontSize: 11),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -468,8 +468,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                           icon: const Icon(Icons.check_circle_rounded, size: 20),
                           label: Text(
                             selectedFolders.isEmpty
-                                ? 'à¤•à¤® à¤¸à¥‡ à¤•à¤® à¤à¤• à¤«à¤¼à¥‹à¤²à¥à¤¡à¤° à¤šà¥à¤¨à¥‡à¤‚'
-                                : 'à¤šà¤¯à¤¨à¤¿à¤¤ ${selectedFolders.length} à¤«à¤¼à¥‹à¤²à¥à¤¡à¤° à¤œà¥‹à¤¡à¤¼à¥‡à¤‚ ($totalSelectedSongs à¤—à¤¾à¤¨à¥‡)',
+                                ? 'कम से कम एक फ़ोल्डर चुनें'
+                                : 'चयनित ${selectedFolders.length} फ़ोल्डर जोड़ें ($totalSelectedSongs गाने)',
                             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                           ),
                           onPressed: selectedFolders.isEmpty
@@ -494,7 +494,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                                   }
                                   final titleLabel = selectedFolders.length == 1
                                       ? selectedFolders.first.split('/').lastWhere((s) => s.isNotEmpty, orElse: () => 'Folder')
-                                      : '${selectedFolders.length} à¤«à¤¼à¥‹à¤²à¥à¤¡à¤°à¥à¤¸ (${uniqueFiles.length} à¤—à¤¾à¤¨à¥‡)';
+                                      : '${selectedFolders.length} फ़ोल्डर्स (${uniqueFiles.length} गाने)';
                                   onFolderSelected(uniqueFiles, titleLabel, selectedFolders.first);
                                 },
                         ),
@@ -572,7 +572,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
               SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'à¤¬à¤²à¥à¤• / à¤«à¤¼à¥‹à¤²à¥à¤¡à¤° à¤—à¤¾à¤¨à¥‡ à¤…à¤ªà¤²à¥‹à¤¡ à¤•à¤°à¥‡à¤‚',
+                  'बल्क / फ़ोल्डर गाने अपलोड करें',
                   style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
                 ),
               ),
@@ -586,7 +586,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'à¤¡à¤¿à¤µà¤¾à¤‡à¤¸ à¤¸à¥‡ à¤«à¤¼à¥‹à¤²à¥à¤¡à¤° à¤¯à¤¾ à¤•à¤ˆ MP3s à¤šà¥à¤¨à¥‡à¤‚à¥¤ à¤«à¤¼à¥‹à¤²à¥à¤¡à¤° à¤•à¤¾ à¤¨à¤¾à¤® Category à¤”à¤° à¤…à¤‚à¤¦à¤° à¤•à¥‡ à¤¸à¤¬-à¤«à¤¼à¥‹à¤²à¥à¤¡à¤° à¤•à¤¾ à¤¨à¤¾à¤® Sub-Category à¤¬à¤¨ à¤œà¤¾à¤à¤—à¤¾à¥¤ à¤¸à¥à¤•à¥à¤°à¥€à¤¨ à¤²à¥‰à¤• à¤¹à¥‹à¤¨à¥‡ à¤ªà¤° à¤­à¥€ à¤¬à¥ˆà¤•à¤—à¥à¤°à¤¾à¤‰à¤‚à¤¡ à¤®à¥‡à¤‚ à¤…à¤ªà¤²à¥‹à¤¡ à¤œà¤¾à¤°à¥€ à¤°à¤¹à¥‡à¤—à¤¾à¥¤',
+                    'डिवाइस से फ़ोल्डर या कई MP3s चुनें। फ़ोल्डर का नाम Category और अंदर के सब-फ़ोल्डर का नाम Sub-Category बन जाएगा। स्क्रीन लॉक होने पर भी बैकग्राउंड में अपलोड जारी रहेगा।',
                     style: TextStyle(color: Colors.white70, fontSize: 11),
                   ),
                   const SizedBox(height: 14),
@@ -608,7 +608,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                             ),
                             icon: const Icon(Icons.folder_special_rounded, size: 15),
                             label: const Text(
-                              'ðŸ“ à¤«à¤¼à¥‹à¤²à¥à¤¡à¤°à¥à¤¸ à¤šà¥à¤¨à¥‡à¤‚ (Multi)',
+                              '📁 फ़ोल्डर्स चुनें (Multi)',
                               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10),
                             ),
                             onPressed: () {
@@ -623,7 +623,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                                   });
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
-                                      content: Text('âœ… "$folderName" à¤¸à¥‡ ${files.length} à¤—à¤¾à¤¨à¥‡ à¤²à¥‹à¤¡ à¤¹à¥à¤!'),
+                                      content: Text('✅ "$folderName" से ${files.length} गाने लोड हुए!'),
                                       backgroundColor: const Color(0xFF1E293B),
                                     ),
                                   );
@@ -648,7 +648,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                             ),
                             icon: const Icon(Icons.drive_folder_upload_rounded, size: 15),
                             label: const Text(
-                              'ðŸ“‚ à¤¸à¤¿à¤¸à¥à¤Ÿà¤® à¤«à¤¼à¥‹à¤²à¥à¤¡à¤°',
+                              '📂 सिस्टम फ़ोल्डर',
                               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10),
                             ),
                             onPressed: () async {
@@ -663,7 +663,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                                     });
                                   } else {
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('à¤šà¤¯à¤¨à¤¿à¤¤ à¤«à¤¼à¥‹à¤²à¥à¤¡à¤° à¤®à¥‡à¤‚ à¤•à¥‹à¤ˆ à¤—à¤¾à¤¨à¤¾ à¤¨à¤¹à¥€à¤‚ à¤®à¤¿à¤²à¤¾à¥¤ "à¤¡à¤¿à¤µà¤¾à¤‡à¤¸ à¤«à¤¼à¥‹à¤²à¥à¤¡à¤°" à¤†à¤œà¤¼à¤®à¤¾à¤à¤‚à¥¤')),
+                                      const SnackBar(content: Text('चयनित फ़ोल्डर में कोई गाना नहीं मिला। "डिवाइस फ़ोल्डर" आज़माएं।')),
                                     );
                                   }
                                 }
@@ -689,7 +689,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                             ),
                             icon: const Icon(Icons.file_open_rounded, size: 15),
                             label: Text(
-                              pickedFiles.isEmpty ? 'ðŸŽµ à¤—à¤¾à¤¨à¥‡ à¤šà¥à¤¨à¥‡à¤‚' : 'ðŸŽµ (${pickedFiles.length})',
+                              pickedFiles.isEmpty ? '🎵 गाने चुनें' : '🎵 (${pickedFiles.length})',
                               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 10),
                             ),
                             onPressed: () async {
@@ -718,7 +718,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                   if (pickedFiles.isNotEmpty) ...[
                     const SizedBox(height: 14),
                     const Text(
-                      'à¤¡à¤¿à¤«à¤¼à¥‰à¤²à¥à¤Ÿ à¤¶à¥à¤°à¥‡à¤£à¥€ (Default Category / Genre):',
+                      'डिफ़ॉल्ट श्रेणी (Default Category / Genre):',
                       style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 6),
@@ -740,7 +740,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                     ),
                     const SizedBox(height: 10),
                     const Text(
-                      'à¤¡à¤¿à¤«à¤¼à¥‰à¤²à¥à¤Ÿ à¤‰à¤ª-à¤¶à¥à¤°à¥‡à¤£à¥€ (Default Sub-Category - Optional):',
+                      'डिफ़ॉल्ट उप-श्रेणी (Default Sub-Category - Optional):',
                       style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 6),
@@ -749,7 +749,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                       enabled: !isUploading,
                       style: const TextStyle(color: Colors.white, fontSize: 12),
                       decoration: InputDecoration(
-                        hintText: 'à¤‰à¤¦à¤¾. Marwadi Hits, Folk (à¤µà¥ˆà¤•à¤²à¥à¤ªà¤¿à¤•)',
+                        hintText: 'उदा. Marwadi Hits, Folk (वैकल्पिक)',
                         hintStyle: const TextStyle(color: Colors.grey, fontSize: 11),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Colors.white24)),
@@ -779,11 +779,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                             contentPadding: EdgeInsets.zero,
                             dense: true,
                             title: const Text(
-                              'ðŸ“ à¤«à¤¼à¥‹à¤²à¥à¤¡à¤° à¤•à¥‡ à¤¨à¤¾à¤® à¤¸à¥‡ à¤ªà¥à¤²à¥‡à¤²à¤¿à¤¸à¥à¤Ÿ à¤¬à¤¨à¤¾à¤à¤‚',
+                              '📁 फ़ोल्डर के नाम से प्लेलिस्ट बनाएं',
                               style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
                             ),
                             subtitle: const Text(
-                              'à¤¸à¤­à¥€ à¤…à¤ªà¤²à¥‹à¤¡ à¤•à¤¿à¤ à¤—à¤ à¤—à¤¾à¤¨à¥‹à¤‚ à¤¸à¥‡ à¤¨à¤ˆ à¤ªà¥à¤²à¥‡à¤²à¤¿à¤¸à¥à¤Ÿ à¤¤à¥ˆà¤¯à¤¾à¤° à¤¹à¥‹à¤—à¥€',
+                              'सभी अपलोड किए गए गानों से नई प्लेलिस्ट तैयार होगी',
                               style: TextStyle(color: Colors.white60, fontSize: 10),
                             ),
                           ),
@@ -794,7 +794,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                               enabled: !isUploading,
                               style: const TextStyle(color: Colors.white, fontSize: 12),
                               decoration: InputDecoration(
-                                labelText: 'à¤ªà¥à¤²à¥‡à¤²à¤¿à¤¸à¥à¤Ÿ à¤•à¤¾ à¤¨à¤¾à¤® (Playlist Title)',
+                                labelText: 'प्लेलिस्ट का नाम (Playlist Title)',
                                 labelStyle: const TextStyle(color: Color(0xFFFFB300), fontSize: 11),
                                 contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                                 enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Colors.white24)),
@@ -807,7 +807,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'à¤šà¤¯à¤¨à¤¿à¤¤ à¤—à¤¾à¤¨à¥‡ (${pickedFiles.length}):',
+                      'चयनित गाने (${pickedFiles.length}):',
                       style: const TextStyle(color: Color(0xFFFFB300), fontSize: 12, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 6),
@@ -880,7 +880,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                                               border: Border.all(color: const Color(0xFF00E5FF).withOpacity(0.3)),
                                             ),
                                             child: Text(
-                                              h.subCategory != null ? '${h.category} â€º ${h.subCategory}' : h.category,
+                                              h.subCategory != null ? '${h.category} › ${h.subCategory}' : h.category,
                                               style: const TextStyle(color: Color(0xFF00E5FF), fontSize: 9, fontWeight: FontWeight.bold),
                                             ),
                                           ),
@@ -932,7 +932,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
             if (!isUploading)
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text('à¤°à¤¦à¥à¤¦ à¤•à¤°à¥‡à¤‚ (Cancel)', style: TextStyle(color: Colors.grey)),
+                child: const Text('रद्द करें (Cancel)', style: TextStyle(color: Colors.grey)),
               ),
             if (pickedFiles.isNotEmpty && !isUploading)
               ElevatedButton.icon(
@@ -943,7 +943,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                 ),
                 icon: const Icon(Icons.cloud_upload_rounded, size: 18),
                 label: Text(
-                  'R2 à¤ªà¤° à¤…à¤ªà¤²à¥‹à¤¡ à¤¶à¥à¤°à¥‚ à¤•à¤°à¥‡à¤‚ (${pickedFiles.length})',
+                  'R2 पर अपलोड शुरू करें (${pickedFiles.length})',
                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                 ),
                 onPressed: () async {
@@ -951,7 +951,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                     isUploading = true;
                     currentIndex = 0;
                     currentTrackProgress = 0.0;
-                    statusMessage = 'à¤…à¤ªà¤²à¥‹à¤¡ à¤¶à¥à¤°à¥‚ à¤¹à¥‹ à¤°à¤¹à¤¾ à¤¹à¥ˆ... (à¤¸à¥à¤•à¥à¤°à¥€à¤¨ à¤‘à¤¨ à¤”à¤° à¤¬à¥ˆà¤•à¤—à¥à¤°à¤¾à¤‰à¤‚à¤¡ à¤à¤•à¥à¤Ÿà¤¿à¤µ)';
+                    statusMessage = 'अपलोड शुरू हो रहा है... (स्क्रीन ऑन और बैकग्राउंड एक्टिव)';
                   });
 
                   // 1. Keep Screen Awake & CPU Running in Background
@@ -979,7 +979,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                         setDialogState(() {
                           currentIndex = i;
                           currentTrackProgress = 1.0;
-                          statusMessage = 'âš ï¸ à¤¸à¥à¤•à¤¿à¤ª à¤•à¤¿à¤¯à¤¾ (Duplicate): $smartTitle (à¤ªà¤¹à¤²à¥‡ à¤¸à¥‡ à¤®à¥Œà¤œà¥‚à¤¦)';
+                          statusMessage = '⚠️ स्किप किया (Duplicate): $smartTitle (पहले से मौजूद)';
                         });
                         await Future.delayed(const Duration(milliseconds: 250));
                         continue;
@@ -990,7 +990,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                       setDialogState(() {
                         currentIndex = i;
                         currentTrackProgress = 0.1;
-                        statusMessage = 'à¤…à¤ªà¤²à¥‹à¤¡ à¤¹à¥‹ à¤°à¤¹à¤¾ à¤¹à¥ˆ (${i + 1}/${pickedFiles.length}): $smartTitle...';
+                        statusMessage = 'अपलोड हो रहा है (${i + 1}/${pickedFiles.length}): $smartTitle...';
                       });
 
                       try {
@@ -1085,7 +1085,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
 
                         // Create distinct playlist for each subfolder
                         for (final entry in subFolderMap.entries) {
-                          final subPlTitle = '$rootTitle â€º ${entry.key}';
+                          final subPlTitle = '$rootTitle › ${entry.key}';
                           newGeneratedPlaylists.add(Playlist(
                             id: 'pl_${DateTime.now().millisecondsSinceEpoch}_${entry.key.hashCode.abs()}',
                             title: subPlTitle,
@@ -1120,8 +1120,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                     // 3. Release WakeLock & Show Native Background Status Notification
                     await BackgroundUploadService.releaseWakeLock();
                     await BackgroundUploadService.showUploadNotification(
-                      title: 'ðŸŽ‰ à¤¬à¤²à¥à¤• à¤…à¤ªà¤²à¥‹à¤¡ à¤ªà¥‚à¤°à¤¾ à¤¹à¥à¤†!',
-                      message: '$successCount à¤—à¤¾à¤¨à¥‡ Cloudflare R2 à¤ªà¤° à¤²à¤¾à¤‡à¤µ à¤¹à¥‹ à¤—à¤!' + (skippedCount > 0 ? ' ($skippedCount à¤¡à¥à¤ªà¥à¤²à¥€à¤•à¥‡à¤Ÿ à¤¸à¥à¤•à¤¿à¤ª)' : ''),
+                      title: '🎉 बल्क अपलोड पूरा हुआ!',
+                      message: '$successCount गाने Cloudflare R2 पर लाइव हो गए!' + (skippedCount > 0 ? ' ($skippedCount डुप्लीकेट स्किप)' : ''),
                     );
                     _refreshStorageStats();
                   }
@@ -1130,8 +1130,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                     Navigator.pop(ctx);
                     setState(() {});
                     final summaryMsg = skippedCount > 0
-                        ? 'ðŸŽ‰ $successCount à¤—à¤¾à¤¨à¥‡ à¤²à¤¾à¤‡à¤µ à¤¹à¥à¤ â€¢ âš ï¸ $skippedCount à¤¡à¥à¤ªà¥à¤²à¥€à¤•à¥‡à¤Ÿ à¤—à¤¾à¤¨à¥‡ à¤¸à¥à¤•à¤¿à¤ª à¤•à¤° à¤¦à¤¿à¤ à¤—à¤!'
-                        : 'ðŸŽ‰ $successCount / ${pickedFiles.length} à¤—à¤¾à¤¨à¥‡ Cloudflare R2 à¤ªà¤° à¤¸à¤«à¤²à¤¤à¤¾à¤ªà¥‚à¤°à¥à¤µà¤• à¤²à¤¾à¤‡à¤µ à¤¹à¥‹ à¤—à¤!';
+                        ? '🎉 $successCount गाने लाइव हुए • ⚠️ $skippedCount डुप्लीकेट गाने स्किप कर दिए गए!'
+                        : '🎉 $successCount / ${pickedFiles.length} गाने Cloudflare R2 पर सफलतापूर्वक लाइव हो गए!';
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(summaryMsg),
@@ -1179,9 +1179,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                _buildAdminTextField(titleCtrl, _lang.t('song_title'), 'à¤‰à¤¦à¤¾. Shree Ram Dhun'),
+                _buildAdminTextField(titleCtrl, _lang.t('song_title'), 'उदा. Shree Ram Dhun'),
                 const SizedBox(height: 10),
-                _buildAdminTextField(artistCtrl, _lang.t('artist_name'), 'à¤‰à¤¦à¤¾. Hariharan'),
+                _buildAdminTextField(artistCtrl, _lang.t('artist_name'), 'उदा. Hariharan'),
                 const SizedBox(height: 10),
                 _buildAdminTextField(albumCtrl, _lang.t('album_name'), 'Msixa Originals'),
                 const SizedBox(height: 10),
@@ -1201,7 +1201,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                         ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF00E5FF)))
                         : const Icon(Icons.cloud_upload_rounded, size: 18),
                     label: Text(
-                      isUploadingToR2 ? 'R2 à¤•à¥à¤²à¤¾à¤‰à¤¡ à¤ªà¤° à¤…à¤ªà¤²à¥‹à¤¡ à¤¹à¥‹ à¤°à¤¹à¤¾ à¤¹à¥ˆ...' : 'ðŸ“ à¤¡à¤¿à¤µà¤¾à¤‡à¤¸ à¤¸à¥‡ MP3 à¤šà¥à¤¨à¥‡à¤‚ à¤”à¤° R2 à¤ªà¤° à¤…à¤ªà¤²à¥‹à¤¡ à¤•à¤°à¥‡à¤‚',
+                      isUploadingToR2 ? 'R2 क्लाउड पर अपलोड हो रहा है...' : '📁 डिवाइस से MP3 चुनें और R2 पर अपलोड करें',
                       style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
                     ),
                     onPressed: isUploadingToR2
@@ -1235,7 +1235,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                 ),
                 const SizedBox(height: 6),
 
-                _buildAdminTextField(audioCtrl, 'à¤‘à¤¡à¤¿à¤¯à¥‹ à¤²à¤¿à¤‚à¤• à¤¯à¤¾ à¤ªà¤¾à¤¥ (Audio Stream URL)', 'https://pub-d4f2... or assets/audio/...'),
+                _buildAdminTextField(audioCtrl, 'ऑडियो लिंक या पाथ (Audio Stream URL)', 'https://pub-d4f2... or assets/audio/...'),
                 const SizedBox(height: 10),
                 _buildAdminTextField(coverCtrl, _lang.t('cover_url'), 'https://.../cover.jpg'),
                 const SizedBox(height: 10),
@@ -1255,7 +1255,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                   },
                 ),
                 const SizedBox(height: 10),
-                _buildAdminTextField(subCategoryCtrl, 'à¤‰à¤ª-à¤¶à¥à¤°à¥‡à¤£à¥€ (Sub-Category - Optional)', 'à¤‰à¤¦à¤¾. Marwadi Hits, Folk, 90s'),
+                _buildAdminTextField(subCategoryCtrl, 'उप-श्रेणी (Sub-Category - Optional)', 'उदा. Marwadi Hits, Folk, 90s'),
               ],
             ),
           ),
@@ -1277,8 +1277,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                     SnackBar(
                       content: Text(
                         _lang.isHindi
-                            ? 'âš ï¸ à¤—à¤¾à¤¨à¤¾ "$title" à¤ªà¤¹à¤²à¥‡ à¤¸à¥‡ à¤®à¥Œà¤œà¥‚à¤¦ à¤¹à¥ˆ! à¤¡à¥à¤ªà¥à¤²à¥€à¤•à¥‡à¤Ÿ à¤—à¤¾à¤¨à¤¾ à¤²à¤¾à¤‡à¤µ à¤¨à¤¹à¥€à¤‚ à¤•à¤¿à¤¯à¤¾ à¤œà¤¾ à¤¸à¤•à¤¤à¤¾à¥¤'
-                            : 'âš ï¸ Song "$title" already exists in library! Duplicates not allowed.',
+                            ? '⚠️ गाना "$title" पहले से मौजूद है! डुप्लीकेट गाना लाइव नहीं किया जा सकता।'
+                            : '⚠️ Song "$title" already exists in library! Duplicates not allowed.',
                       ),
                       backgroundColor: Colors.redAccent,
                     ),
@@ -1299,7 +1299,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                   if (mounted) {
                     Navigator.pop(ctx);
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('ðŸŽ‰ "$title" ${_lang.isHindi ? "à¤¸à¤«à¤²à¤¤à¤¾à¤ªà¥‚à¤°à¥à¤µà¤• à¤²à¤¾à¤‡à¤µ à¤•à¤° à¤¦à¤¿à¤¯à¤¾ à¤—à¤¯à¤¾!" : "successfully published live!"}')),
+                      SnackBar(content: Text('🎉 "$title" ${_lang.isHindi ? "सफलतापूर्वक लाइव कर दिया गया!" : "successfully published live!"}')),
                     );
                   }
                 } catch (e) {
@@ -1308,7 +1308,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                   );
                 }
               },
-              child: Text(_lang.isHindi ? 'à¤—à¤¾à¤¨à¤¾ à¤²à¤¾à¤‡à¤µ à¤•à¤°à¥‡à¤‚' : 'Publish Live', style: const TextStyle(fontWeight: FontWeight.bold)),
+              child: Text(_lang.isHindi ? 'गाना लाइव करें' : 'Publish Live', style: const TextStyle(fontWeight: FontWeight.bold)),
             ),
           ],
         ),
@@ -1356,7 +1356,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                 const SizedBox(height: 10),
                 _buildAdminTextField(albumCtrl, _lang.t('album_name'), ''),
                 const SizedBox(height: 10),
-                _buildAdminTextField(audioCtrl, 'à¤‘à¤¡à¤¿à¤¯à¥‹ à¤²à¤¿à¤‚à¤• à¤¯à¤¾ à¤ªà¤¾à¤¥ (Audio Stream URL)', ''),
+                _buildAdminTextField(audioCtrl, 'ऑडियो लिंक या पाथ (Audio Stream URL)', ''),
                 const SizedBox(height: 10),
                 _buildAdminTextField(coverCtrl, _lang.t('cover_url'), ''),
                 const SizedBox(height: 10),
@@ -1376,7 +1376,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                   },
                 ),
                 const SizedBox(height: 10),
-                _buildAdminTextField(subCategoryCtrl, 'à¤‰à¤ª-à¤¶à¥à¤°à¥‡à¤£à¥€ (Sub-Category)', 'à¤‰à¤¦à¤¾. Marwadi Hits'),
+                _buildAdminTextField(subCategoryCtrl, 'उप-श्रेणी (Sub-Category)', 'उदा. Marwadi Hits'),
               ],
             ),
           ),
@@ -1401,7 +1401,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                 if (mounted) {
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('âœ… "${titleCtrl.text}" ${_lang.t('save_changes')}')),
+                    SnackBar(content: Text('✅ "${titleCtrl.text}" ${_lang.t('save_changes')}')),
                   );
                 }
               },
@@ -1511,7 +1511,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Bucket: ${r2.bucketName ?? "msixa-music"} â€¢ CDN Live',
+                        'Bucket: ${r2.bucketName ?? "msixa-music"} • CDN Live',
                         style: const TextStyle(color: Colors.white60, fontSize: 10),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -1524,7 +1524,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                   icon: _isLoadingStorageStats
                       ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF00E5FF)))
                       : const Icon(Icons.refresh_rounded, size: 18, color: Color(0xFF00E5FF)),
-                  tooltip: _lang.isHindi ? 'à¤¸à¥à¤Ÿà¥‹à¤°à¥‡à¤œ à¤°à¤¿à¤«à¥à¤°à¥‡à¤¶ à¤•à¤°à¥‡à¤‚' : 'Refresh Storage',
+                  tooltip: _lang.isHindi ? 'स्टोरेज रिफ्रेश करें' : 'Refresh Storage',
                   visualDensity: VisualDensity.compact,
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
@@ -1579,7 +1579,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                     style: const TextStyle(fontSize: 11, color: Colors.white70),
                     children: [
                       TextSpan(
-                        text: _lang.isHindi ? 'à¤‰à¤ªà¤¯à¥‹à¤— (Used): ' : 'Used: ',
+                        text: _lang.isHindi ? 'उपयोग (Used): ' : 'Used: ',
                         style: const TextStyle(color: Colors.grey),
                       ),
                       TextSpan(
@@ -1595,7 +1595,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                     style: const TextStyle(fontSize: 11, color: Colors.white70),
                     children: [
                       TextSpan(
-                        text: _lang.isHindi ? 'à¤¬à¤šà¥€ à¤¹à¥à¤ˆ (Free): ' : 'Free: ',
+                        text: _lang.isHindi ? 'बची हुई (Free): ' : 'Free: ',
                         style: const TextStyle(color: Colors.grey),
                       ),
                       TextSpan(
@@ -1603,7 +1603,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                         style: const TextStyle(color: Color(0xFF00E5FF), fontWeight: FontWeight.bold),
                       ),
                       TextSpan(
-                        text: ' (~$estimatedSongsRemaining ${_lang.isHindi ? "à¤—à¤¾à¤¨à¥‡" : "Songs"})',
+                        text: ' (~$estimatedSongsRemaining ${_lang.isHindi ? "गाने" : "Songs"})',
                         style: const TextStyle(color: Colors.white54, fontSize: 10),
                       ),
                     ],
@@ -1636,7 +1636,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
             const Icon(Icons.pie_chart_rounded, color: Color(0xFF00E5FF), size: 22),
             const SizedBox(width: 8),
             Text(
-              _lang.isHindi ? 'Cloudflare R2 à¤¸à¥à¤Ÿà¥‹à¤°à¥‡à¤œ à¤µà¤¿à¤µà¤°à¤£' : 'Cloudflare R2 Storage Details',
+              _lang.isHindi ? 'Cloudflare R2 स्टोरेज विवरण' : 'Cloudflare R2 Storage Details',
               style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
             ),
           ],
@@ -1645,31 +1645,31 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
           mainAxisSize: MainAxisSize.min,
           children: [
             _buildStorageDetailRow(
-              _lang.isHindi ? 'à¤•à¥à¤² à¤®à¥à¤«à¤¼à¥à¤¤ à¤•à¥‹à¤Ÿà¤¾ (Free Plan):' : 'Total Free Quota (Free Plan):',
+              _lang.isHindi ? 'कुल मुफ़्त कोटा (Free Plan):' : 'Total Free Quota (Free Plan):',
               '10.00 GB (10,240 MB)',
               Colors.white,
             ),
             const Divider(color: Colors.white10),
             _buildStorageDetailRow(
-              _lang.isHindi ? 'à¤‰à¤ªà¤¯à¥‹à¤— à¤•à¥€ à¤—à¤ˆ à¤¸à¥à¤Ÿà¥‹à¤°à¥‡à¤œ (Used):' : 'Used Storage:',
+              _lang.isHindi ? 'उपयोग की गई स्टोरेज (Used):' : 'Used Storage:',
               '${usedMb < 1024 ? "${usedMb.toStringAsFixed(1)} MB" : "${usedGb.toStringAsFixed(2)} GB"} (${usedPercentage.toStringAsFixed(1)}%)',
               const Color(0xFFFFB300),
             ),
             const Divider(color: Colors.white10),
             _buildStorageDetailRow(
-              _lang.isHindi ? 'à¤¬à¤šà¥€ à¤¹à¥à¤ˆ à¤®à¥à¤«à¤¼à¥à¤¤ à¤¸à¥à¤Ÿà¥‹à¤°à¥‡à¤œ (Remaining):' : 'Remaining Free Storage:',
+              _lang.isHindi ? 'बची हुई मुफ़्त स्टोरेज (Remaining):' : 'Remaining Free Storage:',
               '${remainingGb.toStringAsFixed(2)} GB (${(100 - usedPercentage).toStringAsFixed(1)}% Free)',
               const Color(0xFF10B981),
             ),
             const Divider(color: Colors.white10),
             _buildStorageDetailRow(
-              _lang.isHindi ? 'à¤•à¥à¤² à¤•à¥à¤²à¤¾à¤‰à¤¡ à¤«à¤¼à¤¾à¤‡à¤²à¥‡à¤‚ (Files):' : 'Total Cloud Files:',
+              _lang.isHindi ? 'कुल क्लाउड फ़ाइलें (Files):' : 'Total Cloud Files:',
               '$totalObjects Objects',
               Colors.cyanAccent,
             ),
             const Divider(color: Colors.white10),
             _buildStorageDetailRow(
-              _lang.isHindi ? 'à¤…à¤¨à¥à¤®à¤¾à¤¨à¤¿à¤¤ à¤¶à¥‡à¤· à¤—à¤¾à¤¨à¥‡ (Can Upload):' : 'Estimated Songs Remaining:',
+              _lang.isHindi ? 'अनुमानित शेष गाने (Can Upload):' : 'Estimated Songs Remaining:',
               '~$estimatedSongsRemaining MP3 Songs',
               const Color(0xFF00E5FF),
             ),
@@ -1682,7 +1682,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
               _refreshStorageStats();
             },
             child: Text(
-              _lang.isHindi ? 'à¤°à¤¿à¤«à¥à¤°à¥‡à¤¶ (Refresh)' : 'Refresh',
+              _lang.isHindi ? 'रिफ्रेश (Refresh)' : 'Refresh',
               style: const TextStyle(color: Color(0xFF00E5FF)),
             ),
           ),
@@ -1690,19 +1690,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981), foregroundColor: Colors.black),
             icon: const Icon(Icons.cloud_sync_rounded, size: 16),
             label: Text(
-              _lang.isHindi ? 'à¤•à¥à¤²à¤¾à¤‰à¤¡ à¤—à¤¾à¤¨à¥‡ à¤¸à¤¿à¤‚à¤• à¤•à¤°à¥‡à¤‚' : 'Sync Cloud Songs',
+              _lang.isHindi ? 'क्लाउड गाने सिंक करें' : 'Sync Cloud Songs',
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
             ),
             onPressed: () async {
               Navigator.pop(ctx);
               ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                content: Text(_lang.isHindi ? 'â³ Cloudflare R2 à¤¸à¥‡ à¤—à¤¾à¤¨à¥‡ à¤²à¥‹à¤¡ à¤¹à¥‹ à¤°à¤¹à¥‡ à¤¹à¥ˆà¤‚...' : 'â³ Loading songs from Cloudflare R2...'),
+                content: Text(_lang.isHindi ? '⏳ Cloudflare R2 से गाने लोड हो रहे हैं...' : '⏳ Loading songs from Cloudflare R2...'),
               ));
               await _backend.syncWithCloud();
               setState(() {});
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                  content: Text(_lang.isHindi ? 'âœ… R2 à¤¸à¥‡ ${_backend.approvedSongs.length} à¤—à¤¾à¤¨à¥‡ à¤²à¥‹à¤¡ à¤¹à¥‹ à¤—à¤!' : 'âœ… Loaded ${_backend.approvedSongs.length} songs from R2!'),
+                  content: Text(_lang.isHindi ? '✅ R2 से ${_backend.approvedSongs.length} गाने लोड हो गए!' : '✅ Loaded ${_backend.approvedSongs.length} songs from R2!'),
                 ));
               }
             },
@@ -1714,7 +1714,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
               _showR2SettingsDialog();
             },
             child: Text(
-              _lang.isHindi ? 'R2 à¤¸à¥‡à¤Ÿà¤¿à¤‚à¤—à¥à¤¸' : 'R2 Settings',
+              _lang.isHindi ? 'R2 सेटिंग्स' : 'R2 Settings',
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
           ),
@@ -1770,7 +1770,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  '10 GB Free Storage â€¢ 0 Bandwidth Fees â€¢ Fast Global Edge Streaming',
+                  '10 GB Free Storage • 0 Bandwidth Fees • Fast Global Edge Streaming',
                   style: TextStyle(color: Colors.white70, fontSize: 11),
                 ),
                 const SizedBox(height: 14),
@@ -1850,7 +1850,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                       });
                       if (mounted) setState(() {});
                     },
-              child: const Text('âš¡ Test Connection', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              child: const Text('⚡ Test Connection', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFFB300), foregroundColor: Colors.black),
@@ -1866,7 +1866,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                   setState(() {});
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('âœ… Cloudflare R2 Credentials Saved & Synced!')),
+                    const SnackBar(content: Text('✅ Cloudflare R2 Credentials Saved & Synced!')),
                   );
                 }
               },
@@ -1947,7 +1947,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
             ),
           ),
           IconButton(
-            tooltip: 'à¤à¤¡à¤®à¤¿à¤¨ à¤…à¤ªà¤¡à¥‡à¤Ÿ à¤šà¥‡à¤• à¤•à¤°à¥‡à¤‚ (Check Update)',
+            tooltip: 'एडमिन अपडेट चेक करें (Check Update)',
             icon: const Icon(Icons.system_update_rounded, color: Color(0xFF00E5FF), size: 21),
             onPressed: () => UpdateService.checkForUpdate(context, autoPrompt: false, isAdmin: true),
           ),
@@ -2057,8 +2057,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                         Expanded(
                           child: Text(
                             _lang.isHindi
-                                ? 'ðŸš€ à¤¨à¤¯à¤¾ à¤à¤¡à¤®à¤¿à¤¨ à¤µà¤°à¥à¤œà¤¼à¤¨ à¤‰à¤ªà¤²à¤¬à¥à¤§ à¤¹à¥ˆ: v$vName (à¤…à¤ªà¤¡à¥‡à¤Ÿ à¤•à¤°à¤¨à¥‡ à¤•à¥‡ à¤²à¤¿à¤ à¤Ÿà¥ˆà¤ª à¤•à¤°à¥‡à¤‚)'
-                                : 'ðŸš€ New Admin Update Available: v$vName (Tap to Install)',
+                                ? '🚀 नया एडमिन वर्ज़न उपलब्ध है: v$vName (अपडेट करने के लिए टैप करें)'
+                                : '🚀 New Admin Update Available: v$vName (Tap to Install)',
                             style: const TextStyle(color: Colors.black, fontSize: 12, fontWeight: FontWeight.bold),
                           ),
                         ),
@@ -2069,7 +2069,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
-                            _lang.isHindi ? 'à¤…à¤ªà¤¡à¥‡à¤Ÿ' : 'Update',
+                            _lang.isHindi ? 'अपडेट' : 'Update',
                             style: const TextStyle(color: Color(0xFFFFB300), fontSize: 11, fontWeight: FontWeight.bold),
                           ),
                         ),
@@ -2206,7 +2206,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                           const SizedBox(width: 6),
                           Expanded(
                             child: Text(
-                              'â€¢ ${song.artist}',
+                              '• ${song.artist}',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
@@ -2223,7 +2223,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                 // Rewind 10s
                 IconButton(
                   icon: const Icon(Icons.replay_10_rounded, color: Colors.white70, size: 22),
-                  tooltip: '10s à¤ªà¥€à¤›à¥‡ à¤•à¤°à¥‡à¤‚ (Rewind 10s)',
+                  tooltip: '10s पीछे करें (Rewind 10s)',
                   onPressed: () => _seekPreviewRelative(-10),
                   visualDensity: VisualDensity.compact,
                 ),
@@ -2234,21 +2234,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                     color: const Color(0xFFFFB300),
                     size: 34,
                   ),
-                  tooltip: _isPlaying ? 'à¤°à¥‹à¤•à¥‡à¤‚ (Pause)' : 'à¤šà¤²à¤¾à¤à¤‚ (Play)',
+                  tooltip: _isPlaying ? 'रोकें (Pause)' : 'चलाएं (Play)',
                   onPressed: () => _playSongPreview(song),
                   visualDensity: VisualDensity.compact,
                 ),
                 // Forward 10s
                 IconButton(
                   icon: const Icon(Icons.forward_10_rounded, color: Colors.white70, size: 22),
-                  tooltip: '10s à¤†à¤—à¥‡ à¤•à¤°à¥‡à¤‚ (Forward 10s)',
+                  tooltip: '10s आगे करें (Forward 10s)',
                   onPressed: () => _seekPreviewRelative(10),
                   visualDensity: VisualDensity.compact,
                 ),
                 // Close
                 IconButton(
                   icon: const Icon(Icons.close_rounded, color: Colors.white54, size: 18),
-                  tooltip: 'à¤¬à¤‚à¤¦ à¤•à¤°à¥‡à¤‚ (Close)',
+                  tooltip: 'बंद करें (Close)',
                   onPressed: _stopSongPreview,
                   visualDensity: VisualDensity.compact,
                 ),
@@ -2351,7 +2351,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          '${song.artist} â€¢ ${song.genre}',
+                          '${song.artist} • ${song.genre}',
                           style: TextStyle(color: Colors.grey.shade300, fontSize: 12),
                         ),
                         const SizedBox(height: 4),
@@ -2485,7 +2485,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                       if (mounted) {
                         setState(() {});
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('ðŸŽ‰ "${song.title}" live!')),
+                          SnackBar(content: Text('🎉 "${song.title}" live!')),
                         );
                       }
                     },
@@ -3397,7 +3397,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                _lang.isHindi ? 'à¤šà¥à¤¨à¥‡ à¤¹à¥à¤ $count à¤—à¤¾à¤¨à¥‡ à¤¹à¤Ÿà¤¾à¤à¤‚?' : 'Delete $count Selected Songs?',
+                _lang.isHindi ? 'चुने हुए $count गाने हटाएं?' : 'Delete $count Selected Songs?',
                 style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
               ),
             ),
@@ -3405,7 +3405,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
         ),
         content: Text(
           _lang.isHindi
-              ? 'à¤•à¥à¤¯à¤¾ à¤†à¤ª à¤¸à¤šà¤®à¥à¤š à¤šà¥à¤¨à¥‡ à¤—à¤ $count à¤—à¤¾à¤¨à¥‹à¤‚ à¤•à¥‹ à¤¹à¤®à¥‡à¤¶à¤¾ à¤•à¥‡ à¤²à¤¿à¤ à¤¹à¤Ÿà¤¾à¤¨à¤¾ à¤šà¤¾à¤¹à¤¤à¥‡ à¤¹à¥ˆà¤‚?'
+              ? 'क्या आप सचमुच चुने गए $count गानों को हमेशा के लिए हटाना चाहते हैं?'
               : 'Are you sure you want to permanently delete $count selected songs?',
           style: const TextStyle(color: Colors.white70, fontSize: 13),
         ),
@@ -3417,7 +3417,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFDC2626), foregroundColor: Colors.white),
             onPressed: () => Navigator.pop(ctx, true),
-            child: Text(_lang.isHindi ? 'à¤¹à¤¾à¤, à¤¹à¤Ÿà¤¾à¤à¤‚' : 'Yes, Delete', style: const TextStyle(fontWeight: FontWeight.bold)),
+            child: Text(_lang.isHindi ? 'हाँ, हटाएं' : 'Yes, Delete', style: const TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -3433,7 +3433,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(_lang.isHindi ? 'âœ… $countDeleted à¤—à¤¾à¤¨à¥‡ à¤¹à¤Ÿà¤¾ à¤¦à¤¿à¤ à¤—à¤!' : 'âœ… $countDeleted songs deleted!'),
+            content: Text(_lang.isHindi ? '✅ $countDeleted गाने हटा दिए गए!' : '✅ $countDeleted songs deleted!'),
             backgroundColor: const Color(0xFFDC2626),
           ),
         );
@@ -3453,7 +3453,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                _lang.isHindi ? 'à¤ªà¥‚à¤°à¥€ à¤¶à¥à¤°à¥‡à¤£à¥€ à¤¹à¤Ÿà¤¾à¤à¤‚: $category' : 'Delete Category: $category',
+                _lang.isHindi ? 'पूरी श्रेणी हटाएं: $category' : 'Delete Category: $category',
                 style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
               ),
             ),
@@ -3461,7 +3461,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
         ),
         content: Text(
           _lang.isHindi
-              ? 'à¤•à¥à¤¯à¤¾ à¤†à¤ª à¤¶à¥à¤°à¥‡à¤£à¥€ "$category" à¤•à¥‡ à¤¸à¤­à¥€ $count à¤—à¤¾à¤¨à¥‡ à¤¹à¤Ÿà¤¾à¤¨à¤¾ à¤šà¤¾à¤¹à¤¤à¥‡ à¤¹à¥ˆà¤‚? à¤¯à¤¹ à¤¸à¤­à¥€ à¤—à¤¾à¤¨à¥‡ à¤¸à¥à¤¥à¤¾à¤¯à¥€ à¤°à¥‚à¤ª à¤¸à¥‡ à¤¹à¤Ÿà¤¾ à¤¦à¥‡à¤—à¤¾à¥¤'
+              ? 'क्या आप श्रेणी "$category" के सभी $count गाने हटाना चाहते हैं? यह सभी गाने स्थायी रूप से हटा देगा।'
               : 'Are you sure you want to permanently delete all $count songs in "$category"?',
           style: const TextStyle(color: Colors.white70, fontSize: 13),
         ),
@@ -3473,7 +3473,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFDC2626), foregroundColor: Colors.white),
             onPressed: () => Navigator.pop(ctx, true),
-            child: Text(_lang.isHindi ? 'à¤¹à¤¾à¤, à¤¶à¥à¤°à¥‡à¤£à¥€ à¤¹à¤Ÿà¤¾à¤à¤‚' : 'Yes, Delete Category', style: const TextStyle(fontWeight: FontWeight.bold)),
+            child: Text(_lang.isHindi ? 'हाँ, श्रेणी हटाएं' : 'Yes, Delete Category', style: const TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -3484,7 +3484,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(_lang.isHindi ? 'âœ… à¤¶à¥à¤°à¥‡à¤£à¥€ "$category" ($deleted à¤—à¤¾à¤¨à¥‡) à¤¹à¤Ÿà¤¾ à¤¦à¥€ à¤—à¤ˆ!' : 'âœ… Category "$category" ($deleted songs) deleted!'),
+            content: Text(_lang.isHindi ? '✅ श्रेणी "$category" ($deleted गाने) हटा दी गई!' : '✅ Category "$category" ($deleted songs) deleted!'),
             backgroundColor: const Color(0xFFDC2626),
           ),
         );
@@ -3504,7 +3504,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                _lang.isHindi ? 'à¤¸à¤¬-à¤«à¤¼à¥‹à¤²à¥à¤¡à¤° à¤¹à¤Ÿà¤¾à¤à¤‚: $subCategory' : 'Delete Sub-Folder: $subCategory',
+                _lang.isHindi ? 'सब-फ़ोल्डर हटाएं: $subCategory' : 'Delete Sub-Folder: $subCategory',
                 style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
               ),
             ),
@@ -3512,8 +3512,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
         ),
         content: Text(
           _lang.isHindi
-              ? 'à¤•à¥à¤¯à¤¾ à¤†à¤ª "$category â€º $subCategory" à¤•à¥‡ à¤¸à¤­à¥€ $count à¤—à¤¾à¤¨à¥‡ à¤¹à¤Ÿà¤¾à¤¨à¤¾ à¤šà¤¾à¤¹à¤¤à¥‡ à¤¹à¥ˆà¤‚?'
-              : 'Are you sure you want to permanently delete all $count songs in "$category â€º $subCategory"?',
+              ? 'क्या आप "$category › $subCategory" के सभी $count गाने हटाना चाहते हैं?'
+              : 'Are you sure you want to permanently delete all $count songs in "$category › $subCategory"?',
           style: const TextStyle(color: Colors.white70, fontSize: 13),
         ),
         actions: [
@@ -3524,7 +3524,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFDC2626), foregroundColor: Colors.white),
             onPressed: () => Navigator.pop(ctx, true),
-            child: Text(_lang.isHindi ? 'à¤¹à¤¾à¤, à¤¹à¤Ÿà¤¾à¤à¤‚' : 'Yes, Delete Sub-Folder', style: const TextStyle(fontWeight: FontWeight.bold)),
+            child: Text(_lang.isHindi ? 'हाँ, हटाएं' : 'Yes, Delete Sub-Folder', style: const TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -3535,7 +3535,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(_lang.isHindi ? 'âœ… à¤¸à¤¬-à¤«à¤¼à¥‹à¤²à¥à¤¡à¤° "$subCategory" ($deleted à¤—à¤¾à¤¨à¥‡) à¤¹à¤Ÿà¤¾ à¤¦à¤¿à¤¯à¤¾ à¤—à¤¯à¤¾!' : 'âœ… Sub-Folder "$subCategory" ($deleted songs) deleted!'),
+            content: Text(_lang.isHindi ? '✅ सब-फ़ोल्डर "$subCategory" ($deleted गाने) हटा दिया गया!' : '✅ Sub-Folder "$subCategory" ($deleted songs) deleted!'),
             backgroundColor: const Color(0xFFDC2626),
           ),
         );
@@ -3581,7 +3581,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          _adminGroupByCategory ? 'ðŸ“ à¤•à¥ˆà¤Ÿà¥‡à¤—à¤°à¥€ à¤µà¥à¤¯à¥‚' : 'ðŸŽµ à¤«à¥à¤²à¥ˆà¤Ÿ à¤²à¤¿à¤¸à¥à¤Ÿ',
+                          _adminGroupByCategory ? '📁 कैटेगरी व्यू' : '🎵 फ्लैट लिस्ट',
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
@@ -3607,8 +3607,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                   icon: Icon(_isMultiSelectMode ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded, size: 16),
                   label: Text(
                     _isMultiSelectMode
-                        ? (_lang.isHindi ? 'à¤¸à¥‡à¤²à¥‡à¤•à¥à¤Ÿ à¤¬à¤‚à¤¦ (${_selectedSongIds.length})' : 'Exit Select (${_selectedSongIds.length})')
-                        : (_lang.isHindi ? 'à¤®à¤²à¥à¤Ÿà¥€-à¤¸à¥‡à¤²à¥‡à¤•à¥à¤Ÿ' : 'Multi-Select'),
+                        ? (_lang.isHindi ? 'सेलेक्ट बंद (${_selectedSongIds.length})' : 'Exit Select (${_selectedSongIds.length})')
+                        : (_lang.isHindi ? 'मल्टी-सेलेक्ट' : 'Multi-Select'),
                     style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
                   ),
                   onPressed: _toggleMultiSelectMode,
@@ -3625,7 +3625,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                     elevation: 0,
                   ),
                   icon: const Icon(Icons.drive_folder_upload_rounded, size: 16),
-                  label: const Text('à¤¬à¤²à¥à¤• / à¤«à¤¼à¥‹à¤²à¥à¤¡à¤° à¤…à¤ªà¤²à¥‹à¤¡', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                  label: const Text('बल्क / फ़ोल्डर अपलोड', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                   onPressed: () => _showBulkUploadDialog(),
                 ),
                 const SizedBox(width: 8),
@@ -3679,7 +3679,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                     elevation: 0,
                   ),
                   icon: const Icon(Icons.delete_sweep_rounded, size: 16),
-                  label: Text(_lang.isHindi ? 'à¤¸à¤­à¥€ à¤¹à¤Ÿà¤¾à¤à¤‚' : 'Clear All', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                  label: Text(_lang.isHindi ? 'सभी हटाएं' : 'Clear All', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                   onPressed: songs.isEmpty
                       ? null
                       : () async {
@@ -3693,14 +3693,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                                   const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 24),
                                   const SizedBox(width: 8),
                                   Text(
-                                    _lang.isHindi ? 'à¤¸à¤­à¥€ à¤—à¤¾à¤¨à¥‡ à¤¹à¤Ÿà¤¾à¤à¤‚?' : 'Delete All Songs?',
+                                    _lang.isHindi ? 'सभी गाने हटाएं?' : 'Delete All Songs?',
                                     style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
                                   ),
                                 ],
                               ),
                               content: Text(
                                 _lang.isHindi
-                                    ? 'à¤•à¥à¤¯à¤¾ à¤†à¤ª à¤¸à¤šà¤®à¥à¤š à¤¸à¤­à¥€ à¤—à¤¾à¤¨à¥‹à¤‚ à¤•à¥‹ à¤¹à¤Ÿà¤¾à¤¨à¤¾ à¤šà¤¾à¤¹à¤¤à¥‡ à¤¹à¥ˆà¤‚? à¤‡à¤¸à¤•à¥‡ à¤¬à¤¾à¤¦ à¤à¤ª à¤®à¥‡à¤‚ à¤•à¥‹à¤ˆ à¤­à¥€ à¤—à¤¾à¤¨à¤¾ (à¤¡à¤¿à¤«à¤¼à¥‰à¤²à¥à¤Ÿ 17 à¤—à¤¾à¤¨à¥‹à¤‚ à¤¸à¤¹à¤¿à¤¤) à¤à¤ª à¤¦à¥‹à¤¬à¤¾à¤°à¤¾ à¤–à¥‹à¤²à¤¨à¥‡ à¤ªà¤° à¤­à¥€ à¤µà¤¾à¤ªà¤¸ à¤¨à¤¹à¥€à¤‚ à¤†à¤à¤—à¤¾à¥¤'
+                                    ? 'क्या आप सचमुच सभी गानों को हटाना चाहते हैं? इसके बाद ऐप में कोई भी गाना (डिफ़ॉल्ट 17 गानों सहित) ऐप दोबारा खोलने पर भी वापस नहीं आएगा।'
                                     : 'Are you sure you want to delete all songs? All tracks including default 17 tracks will be permanently removed and will not return on restart.',
                                 style: const TextStyle(color: Colors.white70, fontSize: 13),
                               ),
@@ -3712,7 +3712,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                                 ElevatedButton(
                                   style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFDC2626), foregroundColor: Colors.white),
                                   onPressed: () => Navigator.pop(ctx, true),
-                                  child: Text(_lang.isHindi ? 'à¤¹à¤¾à¤, à¤¸à¤¬ à¤¹à¤Ÿà¤¾à¤à¤‚' : 'Yes, Delete All', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                  child: Text(_lang.isHindi ? 'हाँ, सब हटाएं' : 'Yes, Delete All', style: const TextStyle(fontWeight: FontWeight.bold)),
                                 ),
                               ],
                             ),
@@ -3723,7 +3723,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                             if (mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                  content: Text(_lang.isHindi ? 'âœ… à¤¸à¤­à¥€ à¤—à¤¾à¤¨à¥‡ à¤¸à¤«à¤²à¤¤à¤¾à¤ªà¥‚à¤°à¥à¤µà¤• à¤¹à¤Ÿà¤¾ à¤¦à¤¿à¤ à¤—à¤!' : 'âœ… All songs purged successfully!'),
+                                  content: Text(_lang.isHindi ? '✅ सभी गाने सफलतापूर्वक हटा दिए गए!' : '✅ All songs purged successfully!'),
                                   backgroundColor: const Color(0xFFDC2626),
                                 ),
                               );
@@ -3754,7 +3754,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                 const SizedBox(width: 8),
                 Text(
                   _lang.isHindi
-                      ? '${_selectedSongIds.length} / ${songs.length} à¤šà¥à¤¨à¥‡ à¤—à¤'
+                      ? '${_selectedSongIds.length} / ${songs.length} चुने गए'
                       : '${_selectedSongIds.length} / ${songs.length} selected',
                   style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
                 ),
@@ -3775,8 +3775,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                   },
                   child: Text(
                     _selectedSongIds.length == songs.length
-                        ? (_lang.isHindi ? 'à¤¸à¤­à¥€ à¤¹à¤Ÿà¤¾à¤à¤‚' : 'Deselect All')
-                        : (_lang.isHindi ? 'à¤¸à¤­à¥€ à¤šà¥à¤¨à¥‡à¤‚' : 'Select All'),
+                        ? (_lang.isHindi ? 'सभी हटाएं' : 'Deselect All')
+                        : (_lang.isHindi ? 'सभी चुनें' : 'Select All'),
                     style: const TextStyle(color: Color(0xFF818CF8), fontSize: 11, fontWeight: FontWeight.bold),
                   ),
                 ),
@@ -3793,7 +3793,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                   ),
                   icon: const Icon(Icons.delete_forever_rounded, size: 14),
                   label: Text(
-                    _lang.isHindi ? 'à¤¹à¤Ÿà¤¾à¤à¤‚ (${_selectedSongIds.length})' : 'Delete (${_selectedSongIds.length})',
+                    _lang.isHindi ? 'हटाएं (${_selectedSongIds.length})' : 'Delete (${_selectedSongIds.length})',
                     style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
                   ),
                   onPressed: _selectedSongIds.isEmpty ? null : _confirmDeleteSelectedSongs,
@@ -3896,11 +3896,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                         color: const Color(0xFF818CF8),
                         size: 20,
                       ),
-                      tooltip: 'à¤ªà¥‚à¤°à¥€ à¤¶à¥à¤°à¥‡à¤£à¥€ à¤šà¥à¤¨à¥‡à¤‚/à¤¹à¤Ÿà¤¾à¤à¤‚',
+                      tooltip: 'पूरी श्रेणी चुनें/हटाएं',
                       onPressed: () => _toggleFolderSelection(catSongs),
                     ),
                   PopupMenuButton<String>(
-                    tooltip: 'à¤¶à¥à¤°à¥‡à¤£à¥€ / à¤«à¤¼à¥‹à¤²à¥à¤¡à¤° à¤µà¤¿à¤•à¤²à¥à¤ª',
+                    tooltip: 'श्रेणी / फ़ोल्डर विकल्प',
                     icon: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
@@ -3914,7 +3914,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                           Icon(Icons.more_vert_rounded, color: Color(0xFFFFB300), size: 14),
                           SizedBox(width: 2),
                           Text(
-                            'à¤µà¤¿à¤•à¤²à¥à¤ª',
+                            'विकल्प',
                             style: TextStyle(color: Color(0xFFFFB300), fontSize: 10, fontWeight: FontWeight.bold),
                           ),
                         ],
@@ -3939,7 +3939,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                           children: const [
                             Icon(Icons.music_note_rounded, color: Color(0xFFFFB300), size: 16),
                             SizedBox(width: 8),
-                            Text('+ à¤à¤•à¤² à¤—à¤¾à¤¨à¤¾ à¤œà¥‹à¤¡à¤¼à¥‡à¤‚', style: TextStyle(color: Colors.white, fontSize: 12)),
+                            Text('+ एकल गाना जोड़ें', style: TextStyle(color: Colors.white, fontSize: 12)),
                           ],
                         ),
                       ),
@@ -3949,7 +3949,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                           children: const [
                             Icon(Icons.drive_folder_upload_rounded, color: Color(0xFF00E5FF), size: 16),
                             SizedBox(width: 8),
-                            Text('ðŸ“ à¤¬à¤²à¥à¤• / à¤«à¤¼à¥‹à¤²à¥à¤¡à¤° à¤…à¤ªà¤²à¥‹à¤¡', style: TextStyle(color: Colors.white, fontSize: 12)),
+                            Text('📁 बल्क / फ़ोल्डर अपलोड', style: TextStyle(color: Colors.white, fontSize: 12)),
                           ],
                         ),
                       ),
@@ -3968,8 +3968,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                             const SizedBox(width: 8),
                             Text(
                               catSongs.isNotEmpty && catSongs.every((s) => _selectedSongIds.contains(s.id))
-                                  ? 'à¤¶à¥à¤°à¥‡à¤£à¥€ à¤…à¤¨-à¤¸à¥‡à¤²à¥‡à¤•à¥à¤Ÿ à¤•à¤°à¥‡à¤‚'
-                                  : 'à¤ªà¥‚à¤°à¥€ à¤¶à¥à¤°à¥‡à¤£à¥€ à¤šà¥à¤¨à¥‡à¤‚ (Multi-Select)',
+                                  ? 'श्रेणी अन-सेलेक्ट करें'
+                                  : 'पूरी श्रेणी चुनें (Multi-Select)',
                               style: const TextStyle(color: Colors.white, fontSize: 12),
                             ),
                           ],
@@ -3981,7 +3981,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                           children: const [
                             Icon(Icons.delete_forever_rounded, color: Color(0xFFEF4444), size: 16),
                             SizedBox(width: 8),
-                            Text('ðŸ—‘ï¸ à¤ªà¥‚à¤°à¥€ à¤¶à¥à¤°à¥‡à¤£à¥€/à¤«à¤¼à¥‹à¤²à¥à¤¡à¤° à¤¹à¤Ÿà¤¾à¤à¤‚', style: TextStyle(color: Color(0xFFEF4444), fontSize: 12, fontWeight: FontWeight.bold)),
+                            Text('🗑️ पूरी श्रेणी/फ़ोल्डर हटाएं', style: TextStyle(color: Color(0xFFEF4444), fontSize: 12, fontWeight: FontWeight.bold)),
                           ],
                         ),
                       ),
@@ -4042,11 +4042,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                                     color: const Color(0xFF818CF8),
                                     size: 18,
                                   ),
-                                  tooltip: 'à¤¸à¤¬-à¤«à¤¼à¥‹à¤²à¥à¤¡à¤° à¤šà¥à¤¨à¥‡à¤‚/à¤¹à¤Ÿà¤¾à¤à¤‚',
+                                  tooltip: 'सब-फ़ोल्डर चुनें/हटाएं',
                                   onPressed: () => _toggleFolderSelection(subSongs),
                                 ),
                               PopupMenuButton<String>(
-                                tooltip: 'à¤‡à¤¸ à¤¸à¤¬-à¤•à¥ˆà¤Ÿà¥‡à¤—à¤°à¥€ à¤®à¥‡à¤‚ à¤µà¤¿à¤•à¤²à¥à¤ª',
+                                tooltip: 'इस सब-कैटेगरी में विकल्प',
                                 icon: Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                                   decoration: BoxDecoration(
@@ -4060,7 +4060,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                                       Icon(Icons.more_vert_rounded, color: Color(0xFF00E5FF), size: 12),
                                       SizedBox(width: 2),
                                       Text(
-                                        'à¤µà¤¿à¤•à¤²à¥à¤ª',
+                                        'विकल्प',
                                         style: TextStyle(color: Color(0xFF00E5FF), fontSize: 9, fontWeight: FontWeight.bold),
                                       ),
                                     ],
@@ -4085,7 +4085,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                                       children: const [
                                         Icon(Icons.music_note_rounded, color: Color(0xFFFFB300), size: 14),
                                         SizedBox(width: 6),
-                                        Text('+ à¤à¤•à¤² à¤—à¤¾à¤¨à¤¾ à¤œà¥‹à¤¡à¤¼à¥‡à¤‚', style: TextStyle(color: Colors.white, fontSize: 11)),
+                                        Text('+ एकल गाना जोड़ें', style: TextStyle(color: Colors.white, fontSize: 11)),
                                       ],
                                     ),
                                   ),
@@ -4095,7 +4095,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                                       children: const [
                                         Icon(Icons.drive_folder_upload_rounded, color: Color(0xFF00E5FF), size: 14),
                                         SizedBox(width: 6),
-                                        Text('ðŸ“ à¤¬à¤²à¥à¤• à¤…à¤ªà¤²à¥‹à¤¡', style: TextStyle(color: Colors.white, fontSize: 11)),
+                                        Text('📁 बल्क अपलोड', style: TextStyle(color: Colors.white, fontSize: 11)),
                                       ],
                                     ),
                                   ),
@@ -4114,8 +4114,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                                         const SizedBox(width: 6),
                                         Text(
                                           subSongs.isNotEmpty && subSongs.every((s) => _selectedSongIds.contains(s.id))
-                                              ? 'à¤…à¤¨-à¤¸à¥‡à¤²à¥‡à¤•à¥à¤Ÿ à¤•à¤°à¥‡à¤‚'
-                                              : 'à¤¸à¤¬-à¤«à¤¼à¥‹à¤²à¥à¤¡à¤° à¤šà¥à¤¨à¥‡à¤‚',
+                                              ? 'अन-सेलेक्ट करें'
+                                              : 'सब-फ़ोल्डर चुनें',
                                           style: const TextStyle(color: Colors.white, fontSize: 11),
                                         ),
                                       ],
@@ -4127,7 +4127,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                                       children: const [
                                         Icon(Icons.delete_forever_rounded, color: Color(0xFFEF4444), size: 14),
                                         SizedBox(width: 6),
-                                        Text('ðŸ—‘ï¸ à¤¯à¤¹ à¤¸à¤¬-à¤«à¤¼à¥‹à¤²à¥à¤¡à¤° à¤¹à¤Ÿà¤¾à¤à¤‚', style: TextStyle(color: Color(0xFFEF4444), fontSize: 11, fontWeight: FontWeight.bold)),
+                                        Text('🗑️ यह सब-फ़ोल्डर हटाएं', style: TextStyle(color: Color(0xFFEF4444), fontSize: 11, fontWeight: FontWeight.bold)),
                                       ],
                                     ),
                                   ),
@@ -4148,7 +4148,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                     Padding(
                       padding: const EdgeInsets.fromLTRB(14, 6, 14, 2),
                       child: Text(
-                        'ðŸŽµ $category à¤®à¥à¤–à¥à¤¯ à¤Ÿà¥à¤°à¥ˆà¤•à¥à¤¸ (${directSongs.length}):',
+                        '🎵 $category मुख्य ट्रैक्स (${directSongs.length}):',
                         style: const TextStyle(color: Colors.white60, fontSize: 10, fontWeight: FontWeight.bold),
                       ),
                     ),
@@ -4247,7 +4247,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                       ),
                       child: Text(
                         s.subCategory != null && s.subCategory!.isNotEmpty && s.subCategory!.toLowerCase() != s.genre.toLowerCase()
-                            ? '${s.genre} â€º ${s.subCategory}'
+                            ? '${s.genre} › ${s.subCategory}'
                             : s.genre,
                         style: const TextStyle(color: Color(0xFF00E5FF), fontSize: 9, fontWeight: FontWeight.bold),
                       ),
