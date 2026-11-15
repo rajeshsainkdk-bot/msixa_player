@@ -7,18 +7,11 @@ import 'providers/player_provider.dart';
 import 'services/cloud_backend_service.dart';
 import 'services/language_service.dart';
 import 'services/r2_storage_service.dart';
-import 'package:video_player_media_kit/video_player_media_kit.dart';
 import 'screens/main_navigation_screen.dart';
 import 'screens/auth/auth_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Initialize MediaKit backend for video_player:
-  // Native in-app software & hardware decoding for EAC3 (Dolby Digital Plus), AC3, DTS, 5.1/7.1 surround downmix!
-  VideoPlayerMediaKit.ensureInitialized(
-    android: true,
-  );
 
   // Initialize background audio playback with system notification controls
   try {
