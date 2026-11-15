@@ -555,7 +555,7 @@ class MainActivity: AudioServiceActivity() {
                                         val lang = if (format.containsKey(MediaFormat.KEY_LANGUAGE)) format.getString(MediaFormat.KEY_LANGUAGE) else "und"
                                         val channels = if (format.containsKey(MediaFormat.KEY_CHANNEL_COUNT)) format.getInteger(MediaFormat.KEY_CHANNEL_COUNT) else 2
                                         val sampleRate = if (format.containsKey(MediaFormat.KEY_SAMPLE_RATE)) format.getInteger(MediaFormat.KEY_SAMPLE_RATE) else 44100
-                                        val title = if (format.containsKey(MediaFormat.KEY_TITLE)) format.getString(MediaFormat.KEY_TITLE) else ""
+                                        val title = if (format.containsKey("title")) (try { format.getString("title") } catch (_: Throwable) { null }) ?: "" else ""
 
                                         val isDolby = mime.contains("eac3") || mime.contains("ac3") || mime.contains("dts")
                                         val channelLabel = when (channels) {
@@ -578,8 +578,8 @@ class MainActivity: AudioServiceActivity() {
                                             "spa" -> "Spanish"
                                             "fra" -> "French"
                                             "deu", "ger" -> "German"
-                                            "und", "" -> if (title.isNotEmpty()) title else "Track ${audioIdx + 1}"
-                                            else -> lang.uppercase()
+                                            "und", "", null -> if (title.isNotEmpty()) title else "Track ${audioIdx + 1}"
+                                            else -> lang?.uppercase() ?: "Track ${audioIdx + 1}"
                                         }
 
                                         val codecLabel = when {
@@ -603,7 +603,7 @@ class MainActivity: AudioServiceActivity() {
                                             "index" to i,
                                             "audioIndex" to audioIdx,
                                             "name" to displayName,
-                                            "language" to lang,
+                                            "language" to (lang ?: "und"),
                                             "mime" to mime,
                                             "channels" to channels,
                                             "sampleRate" to sampleRate,
