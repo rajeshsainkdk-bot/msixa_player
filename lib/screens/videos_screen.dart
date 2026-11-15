@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -749,7 +750,10 @@ class _VideosScreenState extends State<VideosScreen> {
                 final prefs = await SharedPreferences.getInstance();
                 await prefs.setString('alias_${video.id}', newName);
                 setState(() {
-                  video.title = newName;
+                  final idx = _allVideos.indexWhere((v) => v.id == video.id);
+                  if (idx != -1) {
+                    _allVideos[idx] = video.copyWith(title: newName);
+                  }
                 });
                 _showSnackBar('Renamed to "$newName"');
               }

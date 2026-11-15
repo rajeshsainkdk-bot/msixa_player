@@ -9,7 +9,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:share_plus/share_plus.dart';
 import '../models/video_item.dart';
 import '../providers/player_provider.dart';
-import '../services/ad_service.dart';
 import '../services/device_video_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/video_thumbnail_widget.dart';
@@ -2039,7 +2038,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     if (_isScreenLocked || !_isScalingGestureActive) return;
 
     // A. Two-Finger Pinch-to-Zoom & Pan (Dono side se pakad kar Zoom In / Zoom Out)
-    if (details.pointerCount >= 2 || _isPinching) {
+    if (details.pointerCount >= 2 || _isPinching || (details.scale - 1.0).abs() > 0.04) {
       _isPinching = true;
       _isSeekingGesture = false;
       _isVolumeDrag = false;
@@ -2047,8 +2046,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       _showSeekHud = false;
       _showVolumeHud = false;
       _showBrightnessHud = false;
+      _showControls = false;
 
-      final newScale = (_baseZoomScale * details.scale).clamp(0.75, 4.5);
+      final newScale = (_baseZoomScale * details.scale).clamp(0.5, 5.0);
       if (newScale > 1.0) {
         final maxPanX = (screenSize.width * (newScale - 1.0)) / 2.0;
         final maxPanY = (screenSize.height * (newScale - 1.0)) / 2.0;
@@ -2353,6 +2353,30 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                   onTap: () {
                                     Navigator.pop(ctx);
                                     _shareCurrentVideo();
+                                  },
+                                ),
+                                _buildMoreOptionItem(
+                                  icon: Icons.equalizer_rounded,
+                                  label: 'Equalizer',
+                                  onTap: () {
+                                    Navigator.pop(ctx);
+                                    _showAudioSettingsSheet();
+                                  },
+                                ),
+                                _buildMoreOptionItem(
+                                  icon: Icons.cast_rounded,
+                                  label: 'Cast (टीवी पर)',
+                                  onTap: () {
+                                    Navigator.pop(ctx);
+                                    _showCastDialog();
+                                  },
+                                ),
+                                _buildMoreOptionItem(
+                                  icon: Icons.tune_rounded,
+                                  label: 'Customise',
+                                  onTap: () {
+                                    Navigator.pop(ctx);
+                                    _showCustomiseQuickActionsSheet();
                                   },
                                 ),
                                 _buildMoreOptionItem(
@@ -3484,7 +3508,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                 ],
                               ),
 
-                              // Right: Display Settings (⛶) & PiP (↘)
+                              // Right: Display Settings (⛶), PiP (↘) & Fullscreen (⛶)
                               Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
@@ -3492,16 +3516,28 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                     constraints: const BoxConstraints(),
                                     padding: const EdgeInsets.all(6),
                                     icon: const Icon(Icons.aspect_ratio_rounded, color: Colors.white, size: 22),
-                                    tooltip: 'Display Settings',
+                                    tooltip: 'Display Settings (स्क्रीन विकल्प)',
                                     onPressed: _showDisplaySettingsSheet,
                                   ),
-                                  const SizedBox(width: 6),
+                                  const SizedBox(width: 4),
                                   IconButton(
                                     constraints: const BoxConstraints(),
                                     padding: const EdgeInsets.all(6),
                                     icon: const Icon(Icons.picture_in_picture_alt_rounded, color: Colors.white, size: 22),
                                     tooltip: 'Picture in Picture',
                                     onPressed: _enterPip,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  IconButton(
+                                    constraints: const BoxConstraints(),
+                                    padding: const EdgeInsets.all(6),
+                                    icon: Icon(
+                                      _isLandscape ? Icons.fullscreen_exit_rounded : Icons.fullscreen_rounded,
+                                      color: Colors.white,
+                                      size: 24,
+                                    ),
+                                    tooltip: 'Full Screen (पूरी स्क्रीन)',
+                                    onPressed: _toggleOrientation,
                                   ),
                                 ],
                               ),
@@ -3556,94 +3592,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 ),
               ),
             ),
-
-          // 14. DEDICATED LEFT & RIGHT GESTURE ZONES (ACTIVE EVEN WHEN CONTROLS ARE SHOWING!)
-          if (_isInitialized && !_isScreenLocked) ...[
-            // Left side: Brightness & 10s Rewind (A03, A08)
-            Positioned(
-              left: 0,
-              top: 56,
-              bottom: 82,
-              width: screenSize.width * 0.38,
-              child: GestureDetector(
-                behavior: HitTestBehavior.translucent,
-                onVerticalDragUpdate: (details) {
-                  final delta = -details.primaryDelta! / (screenSize.height * 0.55);
-                  _brightness = (_brightness + delta).clamp(0.02, 1.0);
-                  _channel.invokeMethod('setScreenBrightness', {'brightness': _brightness});
-                  setState(() => _showBrightnessHud = true);
-                  _brightnessHudTimer?.cancel();
-                  _brightnessHudTimer = Timer(const Duration(milliseconds: 900), () {
-                    if (mounted) setState(() => _showBrightnessHud = false);
-                  });
-                },
-                onVerticalDragEnd: (_) {
-                  _brightnessHudTimer?.cancel();
-                  _brightnessHudTimer = Timer(const Duration(milliseconds: 900), () {
-                    if (mounted) setState(() => _showBrightnessHud = false);
-                  });
-                },
-                onDoubleTap: () => _seekRelative(-10),
-                onTap: () {
-                  setState(() => _showControls = !_showControls);
-                  if (_showControls) _startControlsTimer();
-                },
-                onLongPressStart: (_) {
-                  _speedBeforeLongPress = _playbackSpeed;
-                  _controller.setPlaybackSpeed(2.0);
-                  _showPillHud('2.0X Fast Forward >>', icon: Icons.fast_forward_rounded);
-                },
-                onLongPressEnd: (_) {
-                  _controller.setPlaybackSpeed(_speedBeforeLongPress);
-                  _showPillHud('Speed: ${_speedBeforeLongPress.toStringAsFixed(1)}X', icon: Icons.speed_rounded);
-                },
-                child: Container(color: Colors.transparent),
-              ),
-            ),
-
-            // Right side: Volume & 10s Forward (A04, A07)
-            Positioned(
-              right: 0,
-              top: 56,
-              bottom: 82,
-              width: screenSize.width * 0.38,
-              child: GestureDetector(
-                behavior: HitTestBehavior.translucent,
-                onVerticalDragUpdate: (details) {
-                  final delta = -details.primaryDelta! / (screenSize.height * 0.55);
-                  _volume = (_volume + delta).clamp(0.0, 1.0);
-                  _controller.setVolume(_volume);
-                  _channel.invokeMethod('setDeviceVolume', {'volume': _volume});
-                  setState(() => _showVolumeHud = true);
-                  _volumeHudTimer?.cancel();
-                  _volumeHudTimer = Timer(const Duration(milliseconds: 900), () {
-                    if (mounted) setState(() => _showVolumeHud = false);
-                  });
-                },
-                onVerticalDragEnd: (_) {
-                  _volumeHudTimer?.cancel();
-                  _volumeHudTimer = Timer(const Duration(milliseconds: 900), () {
-                    if (mounted) setState(() => _showVolumeHud = false);
-                  });
-                },
-                onDoubleTap: () => _seekRelative(10),
-                onTap: () {
-                  setState(() => _showControls = !_showControls);
-                  if (_showControls) _startControlsTimer();
-                },
-                onLongPressStart: (_) {
-                  _speedBeforeLongPress = _playbackSpeed;
-                  _controller.setPlaybackSpeed(2.0);
-                  _showPillHud('2.0X Fast Forward >>', icon: Icons.fast_forward_rounded);
-                },
-                onLongPressEnd: (_) {
-                  _controller.setPlaybackSpeed(_speedBeforeLongPress);
-                  _showPillHud('Speed: ${_speedBeforeLongPress.toStringAsFixed(1)}X', icon: Icons.speed_rounded);
-                },
-                child: Container(color: Colors.transparent),
-              ),
-            ),
-          ],
         ],
       ),
     );

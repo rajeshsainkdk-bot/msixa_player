@@ -309,6 +309,51 @@ class MainActivity: AudioServiceActivity() {
                         result.error("SHARE_ERROR", e.localizedMessage, null)
                     }
                 }
+                "captureVideoScreenshot" -> {
+                    try {
+                        val path = call.argument<String>("path") ?: ""
+                        val posMs = call.argument<Int>("positionMs") ?: 0
+                        val retriever = android.media.MediaMetadataRetriever()
+                        if (path.startsWith("http://") || path.startsWith("https://")) {
+                            retriever.setDataSource(path, HashMap<String, String>())
+                        } else {
+                            retriever.setDataSource(path)
+                        }
+                        val timeMicros = posMs.toLong() * 1000L
+                        val bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                            retriever.getScaledFrameAtTime(timeMicros, android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC, 1280, 720) 
+                                ?: retriever.getFrameAtTime(timeMicros)
+                        } else {
+                            retriever.getFrameAtTime(timeMicros)
+                        }
+                        retriever.release()
+
+                        if (bitmap != null) {
+                            val picturesDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_PICTURES)
+                            val appDir = java.io.File(picturesDir, "Msixa_Screenshots")
+                            if (!appDir.exists()) appDir.mkdirs()
+                            val fileName = "Screenshot_${System.currentTimeMillis()}.jpg"
+                            val file = java.io.File(appDir, fileName)
+                            val fos = java.io.FileOutputStream(file)
+                            bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 92, fos)
+                            fos.flush()
+                            fos.close()
+
+                            android.media.MediaScannerConnection.scanFile(
+                                applicationContext,
+                                arrayOf(file.absolutePath),
+                                arrayOf("image/jpeg"),
+                                null
+                            )
+
+                            result.success(mapOf("success" to true, "path" to file.absolutePath))
+                        } else {
+                            result.success(mapOf("success" to false, "error" to "Frame extraction failed"))
+                        }
+                    } catch (e: Exception) {
+                        result.error("SCREENSHOT_ERROR", e.localizedMessage, null)
+                    }
+                }
                 "installApk" -> {
                     try {
                         val filePath = call.argument<String>("filePath") ?: throw IllegalArgumentException("filePath required")

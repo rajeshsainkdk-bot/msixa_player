@@ -22,6 +22,9 @@ class VideoItem {
     this.dateAdded = 0,
   });
 
+  /// Alias for duration in milliseconds
+  int get durationMs => duration;
+
   /// Formatted duration string: e.g. "04:15" or "01:22:30"
   String get formattedDuration {
     if (duration <= 0) return '00:00';
@@ -68,5 +71,29 @@ class VideoItem {
     folder: json['folder']?.toString() ?? 'Videos',
     dateAdded: (json['dateAdded'] is num) ? (json['dateAdded'] as num).toInt() : 0,
   );
+
+  VideoItem copyWith({
+    String? id,
+    String? title,
+    String? displayName,
+    String? path,
+    int? duration,
+    int? size,
+    String? resolution,
+    String? folder,
+    int? dateAdded,
+  }) {
+    return VideoItem(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      displayName: displayName ?? this.displayName,
+      path: path ?? this.path,
+      duration: duration ?? this.duration,
+      size: size ?? this.size,
+      resolution: resolution ?? this.resolution,
+      folder: folder ?? this.folder,
+      dateAdded: dateAdded ?? this.dateAdded,
+    );
+  }
 }
 
