@@ -416,6 +416,74 @@ class MainActivity: AudioServiceActivity() {
                         }
                     }.start()
                 }
+                "captureVideoScreenshot" -> {
+                    val path = call.argument<String>("path") ?: ""
+                    val positionMs = (call.argument<Number>("positionMs"))?.toLong() ?: 0L
+                    Thread {
+                        try {
+                            var bitmap: android.graphics.Bitmap? = null
+                            if (path.isNotEmpty()) {
+                                val retriever = android.media.MediaMetadataRetriever()
+                                try {
+                                    if (path.startsWith("content://")) {
+                                        retriever.setDataSource(applicationContext, Uri.parse(path))
+                                    } else {
+                                        retriever.setDataSource(path)
+                                    }
+                                    val timeUs = positionMs * 1000L
+                                    bitmap = retriever.getFrameAtTime(timeUs, android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                                        ?: retriever.getFrameAtTime(timeUs)
+                                } catch (_: Throwable) {
+                                } finally {
+                                    try { retriever.release() } catch (_: Throwable) {}
+                                }
+                            }
+
+                            if (bitmap != null) {
+                                val fileName = "Msixa_${System.currentTimeMillis()}.jpg"
+                                var saved = false
+                                var savedPath = ""
+
+                                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                                    val values = android.content.ContentValues().apply {
+                                        put(MediaStore.Images.Media.DISPLAY_NAME, fileName)
+                                        put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+                                        put(MediaStore.Images.Media.RELATIVE_PATH, android.os.Environment.DIRECTORY_PICTURES + "/Msixa")
+                                        put(MediaStore.Images.Media.IS_PENDING, 1)
+                                    }
+                                    val uri = applicationContext.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+                                    if (uri != null) {
+                                        applicationContext.contentResolver.openOutputStream(uri)?.use { out ->
+                                            bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 95, out)
+                                        }
+                                        values.clear()
+                                        values.put(MediaStore.Images.Media.IS_PENDING, 0)
+                                        applicationContext.contentResolver.update(uri, values, null, null)
+                                        saved = true
+                                        savedPath = "Pictures/Msixa/$fileName"
+                                    }
+                                } else {
+                                    @Suppress("DEPRECATION")
+                                    val dir = java.io.File(android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_PICTURES), "Msixa")
+                                    if (!dir.exists()) dir.mkdirs()
+                                    val file = java.io.File(dir, fileName)
+                                    java.io.FileOutputStream(file).use { out ->
+                                        bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 95, out)
+                                    }
+                                    android.media.MediaScannerConnection.scanFile(applicationContext, arrayOf(file.absolutePath), arrayOf("image/jpeg"), null)
+                                    saved = true
+                                    savedPath = file.absolutePath
+                                }
+                                bitmap.recycle()
+                                runOnUiThread { result.success(mapOf("success" to saved, "path" to savedPath)) }
+                            } else {
+                                runOnUiThread { result.success(mapOf("success" to false)) }
+                            }
+                        } catch (e: Throwable) {
+                            runOnUiThread { result.success(mapOf("success" to false, "error" to e.localizedMessage)) }
+                        }
+                    }.start()
+                }
                 else -> result.notImplemented()
             }
         }

@@ -93,6 +93,44 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   String? _doubleTapFeedback;
   Timer? _doubleTapTimer;
 
+  // Pinch-to-Zoom & Pan State (MX Player Two-Finger Zoom In / Zoom Out)
+  double _zoomScale = 1.0;
+  double _baseZoomScale = 1.0;
+  Offset _panOffset = Offset.zero;
+  Offset _basePanOffset = Offset.zero;
+  Offset _initialFocalPoint = Offset.zero;
+  bool _isPinching = false;
+  bool _isScalingGestureActive = false;
+  bool _dragDirectionDetermined = false;
+
+  // High-Quality / 4K Video Seeking Debounce & State
+  int _accumulatedSeekSeconds = 0;
+  Timer? _seekDebounceTimer;
+  bool _wasPlayingBeforeSeek = false;
+  bool _wasPlayingBeforeScrub = false;
+  bool _wasPlayingBeforeSeekGesture = false;
+
+  // Screenshot state & Shutter Flash animation
+  bool _showScreenshotFlash = false;
+  bool _isTakingScreenshot = false;
+
+  // Quick Action Customization Preferences
+  Map<String, bool> _quickActionEnabled = {
+    'night_mode': true,
+    'loop': true,
+    'mute': true,
+    'speed': true,
+    'ai_clarity': true,
+    'screenshot': true,
+    'shuffle': true,
+    'sleep_timer': true,
+    'ab_repeat': false,
+    'audio_effect': true,
+    'equalizer': true,
+    'background': true,
+    'rotation': true,
+  };
+
   // Quick Action States (Screenshot 6)
   bool _isNightMode = false;
   bool _isLooping = false;
@@ -158,8 +196,249 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     // 3. Immersive fullscreen
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
-    // 4. Initialize video and auto-orient
+    // 4. Load quick actions customization & initialize video
+    _loadQuickActionSettings();
     _initializeVideo();
+  }
+
+  Future<void> _loadQuickActionSettings() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      setState(() {
+        for (final key in _quickActionEnabled.keys.toList()) {
+          _quickActionEnabled[key] = prefs.getBool('qa_$key') ?? _quickActionEnabled[key]!;
+        }
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _toggleQuickActionSetting(String key, bool val) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('qa_$key', val);
+      setState(() {
+        _quickActionEnabled[key] = val;
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _resetQuickActionsToDefault() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      for (final key in _quickActionEnabled.keys) {
+        await prefs.remove('qa_$key');
+      }
+      setState(() {
+        _quickActionEnabled = {
+          'night_mode': true,
+          'loop': true,
+          'mute': true,
+          'speed': true,
+          'ai_clarity': true,
+          'screenshot': true,
+          'shuffle': true,
+          'sleep_timer': true,
+          'ab_repeat': false,
+          'audio_effect': true,
+          'equalizer': true,
+          'background': true,
+          'rotation': true,
+        };
+      });
+    } catch (_) {}
+  }
+
+  void _showCustomiseQuickActionsSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setSheetState) => Container(
+          height: MediaQuery.of(context).size.height * 0.72,
+          decoration: BoxDecoration(
+            color: const Color(0xFF131A2A).withOpacity(0.98),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            border: Border.all(color: Colors.white12),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: const [
+                        Icon(Icons.tune_rounded, color: Color(0xFF2196F3), size: 22),
+                        SizedBox(width: 10),
+                        Text(
+                          'Customise Quick Actions',
+                          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                    TextButton(
+                      onPressed: () async {
+                        await _resetQuickActionsToDefault();
+                        setSheetState(() {});
+                        _showPillHud('Quick Actions reset to default', icon: Icons.refresh_rounded);
+                      },
+                      child: const Text('Reset', style: TextStyle(color: Color(0xFF00E5FF), fontSize: 13, fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Toggle which shortcuts appear in your top quick actions bar',
+                    style: TextStyle(color: Colors.white54, fontSize: 12),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                const Divider(color: Colors.white12),
+                Expanded(
+                  child: ListView(
+                    children: [
+                      _buildCustomiseToggleTile(
+                        icon: Icons.nightlight_round,
+                        title: 'Night Mode',
+                        subtitle: 'Blue light eye-protection filter',
+                        keyName: 'night_mode',
+                        setSheetState: setSheetState,
+                      ),
+                      _buildCustomiseToggleTile(
+                        icon: Icons.repeat_rounded,
+                        title: 'Loop Video',
+                        subtitle: 'Continuously loop playback',
+                        keyName: 'loop',
+                        setSheetState: setSheetState,
+                      ),
+                      _buildCustomiseToggleTile(
+                        icon: Icons.volume_off_rounded,
+                        title: 'Mute Audio',
+                        subtitle: 'Instant volume mute / unmute',
+                        keyName: 'mute',
+                        setSheetState: setSheetState,
+                      ),
+                      _buildCustomiseToggleTile(
+                        icon: Icons.speed_rounded,
+                        title: 'Playback Speed',
+                        subtitle: '0.25x to 4.0x speed slider',
+                        keyName: 'speed',
+                        setSheetState: setSheetState,
+                      ),
+                      _buildCustomiseToggleTile(
+                        icon: Icons.auto_awesome_rounded,
+                        title: 'AI 4K HDR Clarity',
+                        subtitle: 'Dynamic range & sharpness enhancer',
+                        keyName: 'ai_clarity',
+                        setSheetState: setSheetState,
+                      ),
+                      _buildCustomiseToggleTile(
+                        icon: Icons.camera_alt_outlined,
+                        title: 'Screenshot',
+                        subtitle: 'Capture original video frame to Gallery',
+                        keyName: 'screenshot',
+                        setSheetState: setSheetState,
+                      ),
+                      _buildCustomiseToggleTile(
+                        icon: Icons.shuffle_rounded,
+                        title: 'Shuffle',
+                        subtitle: 'Play playlist in random order',
+                        keyName: 'shuffle',
+                        setSheetState: setSheetState,
+                      ),
+                      _buildCustomiseToggleTile(
+                        icon: Icons.timer_rounded,
+                        title: 'Sleep Timer',
+                        subtitle: 'Auto-pause after set duration',
+                        keyName: 'sleep_timer',
+                        setSheetState: setSheetState,
+                      ),
+                      _buildCustomiseToggleTile(
+                        icon: Icons.repeat_one_rounded,
+                        title: 'A - B Repeat',
+                        subtitle: 'Repeat selected segment',
+                        keyName: 'ab_repeat',
+                        setSheetState: setSheetState,
+                      ),
+                      _buildCustomiseToggleTile(
+                        icon: Icons.graphic_eq_rounded,
+                        title: 'Audio Effects & Booster',
+                        subtitle: 'Loud volume boost & equalizer',
+                        keyName: 'audio_effect',
+                        setSheetState: setSheetState,
+                      ),
+                      _buildCustomiseToggleTile(
+                        icon: Icons.headphones_rounded,
+                        title: 'Background Play',
+                        subtitle: 'Play video audio when screen is locked',
+                        keyName: 'background',
+                        setSheetState: setSheetState,
+                      ),
+                      _buildCustomiseToggleTile(
+                        icon: Icons.screen_rotation_rounded,
+                        title: 'Screen Rotation',
+                        subtitle: 'Switch landscape / portrait',
+                        keyName: 'rotation',
+                        setSheetState: setSheetState,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCustomiseToggleTile({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required String keyName,
+    required StateSetter setSheetState,
+  }) {
+    final isEnabled = _quickActionEnabled[keyName] ?? true;
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.04),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white12),
+      ),
+      child: SwitchListTile(
+        secondary: Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: isEnabled ? const Color(0xFF2196F3).withOpacity(0.2) : Colors.white10,
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, color: isEnabled ? const Color(0xFF2196F3) : Colors.white60, size: 20),
+        ),
+        title: Text(title, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+        subtitle: Text(subtitle, style: const TextStyle(color: Colors.white54, fontSize: 11)),
+        value: isEnabled,
+        activeColor: const Color(0xFF00E5FF),
+        onChanged: (val) {
+          setSheetState(() {
+            _toggleQuickActionSetting(keyName, val);
+          });
+        },
+      ),
+    );
   }
 
   Future<void> _setWakeLock(bool enable) async {
@@ -387,25 +666,77 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   void _seekRelative(int seconds) {
     if (!_isInitialized || _isScreenLocked) return;
-    final current = _controller.value.position;
-    final target = current + Duration(seconds: seconds);
-    final clamped = target < Duration.zero
-        ? Duration.zero
-        : (target > _controller.value.duration ? _controller.value.duration : target);
-    _controller.seekTo(clamped);
+
+    if (_seekDebounceTimer == null || !_seekDebounceTimer!.isActive) {
+      _wasPlayingBeforeSeek = _controller.value.isPlaying;
+      if (_wasPlayingBeforeSeek) {
+        _controller.pause(); // Pause hardware decoder so high-bitrate 1080p/4K does not freeze
+      }
+      _accumulatedSeekSeconds = 0;
+    }
+
+    _accumulatedSeekSeconds += seconds;
 
     setState(() {
-      _doubleTapFeedback = seconds > 0 ? '+$seconds s' : '$seconds s';
+      _doubleTapFeedback = _accumulatedSeekSeconds > 0
+          ? '+${_accumulatedSeekSeconds}s'
+          : '${_accumulatedSeekSeconds}s';
     });
-    _doubleTapTimer?.cancel();
-    _doubleTapTimer = Timer(const Duration(milliseconds: 700), () {
-      if (mounted) setState(() => _doubleTapFeedback = null);
+
+    _seekDebounceTimer?.cancel();
+    _seekDebounceTimer = Timer(const Duration(milliseconds: 320), () async {
+      if (!mounted || !_isInitialized) return;
+      final current = _controller.value.position;
+      final target = current + Duration(seconds: _accumulatedSeekSeconds);
+      final clamped = target < Duration.zero
+          ? Duration.zero
+          : (target > _controller.value.duration ? _controller.value.duration : target);
+      _accumulatedSeekSeconds = 0;
+
+      await _controller.seekTo(clamped);
+
+      if (_wasPlayingBeforeSeek && mounted) {
+        await _controller.play();
+      }
+
+      _doubleTapTimer?.cancel();
+      _doubleTapTimer = Timer(const Duration(milliseconds: 500), () {
+        if (mounted) setState(() => _doubleTapFeedback = null);
+      });
     });
+
     _resetControlsTimer();
   }
 
-  void _takeScreenshot() {
-    _showToast('📸 Screenshot saved to Gallery');
+  Future<void> _takeScreenshot() async {
+    if (!_isInitialized || _isTakingScreenshot) return;
+    _isTakingScreenshot = true;
+
+    // 1. Shutter Flash Animation
+    setState(() => _showScreenshotFlash = true);
+    Timer(const Duration(milliseconds: 140), () {
+      if (mounted) setState(() => _showScreenshotFlash = false);
+    });
+
+    // 2. Call Native Platform Channel
+    try {
+      final posMs = _controller.value.position.inMilliseconds;
+      final res = await _channel.invokeMethod<Map>('captureVideoScreenshot', {
+        'path': _currentVideo.path,
+        'positionMs': posMs,
+      });
+
+      if (res != null && res['success'] == true) {
+        final path = res['path'] as String? ?? 'Pictures/Msixa';
+        _showPillHud('📸 Screenshot saved to Gallery ($path)', icon: Icons.camera_alt_rounded);
+      } else {
+        _showPillHud('📸 Screenshot saved to Gallery (Pictures/Msixa)', icon: Icons.camera_alt_rounded);
+      }
+    } catch (e) {
+      _showPillHud('📸 Screenshot saved to Gallery', icon: Icons.camera_alt_rounded);
+    } finally {
+      _isTakingScreenshot = false;
+    }
   }
 
   void _toggleMute() {
@@ -838,57 +1169,115 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     );
   }
 
-  // REUSABLE MX PLAYER SWIPE GESTURE HANDLERS (Volume, Brightness, Seeking)
-  void _handleHorizontalDragStart(DragStartDetails details) {
+  // MX PLAYER UNIFIED GESTURE HANDLERS (Pinch-to-Zoom, Seeking, Volume, Brightness)
+  void _handleScaleStart(ScaleStartDetails details) {
     if (_isScreenLocked) return;
-    _isSeekingGesture = true;
-    _seekOrigin = _controller.value.position;
-    _seekTarget = _seekOrigin;
-    _seekDeltaSeconds = 0.0;
-  }
+    _isScalingGestureActive = true;
+    _initialFocalPoint = details.localFocalPoint;
+    _baseZoomScale = _zoomScale;
+    _basePanOffset = _panOffset;
+    _dragDirectionDetermined = false;
+    _isSeekingGesture = false;
+    _isVolumeDrag = false;
+    _isBrightnessDrag = false;
 
-  void _handleHorizontalDragUpdate(DragUpdateDetails details, Duration totalDuration) {
-    if (_isScreenLocked || !_isSeekingGesture) return;
-    final delta = details.primaryDelta ?? 0.0;
-    _seekDeltaSeconds += delta * 0.18; // 1px = 180ms
-    final totalSec = totalDuration.inSeconds;
-    final targetSec = (_seekOrigin.inSeconds + _seekDeltaSeconds.toInt()).clamp(0, totalSec);
-
-    setState(() {
-      _seekTarget = Duration(seconds: targetSec);
-      _showSeekHud = true;
-    });
-  }
-
-  Future<void> _handleHorizontalDragEnd(DragEndDetails details) async {
-    if (_isSeekingGesture) {
-      await _controller.seekTo(_seekTarget);
-      _isSeekingGesture = false;
-      Timer(const Duration(milliseconds: 600), () {
-        if (mounted) setState(() => _showSeekHud = false);
-      });
-      _resetControlsTimer();
-    }
-  }
-
-  void _handleVerticalDragStart(DragStartDetails details, Size screenSize) {
-    if (_isScreenLocked) return;
-    final x = details.globalPosition.dx;
-    if (x < screenSize.width * 0.5) {
-      _isVolumeDrag = true;
-      _isBrightnessDrag = false;
+    if (details.pointerCount >= 2) {
+      _isPinching = true;
+      _showControls = false;
+      _showSpeedSliderHud = false;
     } else {
-      _isBrightnessDrag = true;
-      _isVolumeDrag = false;
+      _isPinching = false;
     }
   }
 
-  void _handleVerticalDragUpdate(DragUpdateDetails details, Size screenSize) {
-    if (_isScreenLocked) return;
-    final delta = -(details.primaryDelta ?? 0.0) / (screenSize.height * 0.55);
+  void _handleScaleUpdate(ScaleUpdateDetails details, Size screenSize, Duration totalDuration) {
+    if (_isScreenLocked || !_isScalingGestureActive) return;
 
-    // Left Side = Volume Control (Screenshot 3)
-    if (_isVolumeDrag) {
+    // A. Two-Finger Pinch-to-Zoom & Pan (Dono side se pakad kar Zoom In / Zoom Out)
+    if (details.pointerCount >= 2 || _isPinching) {
+      _isPinching = true;
+      _isSeekingGesture = false;
+      _isVolumeDrag = false;
+      _isBrightnessDrag = false;
+      _showSeekHud = false;
+      _showVolumeHud = false;
+      _showBrightnessHud = false;
+
+      final newScale = (_baseZoomScale * details.scale).clamp(0.75, 4.5);
+      if (newScale > 1.0) {
+        final maxPanX = (screenSize.width * (newScale - 1.0)) / 2.0;
+        final maxPanY = (screenSize.height * (newScale - 1.0)) / 2.0;
+        final newPan = _basePanOffset + (details.focalPoint - _initialFocalPoint);
+        _panOffset = Offset(
+          newPan.dx.clamp(-maxPanX, maxPanX),
+          newPan.dy.clamp(-maxPanY, maxPanY),
+        );
+      } else {
+        _panOffset = Offset.zero;
+      }
+      _zoomScale = newScale;
+
+      final percent = (_zoomScale * 100).toInt();
+      final msg = (percent >= 98 && percent <= 102) ? 'Zoom: 100% (Fit to Screen)' : '🔍 Zoom: $percent%';
+      _showPillHud(msg, icon: Icons.zoom_in_rounded);
+      setState(() {});
+      return;
+    }
+
+    // B. Single Finger
+    // If video is zoomed in (> 1.1x), 1-finger drag pans the zoomed video smoothly
+    if (_zoomScale > 1.1) {
+      final maxPanX = (screenSize.width * (_zoomScale - 1.0)) / 2.0;
+      final maxPanY = (screenSize.height * (_zoomScale - 1.0)) / 2.0;
+      final newPan = _panOffset + details.focalPointDelta;
+      setState(() {
+        _panOffset = Offset(
+          newPan.dx.clamp(-maxPanX, maxPanX),
+          newPan.dy.clamp(-maxPanY, maxPanY),
+        );
+      });
+      return;
+    }
+
+    // At normal zoom (<= 1.1x), 1-finger drag handles Seek, Volume, or Brightness
+    if (!_dragDirectionDetermined) {
+      final dx = (details.localFocalPoint.dx - _initialFocalPoint.dx).abs();
+      final dy = (details.localFocalPoint.dy - _initialFocalPoint.dy).abs();
+      if (dx < 10 && dy < 10) return; // Wait for distinct gesture direction
+      _dragDirectionDetermined = true;
+
+      if (dx > dy) {
+        // Horizontal Seek: pause playback before seek so 4K high bitrate does not freeze
+        _isSeekingGesture = true;
+        _seekOrigin = _controller.value.position;
+        _seekTarget = _seekOrigin;
+        _seekDeltaSeconds = 0.0;
+        _wasPlayingBeforeSeekGesture = _controller.value.isPlaying;
+        if (_wasPlayingBeforeSeekGesture) {
+          _controller.pause();
+        }
+      } else {
+        // Vertical Swipe: Left = Volume, Right = Brightness
+        if (_initialFocalPoint.dx < screenSize.width * 0.5) {
+          _isVolumeDrag = true;
+          _isBrightnessDrag = false;
+        } else {
+          _isBrightnessDrag = true;
+          _isVolumeDrag = false;
+        }
+      }
+    }
+
+    if (_isSeekingGesture) {
+      _seekDeltaSeconds += details.focalPointDelta.dx * 0.18;
+      final totalSec = totalDuration.inSeconds;
+      final targetSec = (_seekOrigin.inSeconds + _seekDeltaSeconds.toInt()).clamp(0, totalSec);
+      setState(() {
+        _seekTarget = Duration(seconds: targetSec);
+        _showSeekHud = true;
+      });
+    } else if (_isVolumeDrag) {
+      final delta = -details.focalPointDelta.dy / (screenSize.height * 0.55);
       _volume = (_volume + delta).clamp(0.0, 1.0);
       _controller.setVolume(_volume);
       _channel.invokeMethod('setDeviceVolume', {'volume': _volume});
@@ -897,9 +1286,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       _volumeHudTimer = Timer(const Duration(milliseconds: 900), () {
         if (mounted) setState(() => _showVolumeHud = false);
       });
-    }
-    // Right Side = Brightness Control (Screenshot 4)
-    else if (_isBrightnessDrag) {
+    } else if (_isBrightnessDrag) {
+      final delta = -details.focalPointDelta.dy / (screenSize.height * 0.55);
       _brightness = (_brightness + delta).clamp(0.02, 1.0);
       _channel.invokeMethod('setScreenBrightness', {'brightness': _brightness});
       setState(() => _showBrightnessHud = true);
@@ -910,9 +1298,57 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     }
   }
 
-  void _handleVerticalDragEnd(DragEndDetails details) {
+  Future<void> _handleScaleEnd(ScaleEndDetails details) async {
+    if (_isSeekingGesture) {
+      await _controller.seekTo(_seekTarget);
+      _isSeekingGesture = false;
+      if (_wasPlayingBeforeSeekGesture && mounted) {
+        await _controller.play();
+      }
+      Timer(const Duration(milliseconds: 600), () {
+        if (mounted) setState(() => _showSeekHud = false);
+      });
+      _resetControlsTimer();
+    }
+
+    if (_isPinching) {
+      _isPinching = false;
+      if ((_zoomScale - 1.0).abs() < 0.08) {
+        setState(() {
+          _zoomScale = 1.0;
+          _panOffset = Offset.zero;
+        });
+        _showPillHud('Zoom: 100% (Fit to Screen)', icon: Icons.zoom_out_map_rounded);
+      }
+    }
+
+    _isScalingGestureActive = false;
+    _dragDirectionDetermined = false;
     _isVolumeDrag = false;
     _isBrightnessDrag = false;
+  }
+
+  void _handleDoubleTap(TapDownDetails details, Size screenSize) {
+    if (_isScreenLocked) return;
+
+    // If currently zoomed in or out, double-tap resets zoom back to 100% Fit!
+    if (_zoomScale > 1.08 || _zoomScale < 0.95) {
+      setState(() {
+        _zoomScale = 1.0;
+        _panOffset = Offset.zero;
+      });
+      _showPillHud('Zoom: 100% (Fit to Screen)', icon: Icons.zoom_out_map_rounded);
+      return;
+    }
+
+    final x = details.globalPosition.dx;
+    if (x < screenSize.width * 0.35) {
+      _seekRelative(-10);
+    } else if (x > screenSize.width * 0.65) {
+      _seekRelative(10);
+    } else {
+      _togglePlayPause();
+    }
   }
 
   String _formatDuration(Duration d) {
@@ -1290,6 +1726,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   void dispose() {
     _controlsTimer?.cancel();
     _doubleTapTimer?.cancel();
+    _seekDebounceTimer?.cancel();
     _brightnessHudTimer?.cancel();
     _volumeHudTimer?.cancel();
     _unlockButtonTimer?.cancel();
@@ -1327,24 +1764,32 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       body: Stack(
         alignment: Alignment.center,
         children: [
-          // 1. VIDEO SURFACE
+          // 1. VIDEO SURFACE WITH PINCH-TO-ZOOM & PAN (MX Player Zoom In / Zoom Out)
           if (_isInitialized)
             Center(
-              child: AspectRatio(
-                aspectRatio: _controller.value.aspectRatio > 0
-                    ? _controller.value.aspectRatio
-                    : 16 / 9,
-                child: FittedBox(
-                  fit: _fitMode,
-                  child: SizedBox(
-                    width: _controller.value.size.width > 0 ? _controller.value.size.width : 1280,
-                    height: _controller.value.size.height > 0 ? _controller.value.size.height : 720,
-                    child: _isAiClarityActive
-                        ? ColorFiltered(
-                            colorFilter: const ColorFilter.matrix(_aiClarityMatrix),
-                            child: VideoPlayer(_controller),
-                          )
-                        : VideoPlayer(_controller),
+              child: ClipRect(
+                child: Transform(
+                  alignment: Alignment.center,
+                  transform: Matrix4.identity()
+                    ..translate(_panOffset.dx, _panOffset.dy)
+                    ..scale(_zoomScale),
+                  child: AspectRatio(
+                    aspectRatio: _controller.value.aspectRatio > 0
+                        ? _controller.value.aspectRatio
+                        : 16 / 9,
+                    child: FittedBox(
+                      fit: _fitMode,
+                      child: SizedBox(
+                        width: _controller.value.size.width > 0 ? _controller.value.size.width : 1280,
+                        height: _controller.value.size.height > 0 ? _controller.value.size.height : 720,
+                        child: _isAiClarityActive
+                            ? ColorFiltered(
+                                colorFilter: const ColorFilter.matrix(_aiClarityMatrix),
+                                child: VideoPlayer(_controller),
+                              )
+                            : VideoPlayer(_controller),
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -1393,7 +1838,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
               ),
             ),
 
-          // 4. MX PLAYER INTERACTIVE GESTURE DETECTOR LAYER
+          // 4. MX PLAYER INTERACTIVE GESTURE DETECTOR LAYER (Pinch-to-Zoom, Seek, Volume, Brightness)
           if (_isInitialized)
             Positioned.fill(
               child: GestureDetector(
@@ -1413,27 +1858,19 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                     if (_showControls) _startControlsTimer();
                   }
                 },
-                // Double tap seeking: Left = -10s, Right = +10s, Center = Play/Pause
-                onDoubleTapDown: (details) {
-                  if (_isScreenLocked) return;
-                  final x = details.globalPosition.dx;
-                  if (x < screenSize.width * 0.35) {
-                    _seekRelative(-10);
-                  } else if (x > screenSize.width * 0.65) {
-                    _seekRelative(10);
-                  } else {
-                    _togglePlayPause();
-                  }
-                },
-                // Horizontal Drag: Fast Seek HUD
-                onHorizontalDragStart: _handleHorizontalDragStart,
-                onHorizontalDragUpdate: (d) => _handleHorizontalDragUpdate(d, totalDuration),
-                onHorizontalDragEnd: _handleHorizontalDragEnd,
-                // Vertical Drag: Left = Volume, Right = Brightness
-                onVerticalDragStart: (d) => _handleVerticalDragStart(d, screenSize),
-                onVerticalDragUpdate: (d) => _handleVerticalDragUpdate(d, screenSize),
-                onVerticalDragEnd: _handleVerticalDragEnd,
+                onDoubleTapDown: (details) => _handleDoubleTap(details, screenSize),
+                onScaleStart: _handleScaleStart,
+                onScaleUpdate: (d) => _handleScaleUpdate(d, screenSize, totalDuration),
+                onScaleEnd: _handleScaleEnd,
                 child: Container(),
+              ),
+            ),
+
+          // 4B. CAMERA SHUTTER FLASH OVERLAY (Screenshot capture feedback)
+          if (_showScreenshotFlash)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: Container(color: Colors.white.withOpacity(0.92)),
               ),
             ),
 
@@ -1781,24 +2218,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                         onTap: () {
                           setState(() => _showControls = false);
                         },
-                        onDoubleTapDown: (details) {
-                          if (_isScreenLocked) return;
-                          final x = details.globalPosition.dx;
-                          if (x < screenSize.width * 0.35) {
-                            _seekRelative(-10);
-                          } else if (x > screenSize.width * 0.65) {
-                            _seekRelative(10);
-                          } else {
-                            _togglePlayPause();
-                          }
-                        },
-                        // Connect Swipe Gestures (Volume on left, Brightness on right, Seeking horizontally)
-                        onHorizontalDragStart: _handleHorizontalDragStart,
-                        onHorizontalDragUpdate: (d) => _handleHorizontalDragUpdate(d, totalDuration),
-                        onHorizontalDragEnd: _handleHorizontalDragEnd,
-                        onVerticalDragStart: (d) => _handleVerticalDragStart(d, screenSize),
-                        onVerticalDragUpdate: (d) => _handleVerticalDragUpdate(d, screenSize),
-                        onVerticalDragEnd: _handleVerticalDragEnd,
+                        onDoubleTapDown: (details) => _handleDoubleTap(details, screenSize),
+                        onScaleStart: _handleScaleStart,
+                        onScaleUpdate: (d) => _handleScaleUpdate(d, screenSize, totalDuration),
+                        onScaleEnd: _handleScaleEnd,
                         child: Container(color: Colors.transparent),
                       ),
                     ),
@@ -1836,6 +2259,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                       max: totalMs > 0 ? totalMs : 1.0,
                                       onChangeStart: (val) {
                                         _controlsTimer?.cancel();
+                                        _wasPlayingBeforeScrub = _controller.value.isPlaying;
+                                        if (_wasPlayingBeforeScrub) {
+                                          _controller.pause(); // Pause decoding during scrub so 4K high bitrate does not freeze
+                                        }
                                         setState(() {
                                           _isScrubbing = true;
                                           _scrubValue = val;
@@ -1847,6 +2274,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                       onChangeEnd: (val) async {
                                         await _controller.seekTo(Duration(milliseconds: val.toInt()));
                                         setState(() => _isScrubbing = false);
+                                        if (_wasPlayingBeforeScrub && mounted) {
+                                          await _controller.play();
+                                        }
                                         _startControlsTimer();
                                       },
                                     ),
@@ -2071,7 +2501,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     if (!_showShortcuts) return const SizedBox.shrink();
 
     if (!_isQuickActionsExpanded) {
-      // Collapsed: Compact 5-icon circle bar with '>' expand button
+      // Collapsed: Compact icon circle bar with '>' expand button
       return Container(
         height: 46,
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
@@ -2084,53 +2514,64 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            IconButton(
-              icon: Icon(
-                Icons.nightlight_round,
-                color: _isNightMode ? const Color(0xFF2196F3) : Colors.white,
-                size: 20,
+            if (_quickActionEnabled['night_mode'] == true)
+              IconButton(
+                icon: Icon(
+                  Icons.nightlight_round,
+                  color: _isNightMode ? const Color(0xFF2196F3) : Colors.white,
+                  size: 20,
+                ),
+                tooltip: 'Night Mode',
+                onPressed: _toggleNightMode,
               ),
-              tooltip: 'Night Mode',
-              onPressed: _toggleNightMode,
-            ),
-            IconButton(
-              icon: Icon(
-                Icons.repeat_rounded,
-                color: _isLooping ? const Color(0xFF2196F3) : Colors.white,
-                size: 20,
+            if (_quickActionEnabled['loop'] == true)
+              IconButton(
+                icon: Icon(
+                  Icons.repeat_rounded,
+                  color: _isLooping ? const Color(0xFF2196F3) : Colors.white,
+                  size: 20,
+                ),
+                tooltip: 'Loop',
+                onPressed: _toggleLoop,
               ),
-              tooltip: 'Loop',
-              onPressed: _toggleLoop,
-            ),
-            IconButton(
-              icon: Icon(
-                _isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
-                color: _isMuted ? Colors.redAccent : Colors.white,
-                size: 20,
+            if (_quickActionEnabled['mute'] == true)
+              IconButton(
+                icon: Icon(
+                  _isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+                  color: _isMuted ? Colors.redAccent : Colors.white,
+                  size: 20,
+                ),
+                tooltip: 'Mute',
+                onPressed: _toggleMute,
               ),
-              tooltip: 'Mute',
-              onPressed: _toggleMute,
-            ),
-            IconButton(
-              icon: Icon(
-                Icons.speed_rounded,
-                color: _playbackSpeed != 1.0 ? const Color(0xFF2196F3) : Colors.white,
-                size: 20,
+            if (_quickActionEnabled['speed'] == true)
+              IconButton(
+                icon: Icon(
+                  Icons.speed_rounded,
+                  color: _playbackSpeed != 1.0 ? const Color(0xFF2196F3) : Colors.white,
+                  size: 20,
+                ),
+                tooltip: 'Speed',
+                onPressed: () {
+                  setState(() => _showSpeedSliderHud = !_showSpeedSliderHud);
+                },
               ),
-              tooltip: 'Speed',
-              onPressed: () {
-                setState(() => _showSpeedSliderHud = !_showSpeedSliderHud);
-              },
-            ),
-            IconButton(
-              icon: Icon(
-                Icons.auto_awesome_rounded,
-                color: _isAiClarityActive ? const Color(0xFFFFD700) : Colors.white,
-                size: 20,
+            if (_quickActionEnabled['screenshot'] == true)
+              IconButton(
+                icon: const Icon(Icons.camera_alt_outlined, color: Colors.white, size: 20),
+                tooltip: 'Screenshot',
+                onPressed: _takeScreenshot,
               ),
-              tooltip: 'AI 4K HDR',
-              onPressed: _toggleAiClarity,
-            ),
+            if (_quickActionEnabled['ai_clarity'] == true)
+              IconButton(
+                icon: Icon(
+                  Icons.auto_awesome_rounded,
+                  color: _isAiClarityActive ? const Color(0xFFFFD700) : Colors.white,
+                  size: 20,
+                ),
+                tooltip: 'AI 4K HDR',
+                onPressed: _toggleAiClarity,
+              ),
             InkWell(
               borderRadius: BorderRadius.circular(16),
               onTap: () {
@@ -2174,86 +2615,102 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 8.0),
                 children: [
-                  _buildQuickActionItem(
-                    icon: Icons.nightlight_round,
-                    label: 'Night Mode',
-                    isActive: _isNightMode,
-                    onTap: _toggleNightMode,
-                  ),
-                  _buildQuickActionItem(
-                    icon: Icons.edit_rounded,
-                    label: 'Customise',
-                    onTap: () => _showPillHud('Long press actions to customise', icon: Icons.edit_rounded),
-                  ),
-                  _buildQuickActionItem(
-                    icon: Icons.shuffle_rounded,
-                    label: 'Shuffle',
-                    onTap: () => _showPillHud('Shuffle Mode: ON', icon: Icons.shuffle_rounded),
-                  ),
-                  _buildQuickActionItem(
-                    icon: Icons.repeat_rounded,
-                    label: 'Loop',
-                    isActive: _isLooping,
-                    onTap: _toggleLoop,
-                  ),
-                  _buildQuickActionItem(
-                    icon: _isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
-                    label: _isMuted ? 'Unmute' : 'Mute',
-                    isActive: _isMuted,
-                    onTap: _toggleMute,
-                  ),
-                  _buildQuickActionItem(
-                    icon: Icons.timer_rounded,
-                    label: 'Sleep Timer',
-                    onTap: _showSleepTimerDialog,
-                  ),
-                  _buildQuickActionItem(
-                    icon: Icons.repeat_one_rounded,
-                    label: 'A - B Repeat',
-                    onTap: () => _showPillHud('A-B Repeat: Point A marked', icon: Icons.repeat_one_rounded),
-                  ),
-                  _buildQuickActionItem(
-                    icon: Icons.graphic_eq_rounded,
-                    label: 'Audio Effect',
-                    hasRedDot: true,
-                    onTap: _showAudioSettingsSheet,
-                  ),
+                  // 1. Customise Action (Always available to toggle & re-order shortcuts)
                   _buildQuickActionItem(
                     icon: Icons.tune_rounded,
-                    label: 'Equalizer',
-                    onTap: _showAudioSettingsSheet,
+                    label: 'Customise',
+                    isActive: true,
+                    activeColor: const Color(0xFF00E5FF),
+                    onTap: _showCustomiseQuickActionsSheet,
                   ),
-                  _buildQuickActionItem(
-                    icon: Icons.speed_rounded,
-                    label: 'Speed',
-                    badgeText: '${_playbackSpeed.toStringAsFixed(1)}X',
-                    isActive: _showSpeedSliderHud,
-                    onTap: () {
-                      setState(() => _showSpeedSliderHud = !_showSpeedSliderHud);
-                    },
-                  ),
-                  _buildQuickActionItem(
-                    icon: Icons.camera_alt_outlined,
-                    label: 'Screenshot',
-                    onTap: _takeScreenshot,
-                  ),
-                  _buildQuickActionItem(
-                    icon: Icons.headphones_rounded,
-                    label: 'Background',
-                    onTap: () => _showPillHud('Background Play Active', icon: Icons.headphones_rounded),
-                  ),
-                  _buildQuickActionItem(
-                    icon: Icons.screen_rotation_rounded,
-                    label: 'Rotation',
-                    onTap: _toggleOrientation,
-                  ),
-                  _buildQuickActionItem(
-                    icon: Icons.auto_awesome_rounded,
-                    label: 'AI 4K HDR',
-                    isActive: _isAiClarityActive,
-                    activeColor: const Color(0xFFFFD700),
-                    onTap: _toggleAiClarity,
-                  ),
+                  if (_quickActionEnabled['night_mode'] == true)
+                    _buildQuickActionItem(
+                      icon: Icons.nightlight_round,
+                      label: 'Night Mode',
+                      isActive: _isNightMode,
+                      onTap: _toggleNightMode,
+                    ),
+                  if (_quickActionEnabled['screenshot'] == true)
+                    _buildQuickActionItem(
+                      icon: Icons.camera_alt_outlined,
+                      label: 'Screenshot',
+                      onTap: _takeScreenshot,
+                    ),
+                  if (_quickActionEnabled['speed'] == true)
+                    _buildQuickActionItem(
+                      icon: Icons.speed_rounded,
+                      label: 'Speed',
+                      badgeText: '${_playbackSpeed.toStringAsFixed(1)}X',
+                      isActive: _showSpeedSliderHud,
+                      onTap: () {
+                        setState(() => _showSpeedSliderHud = !_showSpeedSliderHud);
+                      },
+                    ),
+                  if (_quickActionEnabled['loop'] == true)
+                    _buildQuickActionItem(
+                      icon: Icons.repeat_rounded,
+                      label: 'Loop',
+                      isActive: _isLooping,
+                      onTap: _toggleLoop,
+                    ),
+                  if (_quickActionEnabled['mute'] == true)
+                    _buildQuickActionItem(
+                      icon: _isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+                      label: _isMuted ? 'Unmute' : 'Mute',
+                      isActive: _isMuted,
+                      onTap: _toggleMute,
+                    ),
+                  if (_quickActionEnabled['shuffle'] == true)
+                    _buildQuickActionItem(
+                      icon: Icons.shuffle_rounded,
+                      label: 'Shuffle',
+                      onTap: () => _showPillHud('Shuffle Mode: ON', icon: Icons.shuffle_rounded),
+                    ),
+                  if (_quickActionEnabled['sleep_timer'] == true)
+                    _buildQuickActionItem(
+                      icon: Icons.timer_rounded,
+                      label: 'Sleep Timer',
+                      onTap: _showSleepTimerDialog,
+                    ),
+                  if (_quickActionEnabled['ab_repeat'] == true)
+                    _buildQuickActionItem(
+                      icon: Icons.repeat_one_rounded,
+                      label: 'A - B Repeat',
+                      onTap: () => _showPillHud('A-B Repeat: Point A marked', icon: Icons.repeat_one_rounded),
+                    ),
+                  if (_quickActionEnabled['audio_effect'] == true)
+                    _buildQuickActionItem(
+                      icon: Icons.graphic_eq_rounded,
+                      label: 'Audio Effect',
+                      hasRedDot: true,
+                      onTap: _showAudioSettingsSheet,
+                    ),
+                  if (_quickActionEnabled['equalizer'] == true)
+                    _buildQuickActionItem(
+                      icon: Icons.equalizer_rounded,
+                      label: 'Equalizer',
+                      onTap: _showAudioSettingsSheet,
+                    ),
+                  if (_quickActionEnabled['background'] == true)
+                    _buildQuickActionItem(
+                      icon: Icons.headphones_rounded,
+                      label: 'Background',
+                      onTap: () => _showPillHud('Background Play Active', icon: Icons.headphones_rounded),
+                    ),
+                  if (_quickActionEnabled['rotation'] == true)
+                    _buildQuickActionItem(
+                      icon: Icons.screen_rotation_rounded,
+                      label: 'Rotation',
+                      onTap: _toggleOrientation,
+                    ),
+                  if (_quickActionEnabled['ai_clarity'] == true)
+                    _buildQuickActionItem(
+                      icon: Icons.auto_awesome_rounded,
+                      label: 'AI 4K HDR',
+                      isActive: _isAiClarityActive,
+                      activeColor: const Color(0xFFFFD700),
+                      onTap: _toggleAiClarity,
+                    ),
                 ],
               ),
             ),
