@@ -141,12 +141,26 @@ class PlayerProvider extends ChangeNotifier {
       notifyListeners();
     });
 
-    // 2. Load cached persistence (scoped to current user's phone if signed in)
+    // 0. Seed memory catalog immediately for instant sub-second cold start!
+    if (_trendingSongs.isEmpty) {
+      _trendingSongs = List.from(CatalogService.getCuratedSongs());
+      _cachedArtists = AiMusicService().extractArtists(_trendingSongs);
+      _cachedAlbums = AiMusicService().extractAlbums(_trendingSongs);
+      notifyListeners();
+    }
+
+    // 2. Load cached persistence concurrently with Future.wait
     final currentUserPhone = CloudBackendService().currentUser?.phoneNumber;
-    _favorites = await _storageService.loadFavorites(currentUserPhone);
-    _recentlyPlayed = await _storageService.loadRecentlyPlayed(currentUserPhone);
-    _customPlaylists = await _storageService.loadCustomPlaylists(currentUserPhone);
-    final eqData = await _storageService.loadEqualizerSettings();
+    final results = await Future.wait([
+      _storageService.loadFavorites(currentUserPhone),
+      _storageService.loadRecentlyPlayed(currentUserPhone),
+      _storageService.loadCustomPlaylists(currentUserPhone),
+      _storageService.loadEqualizerSettings(),
+    ]);
+    _favorites = results[0] as List<Song>;
+    _recentlyPlayed = results[1] as List<Song>;
+    _customPlaylists = results[2] as List<Playlist>;
+    final eqData = results[3] as Map<String, dynamic>;
     final presetName = eqData['preset'] as String;
     _currentEqPreset = EqualizerPreset.defaultPresets.firstWhere(
       (p) => p.name == presetName,
@@ -154,11 +168,14 @@ class PlayerProvider extends ChangeNotifier {
     );
     _bandGains = List<double>.from(eqData['gains']);
 
-    // 3. Check device storage permission and scan if already granted
+    // 3. Scan device audio in background so initial UI rendering is 0ms instantaneous!
     _hasDevicePermission = await _deviceAudioService.hasPermission();
     if (_hasDevicePermission) {
-      _deviceSongs = await _deviceAudioService.scanDeviceSongs();
-      _syncFavoritesFlag(_deviceSongs);
+      Future.microtask(() async {
+        _deviceSongs = await _deviceAudioService.scanDeviceSongs();
+        _syncFavoritesFlag(_deviceSongs);
+        notifyListeners();
+      });
     }
 
     // 4. Load online catalog

@@ -245,6 +245,45 @@ class R2StorageService extends ChangeNotifier {
   /// Total Cloudflare R2 Standard Free Plan Quota: 10 GB per month (10,737,418,240 bytes)
   static const int totalFreeQuotaBytes = 10 * 1024 * 1024 * 1024;
 
+  int _locallyTrackedUploadedBytes = 0;
+
+  void recordSongUploaded(int bytes) {
+    _locallyTrackedUploadedBytes += bytes;
+    notifyListeners();
+  }
+
+  void recordSongDeleted(int bytes) {
+    _locallyTrackedUploadedBytes = (_locallyTrackedUploadedBytes - bytes).clamp(0, 100000000000);
+    notifyListeners();
+  }
+
+  Map<String, dynamic> getInstantEstimatedStats({int songsCount = 0}) {
+    final count = songsCount > 0 ? songsCount : 17;
+    final totalObjectsCount = count + 4;
+    final totalBytesUsed = (count * 6.2 * 1024 * 1024).toInt() + (52 * 1024 * 1024) + _locallyTrackedUploadedBytes;
+    final remainingBytes = (totalFreeQuotaBytes - totalBytesUsed).clamp(0, totalFreeQuotaBytes);
+    final usedMb = (totalBytesUsed / (1024 * 1024));
+    final usedGb = (totalBytesUsed / (1024 * 1024 * 1024));
+    final remainingGb = (remainingBytes / (1024 * 1024 * 1024));
+    final usedPercentage = ((totalBytesUsed / totalFreeQuotaBytes) * 100).clamp(0.0, 100.0);
+    final estimatedSongsRemaining = (remainingBytes / (6.0 * 1024 * 1024)).floor();
+
+    return {
+      'totalLimitBytes': totalFreeQuotaBytes,
+      'totalLimitGb': 10.0,
+      'usedBytes': totalBytesUsed,
+      'usedMb': usedMb,
+      'usedGb': usedGb,
+      'remainingBytes': remainingBytes,
+      'remainingGb': remainingGb,
+      'usedPercentage': usedPercentage,
+      'totalObjects': totalObjectsCount,
+      'estimatedSongsRemaining': estimatedSongsRemaining,
+      'isLiveQueried': false,
+    };
+  }
+
+
   /// Query live bucket storage usage via S3 ListObjectsV2 API, with local accurate fallback
   Future<Map<String, dynamic>> getStorageUsageStats({int knownSongsCount = 0}) async {
     int totalBytesUsed = 0;
@@ -475,6 +514,7 @@ class R2StorageService extends ChangeNotifier {
     );
 
     if (success) {
+      recordSongUploaded(bytes.length);
       onProgress?.call(1.0);
       return 'https://$_publicDomain/$objectKey';
     } else {
@@ -516,6 +556,7 @@ class R2StorageService extends ChangeNotifier {
     );
 
     if (success) {
+      recordSongUploaded(bytes.length);
       onProgress?.call(1.0);
       return 'https://$_publicDomain/$objectKey';
     } else {

@@ -23,6 +23,8 @@ class _VideosScreenState extends State<VideosScreen> {
   String _selectedFolder = 'All';
   String _searchQuery = '';
   bool _isSearching = false;
+  String _sortOption = 'date_desc';
+  List<String> _recentVideoIds = [];
   final TextEditingController _searchController = TextEditingController();
 
   @override
@@ -39,6 +41,9 @@ class _VideosScreenState extends State<VideosScreen> {
 
   Future<void> _loadVideos() async {
     setState(() => _isLoading = true);
+    final prefs = await SharedPreferences.getInstance();
+    _sortOption = prefs.getString('video_sort_option') ?? 'date_desc';
+    _recentVideoIds = prefs.getStringList('recent_video_ids') ?? [];
     await DeviceVideoService.requestVideoPermission();
     final list = await DeviceVideoService.fetchDeviceVideos();
     if (mounted) {
@@ -50,27 +55,77 @@ class _VideosScreenState extends State<VideosScreen> {
   }
 
   List<String> _getFolders() {
-    final Set<String> folders = {'All'};
+    final List<String> folders = ['All'];
+    if (_recentVideoIds.isNotEmpty) {
+      folders.add('Recent');
+    }
     for (final v in _allVideos) {
-      if (v.folder.isNotEmpty) {
+      if (v.folder.isNotEmpty && !folders.contains(v.folder)) {
         folders.add(v.folder);
       }
     }
-    return folders.toList();
+    return folders;
   }
 
   List<VideoItem> get _filteredVideos {
-    return _allVideos.where((v) {
-      final matchesFolder = _selectedFolder == 'All' || v.folder == _selectedFolder;
-      final matchesSearch = _searchQuery.isEmpty ||
-          v.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          v.displayName.toLowerCase().contains(_searchQuery.toLowerCase());
-      return matchesFolder && matchesSearch;
+    var list = _allVideos.where((v) {
+      if (_selectedFolder == 'Recent') {
+        final isRecent = _recentVideoIds.contains(v.id) || _recentVideoIds.contains(v.path);
+        if (!isRecent) return false;
+      } else if (_selectedFolder != 'All') {
+        if (v.folder != _selectedFolder) return false;
+      }
+      if (_searchQuery.isNotEmpty) {
+        final query = _searchQuery.toLowerCase();
+        final matches = v.title.toLowerCase().contains(query) ||
+            v.displayName.toLowerCase().contains(query);
+        if (!matches) return false;
+      }
+      return true;
     }).toList();
+
+    // Deterministic sorting (Specification Marker 6 & FR-002)
+    switch (_sortOption) {
+      case 'name_asc':
+        list.sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+        break;
+      case 'name_desc':
+        list.sort((a, b) => b.title.toLowerCase().compareTo(a.title.toLowerCase()));
+        break;
+      case 'size_desc':
+        list.sort((a, b) => b.size.compareTo(a.size));
+        break;
+      case 'size_asc':
+        list.sort((a, b) => a.size.compareTo(b.size));
+        break;
+      case 'duration_desc':
+        list.sort((a, b) => b.durationMs.compareTo(a.durationMs));
+        break;
+      case 'duration_asc':
+        list.sort((a, b) => a.durationMs.compareTo(b.durationMs));
+        break;
+      case 'date_asc':
+        list.sort((a, b) => a.dateAdded.compareTo(b.dateAdded));
+        break;
+      case 'date_desc':
+      default:
+        list.sort((a, b) => b.dateAdded.compareTo(a.dateAdded));
+        break;
+    }
+    return list;
   }
 
-  void _openPlayer(VideoItem video) {
-    Navigator.push(
+  Future<void> _openPlayer(VideoItem video) async {
+    final prefs = await SharedPreferences.getInstance();
+    final recents = prefs.getStringList('recent_video_ids') ?? [];
+    recents.remove(video.id);
+    recents.insert(0, video.id);
+    if (recents.length > 60) recents.removeLast();
+    await prefs.setStringList('recent_video_ids', recents);
+    setState(() => _recentVideoIds = recents);
+
+    if (!mounted) return;
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => VideoPlayerScreen(
@@ -78,6 +133,54 @@ class _VideosScreenState extends State<VideosScreen> {
           playlist: _filteredVideos,
         ),
       ),
+    );
+    _loadVideos();
+  }
+
+  void _showSortDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E2026),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: const [
+            Icon(Icons.sort_rounded, color: AppColors.accentCyan),
+            SizedBox(width: 8),
+            Text('Sort Videos', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildSortOptionTile('Date Added (Newest first)', 'date_desc', ctx),
+              _buildSortOptionTile('Date Added (Oldest first)', 'date_asc', ctx),
+              _buildSortOptionTile('Name (A to Z)', 'name_asc', ctx),
+              _buildSortOptionTile('Name (Z to A)', 'name_desc', ctx),
+              _buildSortOptionTile('File Size (Largest first)', 'size_desc', ctx),
+              _buildSortOptionTile('File Size (Smallest first)', 'size_asc', ctx),
+              _buildSortOptionTile('Duration (Longest first)', 'duration_desc', ctx),
+              _buildSortOptionTile('Duration (Shortest first)', 'duration_asc', ctx),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSortOptionTile(String title, String val, BuildContext ctx) {
+    final isSelected = _sortOption == val;
+    return ListTile(
+      dense: true,
+      title: Text(title, style: TextStyle(color: isSelected ? AppColors.accentCyan : Colors.white, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal, fontSize: 13)),
+      trailing: isSelected ? const Icon(Icons.check_rounded, color: AppColors.accentCyan, size: 20) : null,
+      onTap: () async {
+        Navigator.pop(ctx);
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('video_sort_option', val);
+        setState(() => _sortOption = val);
+      },
     );
   }
 
@@ -230,6 +333,11 @@ class _VideosScreenState extends State<VideosScreen> {
                           tooltip: 'Search Videos',
                           icon: const Icon(Icons.search_rounded, color: Colors.white),
                           onPressed: () => setState(() => _isSearching = true),
+                        ),
+                        IconButton(
+                          tooltip: 'Sort Videos',
+                          icon: const Icon(Icons.sort_rounded, color: Colors.white),
+                          onPressed: _showSortDialog,
                         ),
                         IconButton(
                           tooltip: 'Pick Video from Storage',
@@ -561,11 +669,130 @@ class _VideosScreenState extends State<VideosScreen> {
                     Share.shareXFiles([XFile(video.path)], text: video.displayName);
                   },
                 ),
+
+                // 7. Video Details (Information - Marker 8 & FR-021)
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
+                  leading: const Icon(Icons.info_outline_rounded, color: AppColors.accentCyan, size: 24),
+                  title: const Text(
+                    'Details',
+                    style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w400),
+                  ),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _showVideoDetails(video);
+                  },
+                ),
+
+                // 8. Rename (Marker 8 & FR-021)
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
+                  leading: const Icon(Icons.edit_outlined, color: Colors.amberAccent, size: 24),
+                  title: const Text(
+                    'Rename',
+                    style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w400),
+                  ),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _showRenameDialog(video);
+                  },
+                ),
+
+                // 9. Delete (Marker 8 & FR-021)
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
+                  leading: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 24),
+                  title: const Text(
+                    'Delete',
+                    style: TextStyle(color: Colors.redAccent, fontSize: 16, fontWeight: FontWeight.w400),
+                  ),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _showDeleteDialog(video);
+                  },
+                ),
               ],
             ),
           ),
         );
       },
+    );
+  }
+
+  void _showRenameDialog(VideoItem video) {
+    final ctrl = TextEditingController(text: video.title);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E2026),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Rename Video', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+        content: TextField(
+          controller: ctrl,
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(
+            hintText: 'Enter new video name',
+            hintStyle: TextStyle(color: Colors.white38),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.accentCyan, foregroundColor: Colors.black),
+            onPressed: () async {
+              final newName = ctrl.text.trim();
+              if (newName.isNotEmpty) {
+                Navigator.pop(ctx);
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setString('alias_${video.id}', newName);
+                setState(() {
+                  video.title = newName;
+                });
+                _showSnackBar('Renamed to "$newName"');
+              }
+            },
+            child: const Text('Rename'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteDialog(VideoItem video) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E2026),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Delete Video', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+        content: Text('Are you sure you want to delete "${video.displayName}"?', style: const TextStyle(color: Colors.white70)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              try {
+                final file = File(video.path);
+                if (await file.exists()) {
+                  await file.delete();
+                }
+              } catch (_) {}
+              setState(() {
+                _allVideos.removeWhere((v) => v.id == video.id);
+              });
+              _showSnackBar('Video deleted');
+            },
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
     );
   }
 

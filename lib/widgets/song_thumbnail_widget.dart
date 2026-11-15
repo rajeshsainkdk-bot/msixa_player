@@ -2,7 +2,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../models/song.dart';
-import '../services/ai_artwork_service.dart';
 import '../theme/app_colors.dart';
 import 'visualizer_bars.dart';
 
@@ -34,7 +33,8 @@ class SongThumbnailWidget extends StatelessWidget {
         genreLower.contains('shyam') ||
         genreLower.contains('krishna') ||
         titleLower.contains('hanuman') ||
-        titleLower.contains('chalisa')) {
+        titleLower.contains('chalisa') ||
+        genreLower.contains('spiritual')) {
       return const [Color(0xFFE65100), Color(0xFFFF6D00), Color(0xFFFFD54F)];
     } else if (genreLower.contains('dj') || genreLower.contains('remix') || genreLower.contains('dance')) {
       return const [Color(0xFF7C4DFF), Color(0xFF00E5FF), Color(0xFF00B0FF)];
@@ -78,12 +78,14 @@ class SongThumbnailWidget extends StatelessWidget {
     return Icons.album_rounded;
   }
 
-  /// Professional, Studio-Grade AI Album Cover Template
-  Widget _buildProceduralArt(BuildContext context) {
+  /// Studio-Grade YouTube Music Style Dynamic Thumbnail Card
+  Widget _buildYouTubeStyleCard(BuildContext context) {
     final gradient = getGradientForSong(song);
     final icon = getIconForGenre(song.genre);
-    final initial = song.title.trim().isNotEmpty ? song.title.trim()[0].toUpperCase() : 'M';
-    final isLarge = size >= 65;
+    final isCompact = size <= 60;
+    final cleanTitle = song.title.replaceAll(RegExp(r'\.(mp3|m4a|wav|aac|flac)$', caseSensitive: false), '').trim();
+    final cleanArtist = song.artist.trim().isNotEmpty ? song.artist.trim() : 'Msixa Music';
+    final genreTag = song.genre.toUpperCase();
 
     return Container(
       width: size,
@@ -103,8 +105,8 @@ class SongThumbnailWidget extends StatelessWidget {
           ),
         ],
         border: Border.all(
-          color: Colors.white.withOpacity(0.18),
-          width: 1,
+          color: Colors.white.withOpacity(0.20),
+          width: 0.8,
         ),
       ),
       child: ClipRRect(
@@ -112,155 +114,153 @@ class SongThumbnailWidget extends StatelessWidget {
         child: Stack(
           alignment: Alignment.center,
           children: [
-            // Layer 1: Vinyl Groove Texture
+            // Layer 1: Ambient Background Pattern & Watermark Icon
+            Positioned(
+              right: -size * 0.15,
+              bottom: -size * 0.15,
+              child: Icon(
+                icon,
+                size: size * 0.72,
+                color: Colors.white.withOpacity(0.14),
+              ),
+            ),
+
+            // Layer 2: Subtle Vinyl Grooves Texture
             Positioned.fill(
               child: CustomPaint(
                 painter: _VinylGroovesPainter(),
               ),
             ),
 
-            // Layer 2: Subtle Ambient Icon Watermark
-            Positioned(
-              right: -size * 0.12,
-              bottom: -size * 0.12,
-              child: Icon(
-                icon,
-                size: size * 0.7,
-                color: Colors.white.withOpacity(0.12),
+            // Layer 3: Dark Vignette Gradient for high readability
+            Positioned.fill(
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withOpacity(0.15),
+                      Colors.black.withOpacity(0.65),
+                    ],
+                  ),
+                ),
               ),
             ),
 
-            // Layer 3: Studio Seal & Audio Quality Badge (Top Left)
+            // Layer 4: Top Studio Pill (e.g. "HD", "MASTER")
             Positioned(
-              top: isLarge ? 8 : 4,
-              left: isLarge ? 8 : 4,
+              top: isCompact ? 3 : 6,
+              left: isCompact ? 3 : 6,
               child: Container(
-                padding: EdgeInsets.symmetric(horizontal: isLarge ? 5 : 3, vertical: isLarge ? 2 : 1),
+                padding: EdgeInsets.symmetric(horizontal: isCompact ? 3 : 5, vertical: 1),
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.45),
-                  borderRadius: BorderRadius.circular(4),
-                  border: Border.all(
-                    color: Colors.white.withOpacity(0.2),
-                    width: 0.5,
-                  ),
+                  color: Colors.black.withOpacity(0.55),
+                  borderRadius: BorderRadius.circular(3),
+                  border: Border.all(color: Colors.white24, width: 0.5),
                 ),
                 child: Text(
-                  'MASTER',
+                  genreTag.length > 7 ? genreTag.substring(0, 7) : genreTag,
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.9),
-                    fontSize: isLarge ? 7 : 5,
+                    color: Colors.white.withOpacity(0.95),
+                    fontSize: isCompact ? 5.5 : 7.5,
                     fontWeight: FontWeight.w900,
-                    letterSpacing: 0.8,
+                    letterSpacing: 0.6,
                   ),
                 ),
               ),
             ),
 
-            // Layer 4: Center Visual (Monogram or 3D Musical Waveform)
-            if (!isLarge)
+            // Layer 5: Main Content Typography (YouTube Music Thumbnail Look)
+            if (isCompact)
               Center(
-                child: Container(
-                  width: size * 0.52,
-                  height: size * 0.52,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.black.withOpacity(0.35),
-                    border: Border.all(
-                      color: Colors.white.withOpacity(0.25),
-                      width: 1,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.3),
-                        blurRadius: 6,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const SizedBox(height: 6),
+                      Text(
+                        cleanTitle,
+                        maxLines: 2,
+                        textAlign: TextAlign.center,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: size * 0.16,
+                          fontWeight: FontWeight.w900,
+                          height: 1.1,
+                          shadows: const [
+                            Shadow(color: Colors.black, blurRadius: 4, offset: Offset(0, 1)),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        cleanArtist,
+                        maxLines: 1,
+                        textAlign: TextAlign.center,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.85),
+                          fontSize: size * 0.11,
+                          fontWeight: FontWeight.w600,
+                          shadows: const [
+                            Shadow(color: Colors.black, blurRadius: 3),
+                          ],
+                        ),
                       ),
                     ],
                   ),
-                  child: Center(
-                    child: Text(
-                      initial,
+                ),
+              )
+            else
+              Positioned(
+                bottom: 8,
+                left: 8,
+                right: 8,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      cleanTitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: size * 0.28,
+                        fontSize: size * 0.09,
                         fontWeight: FontWeight.w900,
                         shadows: const [
-                          Shadow(
-                            color: Colors.black87,
-                            blurRadius: 4,
-                            offset: Offset(0, 1),
-                          ),
+                          Shadow(color: Colors.black, blurRadius: 6, offset: Offset(0, 2)),
                         ],
                       ),
                     ),
-                  ),
+                    const SizedBox(height: 2),
+                    Text(
+                      cleanArtist,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.85),
+                        fontSize: size * 0.065,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
               ),
 
-            // Layer 5: Large Cover Typography Layout (when size >= 65)
-            if (isLarge) ...[
-              Center(
-                child: Container(
-                  width: size * 0.45,
-                  height: size * 0.45,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.black.withOpacity(0.3),
-                    border: Border.all(color: Colors.white.withOpacity(0.25)),
-                  ),
-                  child: Center(
-                    child: Icon(
-                      icon,
-                      color: Colors.white.withOpacity(0.9),
-                      size: size * 0.24,
-                    ),
-                  ),
-                ),
+            // Layer 6: Mini Audio Wave Indicator at bottom
+            Positioned(
+              bottom: 2,
+              right: 4,
+              child: Icon(
+                Icons.graphic_eq_rounded,
+                size: isCompact ? 10 : 16,
+                color: Colors.white.withOpacity(0.70),
               ),
-              Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        Colors.transparent,
-                        Colors.black.withOpacity(0.85),
-                      ],
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        song.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Text(
-                        song.artist,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.7),
-                          fontSize: 8,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
+            ),
           ],
         ),
       ),
@@ -301,8 +301,8 @@ class SongThumbnailWidget extends StatelessWidget {
             width: size,
             height: size,
             fit: BoxFit.cover,
-            placeholder: (_, __) => _buildProceduralArt(context),
-            errorWidget: (_, __, ___) => _buildProceduralArt(context),
+            placeholder: (_, __) => _buildYouTubeStyleCard(context),
+            errorWidget: (_, __, ___) => _buildYouTubeStyleCard(context),
           ),
         );
       } else {
@@ -311,8 +311,8 @@ class SongThumbnailWidget extends StatelessWidget {
           width: size,
           height: size,
           fit: BoxFit.cover,
-          placeholder: (_, __) => _buildProceduralArt(context),
-          errorWidget: (_, __, ___) => _buildProceduralArt(context),
+          placeholder: (_, __) => _buildYouTubeStyleCard(context),
+          errorWidget: (_, __, ___) => _buildYouTubeStyleCard(context),
         );
       }
     } else {
@@ -321,8 +321,8 @@ class SongThumbnailWidget extends StatelessWidget {
         width: size,
         height: size,
         fit: BoxFit.cover,
-        placeholder: (_, __) => _buildProceduralArt(context),
-        errorWidget: (_, __, ___) => _buildProceduralArt(context),
+        placeholder: (_, __) => _buildYouTubeStyleCard(context),
+        errorWidget: (_, __, ___) => _buildYouTubeStyleCard(context),
       );
     }
 
@@ -338,18 +338,20 @@ class SongThumbnailWidget extends StatelessWidget {
           ),
         ),
         if (isPlaying && showVisualizerWhenPlaying)
-          Container(
-            width: size,
-            height: size,
-            decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.55),
-              borderRadius: BorderRadius.circular(borderRadius),
-            ),
-            child: Center(
-              child: VisualizerBars(
-                isPlaying: true,
-                maxHeight: size * 0.4,
-                barWidth: 3,
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(borderRadius),
+                color: Colors.black.withOpacity(0.55),
+              ),
+              child: const Center(
+                child: VisualizerBars(
+                  isPlaying: true,
+                  barCount: 3,
+                  maxHeight: 18,
+                  barWidth: 3,
+                  color: AppColors.accentCyan,
+                ),
               ),
             ),
           ),
@@ -358,18 +360,17 @@ class SongThumbnailWidget extends StatelessWidget {
   }
 }
 
-/// Painter for authentic concentric vinyl record grooves
 class _VinylGroovesPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final maxRadius = size.width * 0.65;
+    final center = Offset(size.width * 0.5, size.height * 0.5);
     final paint = Paint()
+      ..color = Colors.white.withOpacity(0.04)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.5
-      ..color = Colors.white.withOpacity(0.06);
+      ..strokeWidth = 1.0;
 
-    for (double r = size.width * 0.15; r < maxRadius; r += size.width * 0.08) {
+    final maxRadius = size.width * 0.48;
+    for (double r = maxRadius * 0.3; r < maxRadius; r += maxRadius * 0.22) {
       canvas.drawCircle(center, r, paint);
     }
   }

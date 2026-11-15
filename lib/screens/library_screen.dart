@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../models/song.dart';
@@ -8,6 +8,7 @@ import '../providers/player_provider.dart';
 import '../services/app_share_service.dart';
 import '../services/cloud_backend_service.dart';
 import '../services/language_service.dart';
+import '../services/song_artwork_resolver.dart';
 import '../theme/app_colors.dart';
 import '../widgets/song_list_tile.dart';
 import '../widgets/song_thumbnail_widget.dart';
@@ -26,6 +27,8 @@ class _LibraryScreenState extends State<LibraryScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   bool _isGroupedByCategory = false;
+  String _songsViewMode = 'flat'; // 'flat' | 'category' | 'album'
+  String _albumSortMode = 'name'; // 'name' | 'tracks' | 'artist'
 
   @override
   void initState() {
@@ -94,13 +97,13 @@ class _LibraryScreenState extends State<LibraryScreen>
               unselectedLabelColor: AppColors.textMuted,
               isScrollable: true,
               tabs: [
-                Tab(text: '${lang.isHindi ? "सभी गाने" : "All Songs"} (${allSongs.length})'),
-                Tab(text: '${lang.isHindi ? "कलाकार" : "Artists"} (${artists.length})'),
-                Tab(text: '${lang.isHindi ? "एल्बम" : "Albums"} (${albums.length})'),
-                Tab(text: '${lang.isHindi ? "प्लेलिस्ट्स" : "Playlists"} (${provider.customPlaylists.length + provider.curatedPlaylists.length})'),
-                Tab(text: '${lang.isHindi ? "पसंदीदा" : "Favorites"} (${provider.favorites.length})'),
-                Tab(text: '${lang.isHindi ? "फ़ोन स्टोरेज" : "Device"} (${provider.deviceSongs.length})'),
-                Tab(text: '${lang.isHindi ? "हाल ही के" : "Recent"} (${provider.recentlyPlayed.length})'),
+                Tab(text: '${lang.isHindi ? "à¤¸à¤­à¥€ à¤—à¤¾à¤¨à¥‡" : "All Songs"} (${allSongs.length})'),
+                Tab(text: '${lang.isHindi ? "à¤•à¤²à¤¾à¤•à¤¾à¤°" : "Artists"} (${artists.length})'),
+                Tab(text: '${lang.isHindi ? "à¤à¤²à¥à¤¬à¤®" : "Albums"} (${albums.length})'),
+                Tab(text: '${lang.isHindi ? "à¤ªà¥à¤²à¥‡à¤²à¤¿à¤¸à¥à¤Ÿà¥à¤¸" : "Playlists"} (${provider.customPlaylists.length + provider.curatedPlaylists.length})'),
+                Tab(text: '${lang.isHindi ? "à¤ªà¤¸à¤‚à¤¦à¥€à¤¦à¤¾" : "Favorites"} (${provider.favorites.length})'),
+                Tab(text: '${lang.isHindi ? "à¤«à¤¼à¥‹à¤¨ à¤¸à¥à¤Ÿà¥‹à¤°à¥‡à¤œ" : "Device"} (${provider.deviceSongs.length})'),
+                Tab(text: '${lang.isHindi ? "à¤¹à¤¾à¤² à¤¹à¥€ à¤•à¥‡" : "Recent"} (${provider.recentlyPlayed.length})'),
               ],
             ),
           ),
@@ -148,7 +151,7 @@ class _LibraryScreenState extends State<LibraryScreen>
             const Icon(Icons.music_off_rounded, size: 64, color: AppColors.textMuted),
             const SizedBox(height: 16),
             Text(
-              lang.isHindi ? 'कोई गाना उपलब्ध नहीं है' : 'No Tracks Available',
+              lang.isHindi ? 'à¤•à¥‹à¤ˆ à¤—à¤¾à¤¨à¤¾ à¤‰à¤ªà¤²à¤¬à¥à¤§ à¤¨à¤¹à¥€à¤‚ à¤¹à¥ˆ' : 'No Tracks Available',
               style: const TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.bold),
             ),
           ],
@@ -174,7 +177,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                     ),
                     icon: const Icon(Icons.play_arrow_rounded, size: 20),
                     label: Text(
-                      lang.isHindi ? 'सभी बजाएं' : 'Play All',
+                      lang.isHindi ? 'à¤¸à¤­à¥€ à¤¬à¤œà¤¾à¤à¤‚' : 'Play All',
                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                     ),
                     onPressed: () {
@@ -190,46 +193,101 @@ class _LibraryScreenState extends State<LibraryScreen>
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     ),
                     icon: const Icon(Icons.shuffle_rounded, size: 16),
-                    label: Text(lang.isHindi ? 'शफ़ल' : 'Shuffle', style: const TextStyle(fontSize: 12)),
+                    label: Text(lang.isHindi ? 'à¤¶à¤«à¤¼à¤²' : 'Shuffle', style: const TextStyle(fontSize: 12)),
                     onPressed: () {
                       final shuffled = List.of(allSongs)..shuffle();
                       provider.playSong(shuffled.first, queueContext: shuffled);
                     },
                   ),
                   const Spacer(),
-                  // Toggle View: Flat List vs Expandable Category Accordion
-                  InkWell(
-                    onTap: () => setState(() => _isGroupedByCategory = !_isGroupedByCategory),
-                    borderRadius: BorderRadius.circular(16),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: _isGroupedByCategory ? AppColors.accentCyan.withOpacity(0.2) : AppColors.card,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: _isGroupedByCategory ? AppColors.accentCyan : Colors.white.withOpacity(0.12),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            _isGroupedByCategory ? Icons.folder_rounded : Icons.list_rounded,
-                            size: 14,
-                            color: _isGroupedByCategory ? AppColors.accentCyan : Colors.white70,
-                          ),
-                          const SizedBox(width: 5),
-                          Text(
-                            _isGroupedByCategory
-                                ? (lang.isHindi ? 'कैटेगरी सूची' : 'By Category')
-                                : (lang.isHindi ? 'सीधी सूची' : 'Flat List'),
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: _isGroupedByCategory ? AppColors.accentCyan : Colors.white70,
+                  const Spacer(),
+                  // View Mode Selector: Flat List vs By Album vs By Category
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppColors.card,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.white.withOpacity(0.12)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        InkWell(
+                          onTap: () => setState(() => _songsViewMode = 'flat'),
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: _songsViewMode == 'flat' ? AppColors.accentCyan.withOpacity(0.25) : Colors.transparent,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.list_rounded, size: 13, color: _songsViewMode == 'flat' ? AppColors.accentCyan : Colors.white60),
+                                const SizedBox(width: 3),
+                                Text(
+                                  lang.isHindi ? 'सूची' : 'Flat',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: _songsViewMode == 'flat' ? AppColors.accentCyan : Colors.white60,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                        ],
-                      ),
+                        ),
+                        InkWell(
+                          onTap: () => setState(() => _songsViewMode = 'album'),
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: _songsViewMode == 'album' ? AppColors.accentCyan.withOpacity(0.25) : Colors.transparent,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.album_rounded, size: 13, color: _songsViewMode == 'album' ? AppColors.accentCyan : Colors.white60),
+                                const SizedBox(width: 3),
+                                Text(
+                                  lang.isHindi ? 'एल्बम' : 'Album',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: _songsViewMode == 'album' ? AppColors.accentCyan : Colors.white60,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        InkWell(
+                          onTap: () => setState(() => _songsViewMode = 'category'),
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: _songsViewMode == 'category' ? AppColors.accentCyan.withOpacity(0.25) : Colors.transparent,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.folder_rounded, size: 13, color: _songsViewMode == 'category' ? AppColors.accentCyan : Colors.white60),
+                                const SizedBox(width: 3),
+                                Text(
+                                  lang.isHindi ? 'शैली' : 'Genre',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: _songsViewMode == 'category' ? AppColors.accentCyan : Colors.white60,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -288,29 +346,132 @@ class _LibraryScreenState extends State<LibraryScreen>
                   onRefresh: () async {
                     await provider.onUserAuthenticated();
                   },
-                  child: _isGroupedByCategory
-                      ? _buildCategorizedSongsList(context, provider, allSongs, lang)
-                      : ListView.builder(
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          padding: const EdgeInsets.only(bottom: 120),
-                          itemCount: allSongs.length,
-                          itemBuilder: (context, index) {
-                            final song = allSongs[index];
-                            final isCurrent = provider.currentSong?.id == song.id;
+                  child: _songsViewMode == 'album'
+                      ? _buildAlbumGroupedSongsList(context, provider, allSongs, lang)
+                      : (_songsViewMode == 'category'
+                          ? _buildCategorizedSongsList(context, provider, allSongs, lang)
+                          : ListView.builder(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              padding: const EdgeInsets.only(bottom: 120),
+                              itemCount: allSongs.length,
+                              itemBuilder: (context, index) {
+                                final song = allSongs[index];
+                                final isCurrent = provider.currentSong?.id == song.id;
 
-                            return SongListTile(
-                              song: song,
-                              isCurrent: isCurrent,
-                              onTap: () => provider.playSong(song, queueContext: allSongs),
-                            );
-                          },
-                        ),
+                                return SongListTile(
+                                  song: song,
+                                  isCurrent: isCurrent,
+                                  onTap: () => provider.playSong(song, queueContext: allSongs),
+                                );
+                              },
+                            )),
                 ),
         ),
       ],
     );
   }
 
+  Widget _buildAlbumGroupedSongsList(
+    BuildContext context,
+    PlayerProvider provider,
+    List<Song> allSongs,
+    LanguageService lang,
+  ) {
+    final Map<String, List<Song>> albumMap = {};
+    for (final song in allSongs) {
+      final alb = song.album.trim().isNotEmpty ? song.album.trim() : 'Master Indian Essentials';
+      albumMap.putIfAbsent(alb, () => []).add(song);
+    }
+
+    final albumNames = albumMap.keys.toList()..sort();
+
+    return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
+      itemCount: albumNames.length,
+      itemBuilder: (context, index) {
+        final albumName = albumNames[index];
+        final songs = albumMap[albumName] ?? [];
+        final firstSong = songs.first;
+        final singerPortrait = SongArtworkResolver.resolveArtistImage(firstSong.artist);
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: AppColors.card,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white.withOpacity(0.06)),
+          ),
+          child: Theme(
+            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+            child: ExpansionTile(
+              initiallyExpanded: index == 0,
+              tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              leading: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: SizedBox(
+                  width: 44,
+                  height: 44,
+                  child: SongThumbnailWidget(
+                    song: firstSong,
+                    size: 44,
+                    borderRadius: 10,
+                  ),
+                ),
+              ),
+              title: Text(
+                albumName,
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              subtitle: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 7,
+                    backgroundImage: CachedNetworkImageProvider(singerPortrait),
+                  ),
+                  const SizedBox(width: 5),
+                  Expanded(
+                    child: Text(
+                      '${firstSong.artist} • ${songs.length} ${lang.isHindi ? "गाने" : "Tracks"}',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.6),
+                        fontSize: 11,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              trailing: IconButton(
+                icon: const Icon(Icons.play_circle_fill_rounded, color: AppColors.accentCyan, size: 28),
+                tooltip: lang.isHindi ? 'पूरा एल्बम बजाएं' : 'Play Album',
+                onPressed: () => provider.playSong(songs.first, queueContext: songs),
+              ),
+              children: [
+                Divider(color: Colors.white.withOpacity(0.05), height: 1),
+                ...songs.map((song) {
+                  final isCurrent = provider.currentSong?.id == song.id;
+                  return SongListTile(
+                    song: song,
+                    isCurrent: isCurrent,
+                    onTap: () => provider.playSong(song, queueContext: songs),
+                  );
+                }),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
   Widget _buildCategorizedSongsList(
     BuildContext context,
     PlayerProvider provider,
@@ -361,7 +522,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                 ),
               ),
               subtitle: Text(
-                '${songs.length} ${lang.isHindi ? "गाने (टैप करके देखें/छिपाएं)" : "Tracks (Tap to expand/collapse)"}',
+                '${songs.length} ${lang.isHindi ? "à¤—à¤¾à¤¨à¥‡ (à¤Ÿà¥ˆà¤ª à¤•à¤°à¤•à¥‡ à¤¦à¥‡à¤–à¥‡à¤‚/à¤›à¤¿à¤ªà¤¾à¤à¤‚)" : "Tracks (Tap to expand/collapse)"}',
                 style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
               ),
               trailing: Row(
@@ -369,7 +530,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                 children: [
                   IconButton(
                     icon: const Icon(Icons.play_circle_fill_rounded, color: AppColors.accentCyan, size: 28),
-                    tooltip: lang.isHindi ? '$category के सभी गाने बजाएं' : 'Play all in $category',
+                    tooltip: lang.isHindi ? '$category à¤•à¥‡ à¤¸à¤­à¥€ à¤—à¤¾à¤¨à¥‡ à¤¬à¤œà¤¾à¤à¤‚' : 'Play all in $category',
                     onPressed: () {
                       if (songs.isNotEmpty) {
                         provider.playSong(songs.first, queueContext: songs);
@@ -450,7 +611,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                                   ),
                                 ),
                                 subtitle: Text(
-                                  '${subSongs.length} ${lang.isHindi ? "गाने" : "Tracks"}',
+                                  '${subSongs.length} ${lang.isHindi ? "à¤—à¤¾à¤¨à¥‡" : "Tracks"}',
                                   style: const TextStyle(color: AppColors.textMuted, fontSize: 10),
                                 ),
                                 trailing: IconButton(
@@ -472,7 +633,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                           Padding(
                             padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
                             child: Text(
-                              lang.isHindi ? '🎵 मुख्य ट्रैक्स' : '🎵 Main Tracks',
+                              lang.isHindi ? 'ðŸŽµ à¤®à¥à¤–à¥à¤¯ à¤Ÿà¥à¤°à¥ˆà¤•à¥à¤¸' : 'ðŸŽµ Main Tracks',
                               style: const TextStyle(color: AppColors.textSecondary, fontSize: 11, fontWeight: FontWeight.bold),
                             ),
                           ),
@@ -509,7 +670,7 @@ class _LibraryScreenState extends State<LibraryScreen>
             const Icon(Icons.person_outline_rounded, size: 64, color: AppColors.textMuted),
             const SizedBox(height: 16),
             Text(
-              lang.isHindi ? 'कोई कलाकार नहीं मिला' : 'No Artists Found',
+              lang.isHindi ? 'à¤•à¥‹à¤ˆ à¤•à¤²à¤¾à¤•à¤¾à¤° à¤¨à¤¹à¥€à¤‚ à¤®à¤¿à¤²à¤¾' : 'No Artists Found',
               style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
             ),
           ],
@@ -552,22 +713,22 @@ class _LibraryScreenState extends State<LibraryScreen>
                   ],
                 ),
                 child: ClipOval(
-                  child: artist.coverUrl.startsWith('http')
-                      ? CachedNetworkImage(
-                          imageUrl: artist.coverUrl,
-                          fit: BoxFit.cover,
-                          placeholder: (_, __) => Container(color: const Color(0xFF131A2A)),
-                          errorWidget: (_, __, ___) => Container(color: const Color(0xFF131A2A)),
-                        )
-                      : Container(
-                          color: const Color(0xFF1E1B4B),
-                          child: Center(
-                            child: Text(
-                              artist.name.isNotEmpty ? artist.name[0] : '🎵',
-                              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
-                            ),
-                          ),
+                  child: CachedNetworkImage(
+                    imageUrl: (artist.coverUrl.startsWith('http') && !SongArtworkResolver.isGenericMicUrl(artist.coverUrl))
+                        ? artist.coverUrl
+                        : SongArtworkResolver.resolveArtistImage(artist.name),
+                    fit: BoxFit.cover,
+                    placeholder: (_, __) => Container(color: const Color(0xFF131A2A)),
+                    errorWidget: (_, __, ___) => Container(
+                      color: const Color(0xFF1E1B4B),
+                      child: Center(
+                        child: Text(
+                          artist.name.isNotEmpty ? artist.name[0] : 'M',
+                          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
                         ),
+                      ),
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(height: 8),
@@ -590,7 +751,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                 ],
               ),
               Text(
-                '${artist.songCount} ${lang.isHindi ? "गाने" : "Tracks"}',
+                '${artist.songCount} ${lang.isHindi ? "à¤—à¤¾à¤¨à¥‡" : "Tracks"}',
                 style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 10),
               ),
             ],
@@ -601,7 +762,7 @@ class _LibraryScreenState extends State<LibraryScreen>
   }
 
   // ==========================================
-  // TAB 3: ALBUMS (Auto AI Categorized)
+  // TAB 3: ALBUMS (Auto AI Categorized With Sorting & Singer Portraits)
   // ==========================================
   Widget _buildAlbumsTab(BuildContext context, PlayerProvider provider, LanguageService lang) {
     final albums = provider.albums;
@@ -621,58 +782,144 @@ class _LibraryScreenState extends State<LibraryScreen>
       );
     }
 
-    return GridView.builder(
-      padding: const EdgeInsets.all(16),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        childAspectRatio: 0.72,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-      ),
-      itemCount: albums.length,
-      itemBuilder: (context, index) {
-        final album = albums[index];
-        return GestureDetector(
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => AlbumDetailScreen(album: album)),
-            );
-          },
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    final List<Album> sortedAlbums = List.from(albums);
+    if (_albumSortMode == 'name') {
+      sortedAlbums.sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+    } else if (_albumSortMode == 'tracks') {
+      sortedAlbums.sort((a, b) => b.songCount.compareTo(a.songCount));
+    } else if (_albumSortMode == 'artist') {
+      sortedAlbums.sort((a, b) => a.artist.toLowerCase().compareTo(b.artist.toLowerCase()));
+    }
+
+    return Column(
+      children: [
+        // Album Sorting Header Bar
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+          child: Row(
             children: [
-              Expanded(
-                child: SongThumbnailWidget(
-                  song: album.songs.first,
-                  size: double.infinity,
-                  borderRadius: 16,
+              Text(
+                lang.isHindi ? 'क्रमबद्ध (Sort):' : 'Sort:',
+                style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(width: 8),
+              ChoiceChip(
+                label: Text(lang.isHindi ? 'नाम (A-Z)' : 'Name (A-Z)'),
+                selected: _albumSortMode == 'name',
+                selectedColor: AppColors.accentCyan.withOpacity(0.25),
+                backgroundColor: AppColors.card,
+                labelStyle: TextStyle(
+                  color: _albumSortMode == 'name' ? AppColors.accentCyan : Colors.white70,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
                 ),
+                onSelected: (val) {
+                  if (val) setState(() => _albumSortMode = 'name');
+                },
               ),
-              const SizedBox(height: 8),
-              Text(
-                album.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+              const SizedBox(width: 6),
+              ChoiceChip(
+                label: Text(lang.isHindi ? 'अधिक गाने' : 'Tracks'),
+                selected: _albumSortMode == 'tracks',
+                selectedColor: AppColors.accentCyan.withOpacity(0.25),
+                backgroundColor: AppColors.card,
+                labelStyle: TextStyle(
+                  color: _albumSortMode == 'tracks' ? AppColors.accentCyan : Colors.white70,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+                onSelected: (val) {
+                  if (val) setState(() => _albumSortMode = 'tracks');
+                },
               ),
-              Text(
-                album.artist,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 11),
-              ),
-              Text(
-                '${album.songCount} ${lang.isHindi ? "गाने" : "Tracks"}',
-                style: const TextStyle(color: AppColors.accentCyan, fontSize: 10, fontWeight: FontWeight.w600),
+              const SizedBox(width: 6),
+              ChoiceChip(
+                label: Text(lang.isHindi ? 'गायक' : 'Singer'),
+                selected: _albumSortMode == 'artist',
+                selectedColor: AppColors.accentCyan.withOpacity(0.25),
+                backgroundColor: AppColors.card,
+                labelStyle: TextStyle(
+                  color: _albumSortMode == 'artist' ? AppColors.accentCyan : Colors.white70,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+                onSelected: (val) {
+                  if (val) setState(() => _albumSortMode = 'artist');
+                },
               ),
             ],
           ),
-        );
-      },
+        ),
+        Expanded(
+          child: GridView.builder(
+            padding: const EdgeInsets.all(16),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              childAspectRatio: 0.70,
+              crossAxisSpacing: 16,
+              mainAxisSpacing: 16,
+            ),
+            itemCount: sortedAlbums.length,
+            itemBuilder: (context, index) {
+              final album = sortedAlbums[index];
+              final singerPortrait = SongArtworkResolver.resolveArtistImage(album.artist);
+
+              return GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => AlbumDetailScreen(album: album)),
+                  );
+                },
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: SongThumbnailWidget(
+                        song: album.songs.first,
+                        size: double.infinity,
+                        borderRadius: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      album.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 3),
+                    Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 8,
+                          backgroundImage: CachedNetworkImageProvider(singerPortrait),
+                        ),
+                        const SizedBox(width: 5),
+                        Expanded(
+                          child: Text(
+                            album.artist,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(color: Colors.white.withOpacity(0.65), fontSize: 11),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${album.songCount} ${lang.isHindi ? "गाने" : "Tracks"} • ${album.formattedTotalDuration}',
+                      style: const TextStyle(color: AppColors.accentCyan, fontSize: 10, fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
-
   // ==========================================
   // TAB 4: FAVORITES
   // ==========================================
@@ -838,7 +1085,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                       style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary, fontSize: 15),
                     ),
                     subtitle: Text(
-                      '${pl.songs.length} ${lang.isHindi ? "गाने (टैप करके देखें)" : "tracks (tap to expand)"}',
+                      '${pl.songs.length} ${lang.isHindi ? "à¤—à¤¾à¤¨à¥‡ (à¤Ÿà¥ˆà¤ª à¤•à¤°à¤•à¥‡ à¤¦à¥‡à¤–à¥‡à¤‚)" : "tracks (tap to expand)"}',
                       style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
                     ),
                     trailing: Row(
@@ -904,7 +1151,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                                 overflow: TextOverflow.ellipsis,
                               ),
                               subtitle: Text(
-                                '${song.artist} • ${song.formattedDuration}',
+                                '${song.artist} â€¢ ${song.formattedDuration}',
                                 style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
                                 maxLines: 1,
                               ),
@@ -945,7 +1192,7 @@ class _LibraryScreenState extends State<LibraryScreen>
         Padding(
           padding: const EdgeInsets.only(bottom: 8, left: 4),
           child: Text(
-            lang.isHindi ? 'विशेष प्लेलिस्ट्स (Featured Playlists)' : 'Featured Playlists',
+            lang.isHindi ? 'à¤µà¤¿à¤¶à¥‡à¤· à¤ªà¥à¤²à¥‡à¤²à¤¿à¤¸à¥à¤Ÿà¥à¤¸ (Featured Playlists)' : 'Featured Playlists',
             style: const TextStyle(
               color: AppColors.textSecondary,
               fontWeight: FontWeight.bold,
@@ -981,7 +1228,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                     style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary, fontSize: 15),
                   ),
                   subtitle: Text(
-                    '${pl.songs.length} ${lang.isHindi ? "गाने • टैप करके विस्तार से देखें" : "tracks • tap to expand"}',
+                    '${pl.songs.length} ${lang.isHindi ? "à¤—à¤¾à¤¨à¥‡ â€¢ à¤Ÿà¥ˆà¤ª à¤•à¤°à¤•à¥‡ à¤µà¤¿à¤¸à¥à¤¤à¤¾à¤° à¤¸à¥‡ à¤¦à¥‡à¤–à¥‡à¤‚" : "tracks â€¢ tap to expand"}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
@@ -1044,7 +1291,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                               overflow: TextOverflow.ellipsis,
                             ),
                             subtitle: Text(
-                              '${song.artist} • ${song.formattedDuration}',
+                              '${song.artist} â€¢ ${song.formattedDuration}',
                               style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
                               maxLines: 1,
                             ),
@@ -1307,7 +1554,7 @@ class _LibraryScreenState extends State<LibraryScreen>
               }
             },
             child: Text(
-              lang.isHindi ? 'बनाएं' : 'Create',
+              lang.isHindi ? 'à¤¬à¤¨à¤¾à¤à¤‚' : 'Create',
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
           ),
@@ -1316,3 +1563,4 @@ class _LibraryScreenState extends State<LibraryScreen>
     );
   }
 }
+

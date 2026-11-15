@@ -24,11 +24,12 @@ Future<void> main() async {
     );
   } catch (_) {}
 
-  // Initialize Cloud & Authentication Backend
-  await R2StorageService().init();
-  final backend = CloudBackendService();
-  await backend.init();
-  await LanguageService().init();
+  // Fast Parallel Cloud & Service Initializations for Instant App Launch (<300ms)
+  await Future.wait([
+    LanguageService().init(),
+    CloudBackendService().init(),
+    R2StorageService().init(),
+  ]);
 
   // Set system UI to immersive dark styling
   SystemChrome.setSystemUIOverlayStyle(
