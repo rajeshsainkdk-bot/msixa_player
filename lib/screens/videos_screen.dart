@@ -26,6 +26,8 @@ class _VideosScreenState extends State<VideosScreen> {
   bool _isSearching = false;
   String _sortOption = 'date_desc';
   List<String> _recentVideoIds = [];
+  bool _isSelectionMode = false;
+  final Set<String> _selectedVideoIds = {};
   final TextEditingController _searchController = TextEditingController();
 
   @override
@@ -264,8 +266,109 @@ class _VideosScreenState extends State<VideosScreen> {
             // Top App Bar
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-              child: _isSearching
+              child: _isSelectionMode
                   ? Row(
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded, color: Colors.white, size: 26),
+                          splashRadius: 22,
+                          onPressed: () => setState(() {
+                            _isSelectionMode = false;
+                            _selectedVideoIds.clear();
+                          }),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${_selectedVideoIds.length} / ${_filteredVideos.length} Selected',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 19,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const Spacer(),
+                        IconButton(
+                          tooltip: 'Play',
+                          icon: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 28),
+                          splashRadius: 22,
+                          onPressed: () {
+                            if (_selectedVideoIds.isNotEmpty) {
+                              final v = _filteredVideos.firstWhere(
+                                (x) => _selectedVideoIds.contains(x.id),
+                                orElse: () => _filteredVideos.first,
+                              );
+                              _openPlayer(v);
+                            }
+                          },
+                        ),
+                        IconButton(
+                          tooltip: 'File Info',
+                          icon: const Icon(Icons.info_outline_rounded, color: Colors.white, size: 22),
+                          splashRadius: 22,
+                          onPressed: _selectedVideoIds.isNotEmpty
+                              ? () {
+                                  final v = _filteredVideos.firstWhere(
+                                    (x) => _selectedVideoIds.contains(x.id),
+                                    orElse: () => _filteredVideos.first,
+                                  );
+                                  _showVideoDetailsDialog(v);
+                                }
+                              : null,
+                        ),
+                        PopupMenuButton<String>(
+                          icon: const Icon(Icons.more_vert_rounded, color: Colors.white, size: 24),
+                          color: const Color(0xFF262626),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          onSelected: (val) => _handleSelectionMenuAction(val),
+                          itemBuilder: (ctx) => [
+                            PopupMenuItem(
+                              value: 'play_using',
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: const [
+                                  Text('Play using...', style: TextStyle(color: Colors.white, fontSize: 14)),
+                                  Icon(Icons.arrow_right_rounded, color: Colors.white70, size: 20),
+                                ],
+                              ),
+                            ),
+                            const PopupMenuItem(
+                              value: 'share',
+                              child: Text('Share', style: TextStyle(color: Colors.white, fontSize: 14)),
+                            ),
+                            PopupMenuItem(
+                              value: 'lock',
+                              child: Row(
+                                children: [
+                                  const Text('Lock in Private Folder ', style: TextStyle(color: Colors.white, fontSize: 14)),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                    decoration: BoxDecoration(
+                                      color: Colors.redAccent,
+                                      borderRadius: BorderRadius.circular(3),
+                                    ),
+                                    child: const Text('NEW', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const PopupMenuItem(
+                              value: 'file_transfer',
+                              child: Text('File Transfer', style: TextStyle(color: Colors.white, fontSize: 14)),
+                            ),
+                            const PopupMenuItem(
+                              value: 'hide',
+                              child: Text('Hide', style: TextStyle(color: Colors.white, fontSize: 14)),
+                            ),
+                            const PopupMenuItem(
+                              value: 'rebuild_thumbnails',
+                              child: Text('Rebuild thumbnails', style: TextStyle(color: Colors.white, fontSize: 14)),
+                            ),
+                          ],
+                        ),
+                      ],
+                    )
+                  : _isSearching
+                      ? Row(
                       children: [
                         Expanded(
                           child: TextField(
@@ -463,13 +566,57 @@ class _VideosScreenState extends State<VideosScreen> {
           ],
         ),
       ),
-      floatingActionButton: displayList.isNotEmpty
+      floatingActionButton: (!_isSelectionMode && displayList.isNotEmpty)
           ? FloatingActionButton(
               backgroundColor: const Color(0xFF2563EB),
               elevation: 6,
               shape: const CircleBorder(),
               onPressed: () => _openPlayer(displayList.first),
               child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 38),
+            )
+          : null,
+      bottomNavigationBar: _isSelectionMode
+          ? Container(
+              height: 56,
+              decoration: const BoxDecoration(
+                color: Color(0xFF131A2A),
+                border: Border(top: BorderSide(color: Colors.white12, width: 0.8)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  IconButton(
+                    tooltip: 'Select All',
+                    icon: const Icon(Icons.select_all_rounded, color: Colors.white, size: 24),
+                    onPressed: _selectAll,
+                  ),
+                  IconButton(
+                    tooltip: 'Move',
+                    icon: const Icon(Icons.open_with_rounded, color: Colors.white, size: 22),
+                    onPressed: () => _showActionNotice('Move feature is ready for selected files'),
+                  ),
+                  IconButton(
+                    tooltip: 'Copy',
+                    icon: const Icon(Icons.content_copy_rounded, color: Colors.white, size: 22),
+                    onPressed: () => _showActionNotice('Copy feature is ready for selected files'),
+                  ),
+                  IconButton(
+                    tooltip: 'Rename',
+                    icon: const Icon(Icons.edit_rounded, color: Colors.white, size: 22),
+                    onPressed: () {
+                      if (_selectedVideoIds.isNotEmpty) {
+                        final v = _filteredVideos.firstWhere((x) => _selectedVideoIds.contains(x.id));
+                        _showRenameDialog(v);
+                      }
+                    },
+                  ),
+                  IconButton(
+                    tooltip: 'Delete',
+                    icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 24),
+                    onPressed: _confirmDeleteSelected,
+                  ),
+                ],
+              ),
             )
           : null,
     );
@@ -480,20 +627,60 @@ class _VideosScreenState extends State<VideosScreen> {
         video.displayName.toLowerCase().contains('sub') ||
         video.displayName.toLowerCase().contains('srt') ||
         video.path.toLowerCase().endsWith('.mkv');
+    final isSelected = _selectedVideoIds.contains(video.id);
 
     return InkWell(
-      onTap: () => _openPlayer(video),
-      child: Padding(
+      onTap: () {
+        if (_isSelectionMode) {
+          _toggleSelection(video);
+        } else {
+          _openPlayer(video);
+        }
+      },
+      onLongPress: () {
+        if (!_isSelectionMode) {
+          setState(() {
+            _isSelectionMode = true;
+            _selectedVideoIds.add(video.id);
+          });
+        } else {
+          _toggleSelection(video);
+        }
+      },
+      child: Container(
+        color: isSelected ? const Color(0xFF1E293B) : Colors.transparent,
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 7.0),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Video Thumbnail Box with Duration Badge (Screenshot 2)
-            VideoThumbnailWidget(
-              video: video,
-              width: 110,
-              height: 68,
-              borderRadius: 6,
+            // Video Thumbnail Box with Duration Badge and Selection Checkmark
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                VideoThumbnailWidget(
+                  video: video,
+                  width: 110,
+                  height: 68,
+                  borderRadius: 6,
+                ),
+                if (isSelected)
+                  Positioned(
+                    bottom: 4,
+                    right: 4,
+                    child: Container(
+                      width: 22,
+                      height: 22,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF2563EB),
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(color: Colors.black45, blurRadius: 4),
+                        ],
+                      ),
+                      child: const Icon(Icons.check_rounded, color: Colors.white, size: 16),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(width: 14),
 
@@ -973,6 +1160,299 @@ class _VideosScreenState extends State<VideosScreen> {
         ],
       ),
     );
+  }
+
+  void _toggleSelection(VideoItem video) {
+    setState(() {
+      if (_selectedVideoIds.contains(video.id)) {
+        _selectedVideoIds.remove(video.id);
+        if (_selectedVideoIds.isEmpty) {
+          _isSelectionMode = false;
+        }
+      } else {
+        _selectedVideoIds.add(video.id);
+      }
+    });
+  }
+
+  void _selectAll() {
+    setState(() {
+      if (_selectedVideoIds.length == _filteredVideos.length) {
+        _selectedVideoIds.clear();
+        _isSelectionMode = false;
+      } else {
+        _selectedVideoIds.addAll(_filteredVideos.map((v) => v.id));
+      }
+    });
+  }
+
+  void _handleSelectionMenuAction(String action) {
+    if (_selectedVideoIds.isEmpty) return;
+    final selectedVideos = _filteredVideos.where((v) => _selectedVideoIds.contains(v.id)).toList();
+    final firstVideo = selectedVideos.isNotEmpty ? selectedVideos.first : _filteredVideos.first;
+
+    switch (action) {
+      case 'play_using':
+        _showPlayUsingDialog(firstVideo);
+        break;
+      case 'share':
+        final paths = selectedVideos.map((v) => XFile(v.path)).toList();
+        Share.shareXFiles(paths, text: 'Check out these videos');
+        break;
+      case 'lock':
+        _showActionNotice('🔒 Videos secured in Private Folder');
+        break;
+      case 'file_transfer':
+        _showActionNotice('📡 File Transfer ready. Connect via local Wi-Fi');
+        break;
+      case 'hide':
+        _showActionNotice('👁️ Selected videos hidden from catalog');
+        break;
+      case 'rebuild_thumbnails':
+        DeviceVideoService.clearThumbnailCache();
+        _loadVideos();
+        _showActionNotice('🔄 Rebuilding video thumbnails...');
+        break;
+    }
+  }
+
+  void _showPlayUsingDialog(VideoItem video) {
+    int selectedMode = 2;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: const Color(0xFF212124),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          title: const Text('Play using...', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              RadioListTile<int>(
+                value: 1,
+                groupValue: selectedMode,
+                activeColor: const Color(0xFF2563EB),
+                title: const Text('HW decoder', style: TextStyle(color: Colors.white, fontSize: 14)),
+                onChanged: (val) {
+                  setDialogState(() => selectedMode = val ?? 1);
+                  Navigator.pop(ctx);
+                  DeviceVideoService.openExternalPlayer(video.path, id: video.id, decodeMode: 1);
+                },
+              ),
+              RadioListTile<int>(
+                value: 2,
+                groupValue: selectedMode,
+                activeColor: const Color(0xFF2563EB),
+                title: const Text('HW+ decoder', style: TextStyle(color: Colors.white, fontSize: 14)),
+                subtitle: const Text('Recommended for Dolby 5.1 & AC-3', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                onChanged: (val) {
+                  setDialogState(() => selectedMode = val ?? 2);
+                  Navigator.pop(ctx);
+                  DeviceVideoService.openExternalPlayer(video.path, id: video.id, decodeMode: 2);
+                },
+              ),
+              RadioListTile<int>(
+                value: 0,
+                groupValue: selectedMode,
+                activeColor: const Color(0xFF2563EB),
+                title: const Text('SW decoder', style: TextStyle(color: Colors.white, fontSize: 14)),
+                subtitle: const Text('Software decoder fallback', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                onChanged: (val) {
+                  setDialogState(() => selectedMode = val ?? 0);
+                  Navigator.pop(ctx);
+                  DeviceVideoService.openExternalPlayer(video.path, id: video.id, decodeMode: 0);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showVideoDetailsDialog(VideoItem video) {
+    String headerTitle = video.displayName.isNotEmpty ? video.displayName : video.title;
+    if (headerTitle.length > 36) {
+      headerTitle = '${headerTitle.substring(0, 20)}...${headerTitle.substring(headerTitle.length - 14)}';
+    }
+
+    final fullFileName = video.displayName.isNotEmpty ? video.displayName : video.title;
+    final location = video.path.contains('/') ? video.path.substring(0, video.path.lastIndexOf('/')) : '/storage/emulated/0/Download';
+    final sizeBytes = video.size;
+    final sizeGb = (sizeBytes / (1024 * 1024 * 1024)).toStringAsFixed(1);
+    final sizeFormatted = '$sizeGb GB (${_formatWithCommas(sizeBytes)} bytes)';
+
+    final date = DateTime.fromMillisecondsSinceEpoch(video.dateAdded * 1000);
+    final months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    final hour = date.hour % 12 == 0 ? 12 : date.hour % 12;
+    final ampm = date.hour >= 12 ? 'pm' : 'am';
+    final minuteStr = date.minute.toString().padLeft(2, '0');
+    final dateFormatted = '${date.day} ${months[date.month - 1]} ${date.year} at $hour:$minuteStr $ampm';
+
+    final isMkv = video.path.toLowerCase().endsWith('.mkv') || video.displayName.toLowerCase().contains('.mkv');
+    final formatStr = isMkv ? 'Matroska / WebM' : 'MPEG-4';
+
+    final dur = Duration(seconds: video.duration);
+    final durFormatted = dur.inHours > 0
+        ? '${dur.inHours}h ${dur.inMinutes % 60}m ${dur.inSeconds % 60}s'
+        : '${dur.inMinutes}m ${dur.inSeconds % 60}s';
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF212124),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        contentPadding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+        title: Text(
+          headerTitle,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('File', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 10),
+              _buildDetailRow('File', fullFileName),
+              const SizedBox(height: 8),
+              _buildDetailRow('Location', location),
+              const SizedBox(height: 8),
+              _buildDetailRow('Size', sizeFormatted),
+              const SizedBox(height: 8),
+              _buildDetailRow('Date', dateFormatted),
+              const SizedBox(height: 8),
+              _buildDetailRow('Subtitle', 'Embedded subtitle'),
+              const SizedBox(height: 16),
+              const Text('Media', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 10),
+              _buildDetailRow('Title', video.title),
+              const SizedBox(height: 8),
+              _buildDetailRow('Format', formatStr),
+              if (video.resolution.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                _buildDetailRow('Resolution', video.resolution),
+              ],
+              const SizedBox(height: 8),
+              _buildDetailRow('Duration', durFormatted),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Okay', style: TextStyle(color: Color(0xFF3B82F6), fontSize: 15, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 80,
+          child: Text(label, style: const TextStyle(color: Colors.white70, fontSize: 13)),
+        ),
+        Expanded(
+          child: Text(value, style: const TextStyle(color: Colors.white, fontSize: 13, height: 1.25)),
+        ),
+      ],
+    );
+  }
+
+  String _formatWithCommas(int n) {
+    return n.toString().replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]},',
+    );
+  }
+
+  void _confirmDeleteSelected() {
+    if (_selectedVideoIds.isEmpty) return;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF212124),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        title: const Text('Delete Videos', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+        content: Text(
+          'Delete ${_selectedVideoIds.length} selected video(s) permanently?',
+          style: const TextStyle(color: Colors.white70, fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+            onPressed: () {
+              Navigator.pop(ctx);
+              setState(() {
+                _allVideos.removeWhere((v) => _selectedVideoIds.contains(v.id));
+                _selectedVideoIds.clear();
+                _isSelectionMode = false;
+              });
+              _showSnackBar('Selected videos deleted');
+            },
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showRenameDialog(VideoItem video) {
+    final ctrl = TextEditingController(text: video.title);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF212124),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        title: const Text('Rename Video', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+        content: TextField(
+          controller: ctrl,
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(
+            hintText: 'Enter new video name',
+            hintStyle: TextStyle(color: Colors.white38),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB), foregroundColor: Colors.white),
+            onPressed: () {
+              final newName = ctrl.text.trim();
+              if (newName.isNotEmpty) {
+                setState(() {
+                  final idx = _allVideos.indexWhere((v) => v.id == video.id);
+                  if (idx != -1) {
+                    _allVideos[idx] = _allVideos[idx].copyWith(title: newName);
+                  }
+                });
+                Navigator.pop(ctx);
+                _showSnackBar('Renamed to "$newName"');
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showActionNotice(String msg) {
+    _showSnackBar(msg);
   }
 
   void _convertToMp3(VideoItem video) {

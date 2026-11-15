@@ -225,6 +225,8 @@ class MainActivity: AudioServiceActivity() {
                     try {
                         val path = call.argument<String>("path") ?: ""
                         val idStr = call.argument<String>("id")
+                        val decodeMode = call.argument<Int>("decode_mode") ?: 2
+                        val positionMs = call.argument<Int>("position") ?: 0
                         val intent = Intent(Intent.ACTION_VIEW).apply {
                             if (!idStr.isNullOrEmpty() && idStr.toLongOrNull() != null) {
                                 val u = ContentUris.withAppendedId(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, idStr.toLong())
@@ -252,6 +254,13 @@ class MainActivity: AudioServiceActivity() {
                             }
                             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            if (decodeMode >= 0) {
+                                putExtra("decode_mode", decodeMode.toByte())
+                            }
+                            if (positionMs > 0) {
+                                putExtra("position", positionMs)
+                            }
+                            putExtra("return_result", true)
                         }
                         val pm = ctx.packageManager
                         val mxPackages = listOf("com.mxtech.videoplayer.ad", "com.mxtech.videoplayer.pro")

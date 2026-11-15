@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../models/song.dart';
+import 'song_artwork_resolver.dart';
 
 class DeviceAudioService {
   final OnAudioQuery _audioQuery = OnAudioQuery();
@@ -104,7 +105,11 @@ class DeviceAudioService {
           album: (s.album != null && s.album != '<unknown>') ? s.album! : folderLoc,
           duration: (s.duration ?? 0) ~/ 1000,
           streamUrl: s.uri ?? s.data,
-          coverUrl: '',
+          coverUrl: SongArtworkResolver.resolveArtwork(
+            title: s.title,
+            artist: s.artist ?? '',
+            genre: 'Offline',
+          ),
           genre: 'Offline',
           subCategory: folderLoc,
           license: 'Personal Offline Audio',

@@ -94,6 +94,15 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
     final title = _titleCtrl.text.trim();
     final artist = _artistCtrl.text.trim();
 
+    if (title.isNotEmpty && (_coverUrlCtrl.text.isEmpty || SongArtworkResolver.isGenericMicUrl(_coverUrlCtrl.text))) {
+      final autoArt = SongArtworkResolver.resolveArtwork(
+        title: title,
+        artist: artist,
+        genre: _selectedGenre,
+      );
+      _coverUrlCtrl.text = autoArt;
+    }
+
     if (title.length >= 3) {
       final duplicate = _backend.checkDuplicateSong(title: title, artist: artist);
       setState(() {
@@ -134,6 +143,13 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
             if (parsedArtist.isNotEmpty) {
               _artistCtrl.text = parsedArtist;
             }
+          }
+          if (_coverUrlCtrl.text.isEmpty || SongArtworkResolver.isGenericMicUrl(_coverUrlCtrl.text)) {
+            _coverUrlCtrl.text = SongArtworkResolver.resolveArtwork(
+              title: _titleCtrl.text,
+              artist: _artistCtrl.text,
+              genre: _selectedGenre,
+            );
           }
         });
       }
@@ -211,7 +227,13 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
         genre: _selectedGenre,
         subCategory: _subCategoryCtrl.text.trim().isNotEmpty ? _subCategoryCtrl.text.trim() : null,
         audioPath: finalAudioUrl,
-        coverUrl: cover.isNotEmpty ? cover : null,
+        coverUrl: cover.isNotEmpty
+            ? cover
+            : SongArtworkResolver.resolveArtwork(
+                title: title,
+                artist: artist,
+                genre: _selectedGenre,
+              ),
       );
 
       setState(() => _isUploading = false);
@@ -391,12 +413,18 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
         }
 
         try {
+          final assignedCoverUrl = SongArtworkResolver.resolveArtwork(
+            title: cleanName,
+            artist: SongArtworkResolver.extractArtist(cleanName, fallback: defaultArtist),
+            genre: _selectedGenre,
+          );
           final newSong = await _backend.submitUserSong(
             title: cleanName,
             artist: SongArtworkResolver.extractArtist(cleanName, fallback: defaultArtist),
             album: playlistTitle,
             genre: _selectedGenre,
             audioPath: finalAudioUrl,
+            coverUrl: assignedCoverUrl,
           );
           uploadedSongs.add(newSong);
           successCount++;
@@ -868,9 +896,66 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
 
             _buildTextField(
               controller: _coverUrlCtrl,
-              label: _lang.isHindi ? 'पोस्टर आर्ट लिंक (Cover Image URL - Optional)' : 'Cover Image URL (Optional)',
-              hint: _lang.isHindi ? 'https://images.unsplash.com/... (खाली छोड़ने पर डिफ़ॉल्ट पोस्टर लगेगा)' : 'https://images.unsplash.com/... (Leave empty for default)',
+              label: _lang.isHindi ? 'पोस्टर आर्ट लिंक (Cover Image URL - Auto/Optional)' : 'Cover Image URL (Auto/Optional)',
+              hint: _lang.isHindi ? 'टाइटल के अनुसार ओरिजिनल थीम पोस्टर अपने-आप चुना गया है' : 'Auto-selected thematic artwork based on title',
             ),
+            if (_coverUrlCtrl.text.isNotEmpty || _titleCtrl.text.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Builder(builder: (ctx) {
+                final effectiveCover = _coverUrlCtrl.text.trim().isNotEmpty
+                    ? _coverUrlCtrl.text.trim()
+                    : SongArtworkResolver.resolveArtwork(
+                        title: _titleCtrl.text,
+                        artist: _artistCtrl.text,
+                        genre: _selectedGenre,
+                      );
+                final theme = SongArtworkResolver.getThemeForTitle(
+                  _titleCtrl.text,
+                  artist: _artistCtrl.text,
+                  genre: _selectedGenre,
+                );
+                return Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: theme.primaryColor.withOpacity(0.25),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: theme.accentColor.withOpacity(0.4), width: 1),
+                  ),
+                  child: Row(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.network(
+                          effectiveCover,
+                          width: 48,
+                          height: 48,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Icon(theme.icon, color: theme.accentColor, size: 32),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              _lang.isHindi ? '🎯 ऑटो-सिलेक्टेड थीम पोस्टर:' : '🎯 Auto Thematic Cover:',
+                              style: TextStyle(color: theme.accentColor, fontSize: 11, fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              theme.themeName,
+                              style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ],
             if (_isUploading) ...[
               const SizedBox(height: 16),
               ClipRRect(

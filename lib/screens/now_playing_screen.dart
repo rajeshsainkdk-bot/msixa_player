@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/song.dart';
 import '../services/audio_player_service.dart';
+import '../services/song_artwork_resolver.dart';
 import '../providers/player_provider.dart';
 import '../theme/app_colors.dart';
 import '../widgets/album_art_disc.dart';
@@ -34,25 +35,27 @@ class NowPlayingScreen extends StatelessWidget {
 
         final maxDurationMs = provider.totalDuration.inMilliseconds.toDouble();
         final currentPosMs = provider.currentPosition.inMilliseconds.toDouble().clamp(0.0, maxDurationMs > 0 ? maxDurationMs : 1.0);
+        final songTheme = SongArtworkResolver.getThemeForSong(currentSong);
 
         return Scaffold(
           backgroundColor: AppColors.background,
           body: Stack(
             children: [
-              // Ambient Background Glow Blob
+              // Ambient Background Glow Blobs synchronized with Song's Dynamic Visual Theme
               Positioned(
                 top: -100,
                 right: -50,
-                child: Container(
-                  width: 320,
-                  height: 320,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 700),
+                  width: 340,
+                  height: 340,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: AppColors.primary.withOpacity(0.2),
+                    color: songTheme.primaryColor.withOpacity(0.40),
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.primary.withOpacity(0.2),
-                        blurRadius: 100,
+                        color: songTheme.primaryColor.withOpacity(0.40),
+                        blurRadius: 110,
                         spreadRadius: 40,
                       ),
                     ],
@@ -62,17 +65,18 @@ class NowPlayingScreen extends StatelessWidget {
               Positioned(
                 bottom: 100,
                 left: -60,
-                child: Container(
-                  width: 280,
-                  height: 280,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 700),
+                  width: 300,
+                  height: 300,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: AppColors.accentCyan.withOpacity(0.15),
+                    color: songTheme.accentColor.withOpacity(0.25),
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.accentCyan.withOpacity(0.15),
-                        blurRadius: 100,
-                        spreadRadius: 30,
+                        color: songTheme.accentColor.withOpacity(0.25),
+                        blurRadius: 110,
+                        spreadRadius: 35,
                       ),
                     ],
                   ),
@@ -98,7 +102,7 @@ class NowPlayingScreen extends StatelessWidget {
                               Text(
                                 currentSong.isOffline ? 'OFFLINE DEVICE AUDIO' : 'PLAYING FROM STREAM',
                                 style: TextStyle(
-                                  color: currentSong.isOffline ? AppColors.accentGreen : AppColors.accentCyan.withOpacity(0.9),
+                                  color: currentSong.isOffline ? AppColors.accentGreen : songTheme.accentColor,
                                   fontSize: 10,
                                   fontWeight: FontWeight.bold,
                                   letterSpacing: 1.5,
@@ -106,7 +110,7 @@ class NowPlayingScreen extends StatelessWidget {
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                currentSong.source,
+                                '${currentSong.source} • ${songTheme.themeName}',
                                 style: const TextStyle(
                                   color: AppColors.textSecondary,
                                   fontSize: 12,
@@ -144,11 +148,12 @@ class NowPlayingScreen extends StatelessWidget {
 
                       const Spacer(),
 
-                      // Center Vinyl / Album Art Disc
+                      // Center Vinyl / Album Art Disc with Dynamic Theme Label
                       AlbumArtDisc(
                         imageUrl: currentSong.displayCoverUrl,
                         isPlaying: provider.isPlaying,
                         size: MediaQuery.of(context).size.width * 0.70,
+                        song: currentSong,
                       ),
 
                       const Spacer(),

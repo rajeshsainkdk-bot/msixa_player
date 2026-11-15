@@ -356,9 +356,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             Positioned.fill(
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(24),
-                                child: heroSong.coverUrl.startsWith('http')
+                                child: heroSong.displayCoverUrl.startsWith('http')
                                     ? CachedNetworkImage(
-                                        imageUrl: heroSong.coverUrl,
+                                        imageUrl: heroSong.displayCoverUrl,
                                         fit: BoxFit.cover,
                                         color: Colors.black.withOpacity(0.6),
                                         colorBlendMode: BlendMode.darken,

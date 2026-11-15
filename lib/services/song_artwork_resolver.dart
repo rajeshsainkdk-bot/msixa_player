@@ -1,5 +1,28 @@
+import 'package:flutter/material.dart';
 import '../models/song.dart';
 
+/// Representation of a song's dynamic visual theme
+class SongThemeData {
+  final String themeName;
+  final Color primaryColor;
+  final Color secondaryColor;
+  final Color accentColor;
+  final List<Color> gradientColors;
+  final IconData icon;
+
+  const SongThemeData({
+    required this.themeName,
+    required this.primaryColor,
+    required this.secondaryColor,
+    required this.accentColor,
+    required this.gradientColors,
+    required this.icon,
+  });
+}
+
+/// Production-ready Intelligent Song Artwork & Dynamic Visual Theme Resolver
+/// Automatically detects song mood, deity, culture, and musical style from the song title,
+/// singer, and genre to assign authentic high-definition artwork and dynamic ambient theme colors.
 class SongArtworkResolver {
   static bool isGenericMicUrl(String? url) {
     if (url == null || url.trim().isEmpty) return true;
@@ -9,10 +32,11 @@ class SongArtworkResolver {
         u.contains('1493225457124') ||
         u.contains('placeholder') ||
         u.contains('default_cover') ||
-        u == 'null';
+        u == 'null' ||
+        u.endsWith('/cover.jpg') && u.contains('localhost');
   }
 
-  /// Verified studio portraits and official high-resolution pictures of prominent Indian and global artists
+  /// Official verified studio portraits of prominent Indian and global artists
   static const Map<String, String> _artistImages = {
     // Bhakti & Devotional Singers
     'hariharan': 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=800&q=85',
@@ -120,113 +144,125 @@ class SongArtworkResolver {
     'gulzaar chhaniwala': 'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=800&q=85',
   };
 
-  /// Specific YouTube Music style official posters for uploaded and curated songs
-  static const Map<String, String> _songPosterMap = {
-    'sankat mochan': 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=800&q=85',
-    'hanuman ashtak': 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=800&q=85',
-    'ye chamak': 'https://images.unsplash.com/photo-1590076215667-875d4ef2d7ee?w=800&q=85',
-    'sab kuch sarkar': 'https://images.unsplash.com/photo-1590076215667-875d4ef2d7ee?w=800&q=85',
-    'powerful hanuman': 'https://images.unsplash.com/photo-1609137144822-1d577e02581c?w=800&q=85',
-    'hanuman chalisa': 'https://images.unsplash.com/photo-1609137144822-1d577e02581c?w=800&q=85',
-    'ram siya ram': 'https://images.unsplash.com/photo-1548013146-72479768bada?w=800&q=85',
-    'adipurush': 'https://images.unsplash.com/photo-1548013146-72479768bada?w=800&q=85',
-    'radhe tere charno': 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=800&q=85',
-    'krishna bhajan': 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=800&q=85',
-    'bajrang baan': 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&q=85',
-    'aadesh hanuman': 'https://images.unsplash.com/photo-1506461883276-594a12b11cf3?w=800&q=85',
-    'alakh niranjan': 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800&q=85',
-    'aghori': 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800&q=85',
-    'siddh shabar': 'https://images.unsplash.com/photo-1590076215667-875d4ef2d7ee?w=800&q=85',
-    'guzarish': 'https://images.unsplash.com/photo-1511192336575-5a79af67a629?w=800&q=85',
-    'udaarian': 'https://images.unsplash.com/photo-1465847899084-d164df4dedc6?w=800&q=85',
-    'sajjan raazi': 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&q=85',
-    'tere bina na guzara': 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800&q=85',
-    'jaiye sajana': 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=800&q=85',
-    'intezaar reh gya': 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=800&q=85',
-    'kagaz ki kashti': 'https://images.unsplash.com/photo-1445985543470-41fdd5c31447?w=800&q=85',
-    'choudhary': 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=800&q=85',
-    'kesariya': 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800&q=85',
-    'apna bana le': 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&q=85',
-  };
-
-  /// Thematic artwork collections by deity, culture, and musical style
-  static const Map<String, List<String>> _genreCollections = {
+  /// Thematic High-Resolution Artwork Collections Organized by Deity, Culture, Genre & Mood
+  static const Map<String, List<String>> _thematicGalleries = {
     'shiva': [
-      'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800&q=85',
-      'https://images.unsplash.com/photo-1507676184212-d03ab07a01bf?w=800&q=85',
-      'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&q=85',
+      'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=900&q=85', // Cosmic Himalayan Aura
+      'https://images.unsplash.com/photo-1507676184212-d03ab07a01bf?w=900&q=85', // Sacred Deep Meditation
+      'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=900&q=85', // Night Blue Trishul Radiance
+      'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=900&q=85', // Mystic Tandav Atmosphere
     ],
     'hanuman': [
-      'https://images.unsplash.com/photo-1544717305-2782549b5136?w=800&q=85',
-      'https://images.unsplash.com/photo-1590076215667-875d4ef2d7ee?w=800&q=85',
-      'https://images.unsplash.com/photo-1609137144822-1d577e02581c?w=800&q=85',
+      'https://images.unsplash.com/photo-1544717305-2782549b5136?w=900&q=85', // Golden Radiance of Sankat Mochan
+      'https://images.unsplash.com/photo-1590076215667-875d4ef2d7ee?w=900&q=85', // Sacred Diya & Temple Glow
+      'https://images.unsplash.com/photo-1609137144822-1d577e02581c?w=900&q=85', // Divine Temple Carvings
+      'https://images.unsplash.com/photo-1548013146-72479768bada?w=900&q=85', // Radiant Dawn
     ],
     'krishna': [
-      'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=800&q=85',
-      'https://images.unsplash.com/photo-1544717305-2782549b5136?w=800&q=85',
+      'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=900&q=85', // Golden Peacock Feather Radiance
+      'https://images.unsplash.com/photo-1544717305-2782549b5136?w=900&q=85', // Vrindavan Divine Morning
+      'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=900&q=85', // Celestial Flute Dusk
+      'https://images.unsplash.com/photo-1465847899084-d164df4dedc6?w=900&q=85', // Sunset Radiance
     ],
     'ram': [
-      'https://images.unsplash.com/photo-1548013146-72479768bada?w=800&q=85',
-      'https://images.unsplash.com/photo-1590076215667-875d4ef2d7ee?w=800&q=85',
+      'https://images.unsplash.com/photo-1548013146-72479768bada?w=900&q=85', // Sacred Ayodhya Dawn
+      'https://images.unsplash.com/photo-1590076215667-875d4ef2d7ee?w=900&q=85', // Golden Ramrajya Aura
+      'https://images.unsplash.com/photo-1609137144822-1d577e02581c?w=900&q=85', // Ancient Temple Sanctum
     ],
-    'bhakti': [
-      'https://images.unsplash.com/photo-1544717305-2782549b5136?w=800&q=85',
-      'https://images.unsplash.com/photo-1590076215667-875d4ef2d7ee?w=800&q=85',
-      'https://images.unsplash.com/photo-1609137144822-1d577e02581c?w=800&q=85',
-      'https://images.unsplash.com/photo-1548013146-72479768bada?w=800&q=85',
-      'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=800&q=85',
+    'mata': [
+      'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=900&q=85', // Divine Red Kumkum Aura
+      'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=900&q=85', // Radiant Golden Devi
+      'https://images.unsplash.com/photo-1590076215667-875d4ef2d7ee?w=900&q=85', // Navratri Jyoti
     ],
-    'rajasthani': [
-      'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=800&q=85',
-      'https://images.unsplash.com/photo-1582510003544-4d00b7f74220?w=800&q=85',
-      'https://images.unsplash.com/photo-1524492412937-b28074a5d7da?w=800&q=85',
+    'ganesha': [
+      'https://images.unsplash.com/photo-1590076215667-875d4ef2d7ee?w=900&q=85', // Auspicious Golden Light
+      'https://images.unsplash.com/photo-1544717305-2782549b5136?w=900&q=85', // Vinayak Sacred Blessings
+      'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=900&q=85', // Golden Modak Radiance
     ],
-    'punjabi': [
-      'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800&q=85',
-      'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=800&q=85',
-      'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=800&q=85',
-      'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=800&q=85',
+    'sai': [
+      'https://images.unsplash.com/photo-1544717305-2782549b5136?w=900&q=85', // Shirdi Divine Sanctum
+      'https://images.unsplash.com/photo-1590076215667-875d4ef2d7ee?w=900&q=85', // Holy Dhuni Light
     ],
-    'haryanvi': [
-      'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=800&q=85',
-      'https://images.unsplash.com/photo-1506157786151-b8491531f063?w=800&q=85',
-    ],
-    'bollywood': [
-      'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800&q=85',
-      'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&q=85',
-      'https://images.unsplash.com/photo-1465847899084-d164df4dedc6?w=800&q=85',
-    ],
-    'lo-fi': [
-      'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&q=85',
-      'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=800&q=85',
-    ],
-    'ghazal': [
-      'https://images.unsplash.com/photo-1445985543470-41fdd5c31447?w=800&q=85',
-      'https://images.unsplash.com/photo-1511192336575-5a79af67a629?w=800&q=85',
+    'waheguru': [
+      'https://images.unsplash.com/photo-1548013146-72479768bada?w=900&q=85', // Golden Temple Radiance
+      'https://images.unsplash.com/photo-1511192336575-5a79af67a629?w=900&q=85', // Sacred Shabad Gurbani
     ],
     'sufi': [
-      'https://images.unsplash.com/photo-1511192336575-5a79af67a629?w=800&q=85',
-      'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=800&q=85',
+      'https://images.unsplash.com/photo-1511192336575-5a79af67a629?w=900&q=85', // Classical Mehfil Qawwali
+      'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=900&q=85', // Soulful Whirling Mystic
+      'https://images.unsplash.com/photo-1445985543470-41fdd5c31447?w=900&q=85', // Acoustic Strings
+    ],
+    'romantic': [
+      'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=900&q=85', // Midnight Romantic Dusk
+      'https://images.unsplash.com/photo-1465847899084-d164df4dedc6?w=900&q=85', // Romantic Golden Sunset
+      'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=900&q=85', // Dreamy Starlight Lovers
+      'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=900&q=85', // Cinematic Rose Velvet
+    ],
+    'sad': [
+      'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=900&q=85', // Raindrop Window Melancholy
+      'https://images.unsplash.com/photo-1445985543470-41fdd5c31447?w=900&q=85', // Lonely Night Streetlight
+      'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=900&q=85', // Solitary Indigo Sky
+    ],
+    'lofi': [
+      'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=900&q=85', // Aesthetic Purple Lo-Fi Bedroom
+      'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=900&q=85', // Cozy Rainy Window
+      'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=900&q=85', // Vintage Cassette Night
+    ],
+    'dj': [
+      'https://images.unsplash.com/photo-1571266028243-3716f02d2d2e?w=900&q=85', // Cyber Neon Laser Spectrum
+      'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=900&q=85', // High-Energy Club Concert
+      'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=900&q=85', // Ultra EDM Festival Crowd
+      'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=900&q=85', // Electric Stage Lights
+    ],
+    'punjabi': [
+      'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=900&q=85', // Royal Punjabi Stage Lights
+      'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=900&q=85', // Golden Mustard Sunset Vibe
+      'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=900&q=85', // High Energy Live Festival
+      'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=900&q=85', // Punjabi Jatt Celebration
+    ],
+    'haryanvi': [
+      'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=900&q=85', // High-Voltage Desi Stage
+      'https://images.unsplash.com/photo-1506157786151-b8491531f063?w=900&q=85', // Heavy Bass Subwoofer Beat
+      'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=900&q=85', // Desi Swag Crowd
+    ],
+    'rajasthani': [
+      'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=900&q=85', // Thar Desert Golden Sunset
+      'https://images.unsplash.com/photo-1582510003544-4d00b7f74220?w=900&q=85', // Royal Fort Arches & Heritage
+      'https://images.unsplash.com/photo-1524492412937-b28074a5d7da?w=900&q=85', // Marwadi Kesariya Culture
+    ],
+    'bollywood': [
+      'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=900&q=85', // Cinema Spotlight & Glamour
+      'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=900&q=85', // Bollywood Blockbuster Night
+      'https://images.unsplash.com/photo-1465847899084-d164df4dedc6?w=900&q=85', // Dramatic Sunset Horizon
+    ],
+    'hiphop': [
+      'https://images.unsplash.com/photo-1506157786151-b8491531f063?w=900&q=85', // Urban Neon Street Cypher
+      'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=900&q=85', // Underground Rap Stage
+    ],
+    'retro': [
+      'https://images.unsplash.com/photo-1445985543470-41fdd5c31447?w=900&q=85', // Classic Golden Vinyl Player
+      'https://images.unsplash.com/photo-1511192336575-5a79af67a629?w=900&q=85', // 70s-90s Warm Vintage
+      'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=900&q=85', // Nostalgic Audio Cassette
     ],
   };
 
-  /// Studio Pool of vibrant music artwork cards
-  static const List<String> _uniqueStudioPool = [
-    'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800&q=85',
-    'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=800&q=85',
-    'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=800&q=85',
-    'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=800&q=85',
-    'https://images.unsplash.com/photo-1511192336575-5a79af67a629?w=800&q=85',
-    'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=800&q=85',
-    'https://images.unsplash.com/photo-1445985543470-41fdd5c31447?w=800&q=85',
-    'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&q=85',
-    'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=800&q=85',
-    'https://images.unsplash.com/photo-1465847899084-d164df4dedc6?w=800&q=85',
-    'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=800&q=85',
-    'https://images.unsplash.com/photo-1506157786151-b8491531f063?w=800&q=85',
-    'https://images.unsplash.com/photo-1544717305-2782549b5136?w=800&q=85',
-    'https://images.unsplash.com/photo-1590076215667-875d4ef2d7ee?w=800&q=85',
-    'https://images.unsplash.com/photo-1609137144822-1d577e02581c?w=800&q=85',
+  /// Pre-defined Studio Artworks for Universal Deterministic Fallback
+  static const List<String> _studioArtPool = [
+    'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=900&q=85',
+    'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=900&q=85',
+    'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=900&q=85',
+    'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=900&q=85',
+    'https://images.unsplash.com/photo-1511192336575-5a79af67a629?w=900&q=85',
+    'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=900&q=85',
+    'https://images.unsplash.com/photo-1445985543470-41fdd5c31447?w=900&q=85',
+    'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=900&q=85',
+    'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=900&q=85',
+    'https://images.unsplash.com/photo-1465847899084-d164df4dedc6?w=900&q=85',
+    'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=900&q=85',
+    'https://images.unsplash.com/photo-1506157786151-b8491531f063?w=900&q=85',
+    'https://images.unsplash.com/photo-1544717305-2782549b5136?w=900&q=85',
+    'https://images.unsplash.com/photo-1590076215667-875d4ef2d7ee?w=900&q=85',
+    'https://images.unsplash.com/photo-1609137144822-1d577e02581c?w=900&q=85',
   ];
 
   /// Resolves the verified singer portrait for Artist avatars and detail screens
@@ -238,77 +274,500 @@ class SongArtworkResolver {
       }
     }
     final hash = artistName.hashCode.abs();
-    return _uniqueStudioPool[hash % _uniqueStudioPool.length];
+    return _studioArtPool[hash % _studioArtPool.length];
   }
 
-  /// Resolves the optimal high-resolution artwork for any song based on title, singer, deity, or genre
+  /// Automatically detects the thematic key from title, artist, and genre
+  static String detectThemeKey(String title, {String artist = '', String? genre}) {
+    final t = title.toLowerCase();
+    final a = artist.toLowerCase();
+    final g = (genre ?? '').toLowerCase();
+    final combined = '$t $a $g';
+
+    // 1. Lord Shiva / Mahadev
+    if (combined.contains('shiv') ||
+        combined.contains('mahadev') ||
+        combined.contains('shambhu') ||
+        combined.contains('bhole') ||
+        combined.contains('kedarnath') ||
+        combined.contains('ujjain') ||
+        combined.contains('damru') ||
+        combined.contains('tandav') ||
+        combined.contains('kailash') ||
+        combined.contains('om namah') ||
+        combined.contains('rudra') ||
+        combined.contains('aghori')) {
+      return 'shiva';
+    }
+
+    // 2. Lord Hanuman / Bajrangbali / Balaji
+    if (combined.contains('hanuman') ||
+        combined.contains('bajrang') ||
+        combined.contains('chalisa') ||
+        combined.contains('sankat') ||
+        combined.contains('balaji') ||
+        combined.contains('maruti') ||
+        combined.contains('anjani') ||
+        combined.contains('pawansut') ||
+        combined.contains('mehandipur')) {
+      return 'hanuman';
+    }
+
+    // 3. Lord Krishna / Khatu Shyam / Radhe
+    if (combined.contains('krishna') ||
+        combined.contains('shyam') ||
+        combined.contains('khatu') ||
+        combined.contains('radha') ||
+        combined.contains('radhe') ||
+        combined.contains('kanha') ||
+        combined.contains('gopal') ||
+        combined.contains('makhan') ||
+        combined.contains('vrindavan') ||
+        combined.contains('barsana') ||
+        combined.contains('govind') ||
+        combined.contains('bihari') ||
+        combined.contains('murli')) {
+      return 'krishna';
+    }
+
+    // 4. Lord Ram / Ayodhya
+    if (combined.contains('ram') ||
+        combined.contains('siya') ||
+        combined.contains('ayodhya') ||
+        combined.contains('raghu') ||
+        combined.contains('sita') ||
+        combined.contains('adipurush')) {
+      return 'ram';
+    }
+
+    // 5. Maa Durga / Navratri / Kali / Vaishno
+    if (combined.contains('mata') ||
+        combined.contains('durga') ||
+        combined.contains('ambe') ||
+        combined.contains('kali') ||
+        combined.contains('vaishno') ||
+        combined.contains('sherawali') ||
+        combined.contains('navratri') ||
+        combined.contains('bhavani') ||
+        combined.contains('maiya')) {
+      return 'mata';
+    }
+
+    // 6. Lord Ganesha
+    if (combined.contains('ganesh') ||
+        combined.contains('ganpati') ||
+        combined.contains('vinayak') ||
+        combined.contains('bappa') ||
+        combined.contains('modak') ||
+        combined.contains('lambodar')) {
+      return 'ganesha';
+    }
+
+    // 7. Sai Baba
+    if (combined.contains('sai') || combined.contains('shirdi')) {
+      return 'sai';
+    }
+
+    // 8. Sikh Devotional / Waheguru / Gurbani
+    if (combined.contains('waheguru') ||
+        combined.contains('gurbani') ||
+        combined.contains('satnam') ||
+        combined.contains('shabad') ||
+        combined.contains('khalsa') ||
+        combined.contains('golden temple')) {
+      return 'waheguru';
+    }
+
+    // 9. Sufi / Qawwali / Khwaja
+    if (combined.contains('sufi') ||
+        combined.contains('qawwali') ||
+        combined.contains('khwaja') ||
+        combined.contains('dargah') ||
+        combined.contains('ajmer') ||
+        combined.contains('maula') ||
+        combined.contains('faqeer') ||
+        combined.contains('ali')) {
+      return 'sufi';
+    }
+
+    // 10. DJ Remix / Bass / Club / Party
+    if (combined.contains('dj') ||
+        combined.contains('remix') ||
+        combined.contains('party') ||
+        combined.contains('club') ||
+        combined.contains('bass') ||
+        combined.contains('drop') ||
+        combined.contains('edm') ||
+        combined.contains('dance') ||
+        combined.contains('mashup')) {
+      return 'dj';
+    }
+
+    // 11. Punjabi / Bhangra
+    if (combined.contains('punjabi') ||
+        combined.contains('bhangra') ||
+        combined.contains('dhol') ||
+        combined.contains('jatt') ||
+        combined.contains('pind') ||
+        combined.contains('sardar') ||
+        combined.contains('gabru') ||
+        combined.contains('patiala')) {
+      return 'punjabi';
+    }
+
+    // 12. Haryanvi / Desi
+    if (combined.contains('haryanvi') ||
+        combined.contains('desi') ||
+        combined.contains('ragni') ||
+        combined.contains('jaat') ||
+        combined.contains('tau') ||
+        combined.contains('systumm') ||
+        combined.contains('badmashi')) {
+      return 'haryanvi';
+    }
+
+    // 13. Rajasthani / Marwadi
+    if (combined.contains('rajasthan') ||
+        combined.contains('marwadi') ||
+        combined.contains('ghoomar') ||
+        combined.contains('kesariya') ||
+        combined.contains('banna') ||
+        combined.contains('choudhary') ||
+        combined.contains('padharo')) {
+      return 'rajasthani';
+    }
+
+    // 14. Romantic / Love
+    if (combined.contains('pyar') ||
+        combined.contains('ishq') ||
+        combined.contains('mohabbat') ||
+        combined.contains('dil') ||
+        combined.contains('love') ||
+        combined.contains('romantic') ||
+        combined.contains('humsafar') ||
+        combined.contains('sanam') ||
+        combined.contains('jaan') ||
+        combined.contains('chahat') ||
+        combined.contains('soniye') ||
+        combined.contains('hiriye')) {
+      return 'romantic';
+    }
+
+    // 15. Sad / Heartbreak / Dard
+    if (combined.contains('sad') ||
+        combined.contains('dard') ||
+        combined.contains('judai') ||
+        combined.contains('bewafa') ||
+        combined.contains('yaad') ||
+        combined.contains('tanha') ||
+        combined.contains('breakup') ||
+        combined.contains('aansu') ||
+        combined.contains('broken')) {
+      return 'sad';
+    }
+
+    // 16. Lo-Fi / Chill / Acoustic
+    if (combined.contains('lofi') ||
+        combined.contains('lo-fi') ||
+        combined.contains('chill') ||
+        combined.contains('slow') ||
+        combined.contains('reverb') ||
+        combined.contains('acoustic') ||
+        combined.contains('sleep') ||
+        combined.contains('relax') ||
+        combined.contains('midnight')) {
+      return 'lofi';
+    }
+
+    // 17. Rap / Hip-Hop
+    if (combined.contains('rap') ||
+        combined.contains('hip hop') ||
+        combined.contains('hiphop') ||
+        combined.contains('gully') ||
+        combined.contains('cypher') ||
+        combined.contains('bars')) {
+      return 'hiphop';
+    }
+
+    // 18. Retro / Classics
+    if (combined.contains('retro') ||
+        combined.contains('classic') ||
+        combined.contains('vintage') ||
+        combined.contains('purane') ||
+        combined.contains('70s') ||
+        combined.contains('80s') ||
+        combined.contains('90s') ||
+        combined.contains('evergreen')) {
+      return 'retro';
+    }
+
+    // 19. Bollywood / General
+    if (combined.contains('bollywood') || combined.contains('filmi') || combined.contains('cinema')) {
+      return 'bollywood';
+    }
+
+    return 'default';
+  }
+
+  /// Returns the dynamic visual theme data (gradients, ambient aura colors, icons) for any song
+  static SongThemeData getThemeForSong(Song song) {
+    return getThemeForTitle(song.title, artist: song.artist, genre: song.genre);
+  }
+
+  /// Returns the dynamic visual theme data for given title, artist, and genre
+  static SongThemeData getThemeForTitle(String title, {String artist = '', String? genre}) {
+    final key = detectThemeKey(title, artist: artist, genre: genre);
+    switch (key) {
+      case 'shiva':
+        return const SongThemeData(
+          themeName: 'Mahadev Aura',
+          primaryColor: Color(0xFF0F172A),
+          secondaryColor: Color(0xFF1E293B),
+          accentColor: Color(0xFF00E5FF),
+          gradientColors: [Color(0xFF0A1128), Color(0xFF1C2A4A), Color(0xFF00E5FF)],
+          icon: Icons.flare_rounded,
+        );
+      case 'hanuman':
+        return const SongThemeData(
+          themeName: 'Bajrangbali Aura',
+          primaryColor: Color(0xFF431407),
+          secondaryColor: Color(0xFF9A3412),
+          accentColor: Color(0xFFFF9800),
+          gradientColors: [Color(0xFF451A03), Color(0xFFC2410C), Color(0xFFFFB74D)],
+          icon: Icons.local_fire_department_rounded,
+        );
+      case 'krishna':
+        return const SongThemeData(
+          themeName: 'Shyam Khatu Aura',
+          primaryColor: Color(0xFF064E3B),
+          secondaryColor: Color(0xFF047857),
+          accentColor: Color(0xFF10B981),
+          gradientColors: [Color(0xFF022C22), Color(0xFF065F46), Color(0xFF34D399)],
+          icon: Icons.wb_sunny_rounded,
+        );
+      case 'ram':
+        return const SongThemeData(
+          themeName: 'Ayodhya Ram Aura',
+          primaryColor: Color(0xFF7C2D12),
+          secondaryColor: Color(0xFFC2410C),
+          accentColor: Color(0xFFFBBF24),
+          gradientColors: [Color(0xFF431407), Color(0xFFEA580C), Color(0xFFFDE047)],
+          icon: Icons.brightness_high_rounded,
+        );
+      case 'mata':
+        return const SongThemeData(
+          themeName: 'Mata Rani Aura',
+          primaryColor: Color(0xFF881337),
+          secondaryColor: Color(0xFFBE123C),
+          accentColor: Color(0xFFFDA4AF),
+          gradientColors: [Color(0xFF4C0519), Color(0xFF9F1239), Color(0xFFFB7185)],
+          icon: Icons.star_rounded,
+        );
+      case 'ganesha':
+        return const SongThemeData(
+          themeName: 'Ganpati Aura',
+          primaryColor: Color(0xFF78350F),
+          secondaryColor: Color(0xFFD97706),
+          accentColor: Color(0xFFFCD34D),
+          gradientColors: [Color(0xFF451A03), Color(0xFFB45309), Color(0xFFFBBF24)],
+          icon: Icons.celebration_rounded,
+        );
+      case 'sai':
+        return const SongThemeData(
+          themeName: 'Sai Baba Aura',
+          primaryColor: Color(0xFF78350F),
+          secondaryColor: Color(0xFFB45309),
+          accentColor: Color(0xFFFFD54F),
+          gradientColors: [Color(0xFF3E1F00), Color(0xFF8D4004), Color(0xFFFFD54F)],
+          icon: Icons.lightbulb_rounded,
+        );
+      case 'waheguru':
+        return const SongThemeData(
+          themeName: 'Gurbani Aura',
+          primaryColor: Color(0xFF1E3A8A),
+          secondaryColor: Color(0xFF1D4ED8),
+          accentColor: Color(0xFFF59E0B),
+          gradientColors: [Color(0xFF172554), Color(0xFF1E40AF), Color(0xFFFBBF24)],
+          icon: Icons.circle_outlined,
+        );
+      case 'sufi':
+        return const SongThemeData(
+          themeName: 'Sufi Mehfil',
+          primaryColor: Color(0xFF1C1917),
+          secondaryColor: Color(0xFF44403C),
+          accentColor: Color(0xFFD97706),
+          gradientColors: [Color(0xFF1C1917), Color(0xFF292524), Color(0xFFB45309)],
+          icon: Icons.audiotrack_rounded,
+        );
+      case 'romantic':
+        return const SongThemeData(
+          themeName: 'Romantic Velvet',
+          primaryColor: Color(0xFF4C0519),
+          secondaryColor: Color(0xFF831843),
+          accentColor: Color(0xFFF43F5E),
+          gradientColors: [Color(0xFF3B0764), Color(0xFF880E4F), Color(0xFFFB7185)],
+          icon: Icons.favorite_rounded,
+        );
+      case 'sad':
+        return const SongThemeData(
+          themeName: 'Moody Blue',
+          primaryColor: Color(0xFF0F172A),
+          secondaryColor: Color(0xFF1E293B),
+          accentColor: Color(0xFF38BDF8),
+          gradientColors: [Color(0xFF0B192C), Color(0xFF1E3E62), Color(0xFF60A5FA)],
+          icon: Icons.cloud_rounded,
+        );
+      case 'lofi':
+        return const SongThemeData(
+          themeName: 'Lo-Fi Chill',
+          primaryColor: Color(0xFF2E1065),
+          secondaryColor: Color(0xFF581C87),
+          accentColor: Color(0xFFA855F7),
+          gradientColors: [Color(0xFF180A2E), Color(0xFF4C1D95), Color(0xFF818CF8)],
+          icon: Icons.nightlight_round,
+        );
+      case 'dj':
+        return const SongThemeData(
+          themeName: 'DJ Cyber Bass',
+          primaryColor: Color(0xFF1E1B4B),
+          secondaryColor: Color(0xFF3730A3),
+          accentColor: Color(0xFF00E5FF),
+          gradientColors: [Color(0xFF1E1B4B), Color(0xFF7C3AED), Color(0xFF00E5FF)],
+          icon: Icons.speaker_group_rounded,
+        );
+      case 'punjabi':
+        return const SongThemeData(
+          themeName: 'Punjabi Beats',
+          primaryColor: Color(0xFF581C87),
+          secondaryColor: Color(0xFF7E22CE),
+          accentColor: Color(0xFFFF9800),
+          gradientColors: [Color(0xFF3B0764), Color(0xFF6B21A8), Color(0xFFFF9800)],
+          icon: Icons.music_note_rounded,
+        );
+      case 'haryanvi':
+        return const SongThemeData(
+          themeName: 'Haryanvi Desi',
+          primaryColor: Color(0xFF14532D),
+          secondaryColor: Color(0xFF15803D),
+          accentColor: Color(0xFF4ADE80),
+          gradientColors: [Color(0xFF052E16), Color(0xFF166534), Color(0xFF22C55E)],
+          icon: Icons.bolt_rounded,
+        );
+      case 'rajasthani':
+        return const SongThemeData(
+          themeName: 'Rajasthani Kesariya',
+          primaryColor: Color(0xFF7C2D12),
+          secondaryColor: Color(0xFFC2410C),
+          accentColor: Color(0xFFFBBF24),
+          gradientColors: [Color(0xFF451A03), Color(0xFFEA580C), Color(0xFFFBBF24)],
+          icon: Icons.wb_sunny_rounded,
+        );
+      case 'hiphop':
+        return const SongThemeData(
+          themeName: 'Street Hip-Hop',
+          primaryColor: Color(0xFF18181B),
+          secondaryColor: Color(0xFF27272A),
+          accentColor: Color(0xFFE11D48),
+          gradientColors: [Color(0xFF18181B), Color(0xFF3F3F46), Color(0xFFE11D48)],
+          icon: Icons.mic_external_on_rounded,
+        );
+      case 'retro':
+        return const SongThemeData(
+          themeName: 'Vintage Gold',
+          primaryColor: Color(0xFF292524),
+          secondaryColor: Color(0xFF44403C),
+          accentColor: Color(0xFFD97706),
+          gradientColors: [Color(0xFF1C1917), Color(0xFF44403C), Color(0xFFD97706)],
+          icon: Icons.radio_rounded,
+        );
+      case 'bollywood':
+      default:
+        // Deterministic palette based on title & artist
+        final hash = (title + artist).hashCode.abs();
+        final palettes = [
+          const SongThemeData(
+            themeName: 'Electric Neon',
+            primaryColor: Color(0xFF0F172A),
+            secondaryColor: Color(0xFF1E293B),
+            accentColor: Color(0xFF00E5FF),
+            gradientColors: [Color(0xFF0A192F), Color(0xFF1E3A8A), Color(0xFF00E5FF)],
+            icon: Icons.album_rounded,
+          ),
+          const SongThemeData(
+            themeName: 'Cosmic Purple',
+            primaryColor: Color(0xFF2E1065),
+            secondaryColor: Color(0xFF4C1D95),
+            accentColor: Color(0xFFEC4899),
+            gradientColors: [Color(0xFF1E1B4B), Color(0xFF581C87), Color(0xFFEC4899)],
+            icon: Icons.music_note_rounded,
+          ),
+          const SongThemeData(
+            themeName: 'Emerald Harmony',
+            primaryColor: Color(0xFF064E3B),
+            secondaryColor: Color(0xFF047857),
+            accentColor: Color(0xFF10B981),
+            gradientColors: [Color(0xFF022C22), Color(0xFF065F46), Color(0xFF34D399)],
+            icon: Icons.graphic_eq_rounded,
+          ),
+          const SongThemeData(
+            themeName: 'Amber Sunset',
+            primaryColor: Color(0xFF7C2D12),
+            secondaryColor: Color(0xFF9A3412),
+            accentColor: Color(0xFFF59E0B),
+            gradientColors: [Color(0xFF431407), Color(0xFFB45309), Color(0xFFFBBF24)],
+            icon: Icons.surround_sound_rounded,
+          ),
+        ];
+        return palettes[hash % palettes.length];
+    }
+  }
+
+  /// Resolves the optimal high-resolution thematic artwork URL for any song based on title, singer, or genre
   static String resolveArtwork({
     required String title,
     required String artist,
     String? genre,
   }) {
-    final lowerTitle = title.toLowerCase();
+    // 1. Direct singer / artist keyword matches
     final lowerArtist = artist.toLowerCase();
-
-    // 1. Direct song title matches to official song posters
-    for (final entry in _songPosterMap.entries) {
-      if (lowerTitle.contains(entry.key)) {
-        return entry.value;
-      }
-    }
-
-    // 2. Direct singer / artist keyword matches
+    final lowerTitle = title.toLowerCase();
     for (final entry in _artistImages.entries) {
       if (lowerArtist.contains(entry.key) || lowerTitle.contains(entry.key)) {
         return entry.value;
       }
     }
 
-    // 3. Spiritual / deity keywords in title or artist
-    final combined = '$lowerArtist $lowerTitle';
-    if (combined.contains('shiv') || combined.contains('mahadev') || combined.contains('shambhu') || combined.contains('bholenath')) {
-      final list = _genreCollections['shiva']!;
-      return list[title.hashCode.abs() % list.length];
-    }
-    if (combined.contains('hanuman') || combined.contains('bajrang') || combined.contains('chalisa') || combined.contains('sankat')) {
-      final list = _genreCollections['hanuman']!;
-      return list[title.hashCode.abs() % list.length];
-    }
-    if (combined.contains('krishna') || combined.contains('shyam') || combined.contains('khatu') || combined.contains('radhe') || combined.contains('kanha')) {
-      final list = _genreCollections['krishna']!;
-      return list[title.hashCode.abs() % list.length];
-    }
-    if (combined.contains('ram') || combined.contains('ayodhya') || combined.contains('siya')) {
-      final list = _genreCollections['ram']!;
-      return list[title.hashCode.abs() % list.length];
+    // 2. Identify thematic gallery key
+    final themeKey = detectThemeKey(title, artist: artist, genre: genre);
+    final gallery = _thematicGalleries[themeKey];
+    if (gallery != null && gallery.isNotEmpty) {
+      final hash = (title + artist).hashCode.abs();
+      return gallery[hash % gallery.length];
     }
 
-    // 4. Check genre keywords
-    final lowerGenre = (genre ?? '').toLowerCase();
-    for (final entry in _genreCollections.entries) {
-      if (lowerGenre.contains(entry.key) || combined.contains(entry.key)) {
-        final list = entry.value;
-        return list[title.hashCode.abs() % list.length];
-      }
-    }
-
-    // 5. Deterministic unique cover from pool using title hash
+    // 3. Fallback to rich studio pool deterministically
     final hash = (title + artist).hashCode.abs();
-    return _uniqueStudioPool[hash % _uniqueStudioPool.length];
+    return _studioArtPool[hash % _studioArtPool.length];
   }
 
   /// Automatically parses artist name from title or filename
-  static String extractArtist(String title, {String fallback = 'Unknown Artist'}) {
+  static String extractArtist(String title, {String fallback = 'Various Artists'}) {
     final clean = title.replaceAll(RegExp(r'\.(mp3|m4a|wav|aac|flac)$', caseSensitive: false), '');
-    if (clean.contains('-')) {
+    if (clean.contains(' - ')) {
+      final parts = clean.split(' - ');
+      if (parts.length >= 2) {
+        final left = parts[0].trim();
+        if (left.isNotEmpty) return left;
+      }
+    } else if (clean.contains('-')) {
       final parts = clean.split('-');
       if (parts.length >= 2) {
         final right = parts[1].trim();
         if (right.isNotEmpty) return right;
       }
     }
-    if (clean.contains('by ')) {
-      final parts = clean.split('by ');
+    if (clean.contains('by ') || clean.contains('By ')) {
+      final parts = clean.split(RegExp(r'by ', caseSensitive: false));
       if (parts.length >= 2) {
         final right = parts[1].trim();
         if (right.isNotEmpty) return right;

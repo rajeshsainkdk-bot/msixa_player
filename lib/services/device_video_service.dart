@@ -158,11 +158,13 @@ class DeviceVideoService {
   }
 
   /// Open video with system external player (MX Player, VLC, Samsung Video, etc.)
-  static Future<void> openExternalPlayer(String path, {String? id}) async {
+  static Future<void> openExternalPlayer(String path, {String? id, int decodeMode = 2, int positionMs = 0}) async {
     try {
       await _channel.invokeMethod('openVideoWithApp', {
         'path': path,
         'id': id,
+        'decode_mode': decodeMode,
+        'position': positionMs,
       });
     } catch (_) {}
   }
@@ -174,6 +176,12 @@ class DeviceVideoService {
   static Uint8List? getCachedThumbnail(String path, {String? id}) {
     final key = '$id:$path';
     return _thumbnailMemoryCache[key];
+  }
+
+  /// Clears in-memory video thumbnail caches for re-generation
+  static void clearThumbnailCache() {
+    _thumbnailMemoryCache.clear();
+    _inFlightThumbnails.clear();
   }
 
   /// Asynchronously retrieve video thumbnail bytes from memory, disk cache, or native extractor

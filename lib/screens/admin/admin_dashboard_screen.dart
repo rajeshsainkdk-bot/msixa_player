@@ -1,4 +1,4 @@
-﻿import 'package:flutter/services.dart';
+import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import 'dart:async';
 import 'dart:io';
@@ -1034,7 +1034,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                               detectedArtist = split[0].trim();
                               detectedTitle = split.sublist(1).join(' - ').trim();
                             }
+                          } else {
+                            detectedArtist = SongArtworkResolver.extractArtist(smartTitle, fallback: 'Various Artists');
                           }
+
+                          discoveredCoverUrl ??= SongArtworkResolver.resolveArtwork(
+                            title: detectedTitle,
+                            artist: detectedArtist,
+                            genre: targetCategory,
+                          );
 
                           final newSong = await _backend.addAdminSong(
                             title: detectedTitle,
@@ -1047,6 +1055,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                           );
                           uploadedSongsList.add(newSong);
                           successCount++;
+                          _onR2Update();
                         }
                       } catch (e) {
                         debugPrint('Error uploading ${pf.name}: $e');

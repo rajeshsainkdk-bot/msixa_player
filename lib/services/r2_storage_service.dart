@@ -318,7 +318,7 @@ class R2StorageService extends ChangeNotifier {
 
     if (isConfigured) {
       try {
-        String? continuationToken;
+        String? lastKey;
         int pages = 0;
 
         while (pages < 5) {
@@ -328,9 +328,10 @@ class R2StorageService extends ChangeNotifier {
           final amzDate = _formatAmzDate(now);
           final endpointHost = '$_accountId.r2.cloudflarestorage.com';
 
-          // Canonical Request for S3 ListObjectsV2
-          final canonicalQuery = continuationToken != null
-              ? 'continuation-token=${Uri.encodeComponent(continuationToken)}&list-type=2'
+          // Canonical Request for S3 ListObjectsV2 with start-after key pagination
+          // Note: In SigV4 canonical query, parameters must be sorted alphabetically: list-type comes before start-after
+          final canonicalQuery = lastKey != null
+              ? 'list-type=2&start-after=${Uri.encodeComponent(lastKey)}'
               : 'list-type=2';
           const emptyPayloadHash = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
           final canonicalHeaders = 'host:$endpointHost\n'
@@ -375,6 +376,7 @@ class R2StorageService extends ChangeNotifier {
           if (response.statusCode == 200) {
             final body = response.body;
             final sizeMatches = RegExp(r'<Size>(\d+)</Size>').allMatches(body);
+            final keyMatches = RegExp(r'<Key>([^<]+)</Key>').allMatches(body).toList();
             for (final m in sizeMatches) {
               final size = int.tryParse(m.group(1) ?? '0') ?? 0;
               totalBytesUsed += size;
@@ -382,9 +384,9 @@ class R2StorageService extends ChangeNotifier {
             }
             isLiveQueried = true;
 
-            final tokenMatch = RegExp(r'<NextContinuationToken>([^<]+)</NextContinuationToken>').firstMatch(body);
-            if (tokenMatch != null && tokenMatch.group(1) != null) {
-              continuationToken = tokenMatch.group(1);
+            final isTruncated = body.contains('<IsTruncated>true</IsTruncated>');
+            if (isTruncated && keyMatches.isNotEmpty) {
+              lastKey = keyMatches.last.group(1);
             } else {
               break;
             }

@@ -589,14 +589,17 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     } catch (_) {}
   }
 
-  Future<void> _openInMxPlayer() async {
+  Future<void> _openInMxPlayer({int decodeMode = 2}) async {
     try {
       if (_controller.value.isPlaying) {
         await _controller.pause();
       }
+      final posMs = _controller.value.position.inMilliseconds;
       await DeviceVideoService.openExternalPlayer(
         _currentVideo.path,
         id: _currentVideo.id,
+        decodeMode: decodeMode,
+        positionMs: posMs,
       );
     } catch (_) {}
   }
@@ -1345,11 +1348,18 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       final targetMs = (currentPos.inMilliseconds + _accumulatedSeekSeconds * 1000).clamp(0, maxMs);
       _accumulatedSeekSeconds = 0;
 
+      final wasPlaying = _controller.value.isPlaying;
+      if (wasPlaying) {
+        await _controller.pause();
+      }
       await _controller.seekTo(Duration(milliseconds: targetMs));
       if (_isSyncAudioPlaying) {
         try {
           await _channel.invokeMethod('seekSyncAudio', {'positionMs': targetMs});
         } catch (_) {}
+      }
+      if (wasPlaying && mounted) {
+        await _controller.play();
       }
     });
 
@@ -3827,11 +3837,18 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                         setState(() => _scrubValue = val);
                                       },
                                       onChangeEnd: (val) async {
+                                        final wasPlaying = _controller.value.isPlaying;
+                                        if (wasPlaying) {
+                                          await _controller.pause();
+                                        }
                                         await _controller.seekTo(Duration(milliseconds: val.toInt()));
                                         if (_isSyncAudioPlaying) {
                                           try {
                                             await _channel.invokeMethod('seekSyncAudio', {'positionMs': val.toInt()});
                                           } catch (_) {}
+                                        }
+                                        if (wasPlaying && mounted) {
+                                          await _controller.play();
                                         }
                                         setState(() => _isScrubbing = false);
                                         _startControlsTimer();
