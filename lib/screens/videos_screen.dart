@@ -1224,44 +1224,53 @@ class _VideosScreenState extends State<VideosScreen> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
           backgroundColor: const Color(0xFF212124),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          title: const Text('Play using...', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: const [
+              Icon(Icons.developer_board_rounded, color: Color(0xFF2563EB), size: 22),
+              SizedBox(width: 8),
+              Text('Play with Decoder', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+            ],
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              RadioListTile<int>(
-                value: 1,
-                groupValue: selectedMode,
-                activeColor: const Color(0xFF2563EB),
-                title: const Text('HW decoder', style: TextStyle(color: Colors.white, fontSize: 14)),
-                onChanged: (val) {
-                  setDialogState(() => selectedMode = val ?? 1);
-                  Navigator.pop(ctx);
-                  DeviceVideoService.openExternalPlayer(video.path, id: video.id, decodeMode: 1);
-                },
+              const Padding(
+                padding: EdgeInsets.only(left: 14, bottom: 8),
+                child: Text('Playback runs in-app with crystal clear sound & smooth seek', style: TextStyle(color: Colors.white54, fontSize: 11)),
               ),
               RadioListTile<int>(
                 value: 2,
                 groupValue: selectedMode,
                 activeColor: const Color(0xFF2563EB),
-                title: const Text('HW+ decoder', style: TextStyle(color: Colors.white, fontSize: 14)),
-                subtitle: const Text('Recommended for Dolby 5.1 & AC-3', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                title: const Text('HW+ Decoder (Recommended)', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                subtitle: const Text('High-performance engine for 4K movies, Dolby 5.1 & AC-3', style: TextStyle(color: Colors.white54, fontSize: 11)),
                 onChanged: (val) {
-                  setDialogState(() => selectedMode = val ?? 2);
                   Navigator.pop(ctx);
-                  DeviceVideoService.openExternalPlayer(video.path, id: video.id, decodeMode: 2);
+                  _playVideoWithDecoder(video, 'HW+');
+                },
+              ),
+              RadioListTile<int>(
+                value: 1,
+                groupValue: selectedMode,
+                activeColor: const Color(0xFF2563EB),
+                title: const Text('HW Decoder', style: TextStyle(color: Colors.white, fontSize: 14)),
+                subtitle: const Text('Hardware acceleration (Best battery life)', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                onChanged: (val) {
+                  Navigator.pop(ctx);
+                  _playVideoWithDecoder(video, 'HW');
                 },
               ),
               RadioListTile<int>(
                 value: 0,
                 groupValue: selectedMode,
                 activeColor: const Color(0xFF2563EB),
-                title: const Text('SW decoder', style: TextStyle(color: Colors.white, fontSize: 14)),
-                subtitle: const Text('Software decoder fallback', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                title: const Text('SW Decoder', style: TextStyle(color: Colors.white, fontSize: 14)),
+                subtitle: const Text('Software decoder fallback for complex containers', style: TextStyle(color: Colors.white54, fontSize: 11)),
                 onChanged: (val) {
-                  setDialogState(() => selectedMode = val ?? 0);
                   Navigator.pop(ctx);
-                  DeviceVideoService.openExternalPlayer(video.path, id: video.id, decodeMode: 0);
+                  _playVideoWithDecoder(video, 'SW');
                 },
               ),
             ],
@@ -1269,6 +1278,29 @@ class _VideosScreenState extends State<VideosScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _playVideoWithDecoder(VideoItem video, String decoder) async {
+    final prefs = await SharedPreferences.getInstance();
+    final recents = prefs.getStringList('recent_video_ids') ?? [];
+    recents.remove(video.id);
+    recents.insert(0, video.id);
+    if (recents.length > 60) recents.removeLast();
+    await prefs.setStringList('recent_video_ids', recents);
+    setState(() => _recentVideoIds = recents);
+
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => VideoPlayerScreen(
+          video: video,
+          playlist: _filteredVideos,
+          initialDecoder: decoder,
+        ),
+      ),
+    );
+    _loadVideos();
   }
 
   void _showVideoDetailsDialog(VideoItem video) {

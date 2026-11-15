@@ -254,69 +254,8 @@ class MainActivity: AudioServiceActivity() {
                     }
                 }
                 "openVideoWithApp" -> {
-                    try {
-                        val path = call.argument<String>("path") ?: ""
-                        val idStr = call.argument<String>("id")
-                        val decodeMode = call.argument<Int>("decode_mode") ?: 2
-                        val positionMs = call.argument<Int>("position") ?: 0
-                        val intent = Intent(Intent.ACTION_VIEW).apply {
-                            if (!idStr.isNullOrEmpty() && idStr.toLongOrNull() != null) {
-                                val u = ContentUris.withAppendedId(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, idStr.toLong())
-                                setDataAndType(u, "video/*")
-                            } else if (path.startsWith("content://")) {
-                                setDataAndType(Uri.parse(path), "video/*")
-                            } else {
-                                var contentUri: Uri? = null
-                                try {
-                                    val cursor = ctx.contentResolver.query(
-                                        MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
-                                        arrayOf(MediaStore.Video.Media._ID),
-                                        "${MediaStore.Video.Media.DATA} = ?",
-                                        arrayOf(path),
-                                        null
-                                    )
-                                    cursor?.use {
-                                        if (it.moveToFirst()) {
-                                            val id = it.getLong(it.getColumnIndexOrThrow(MediaStore.Video.Media._ID))
-                                            contentUri = ContentUris.withAppendedId(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, id)
-                                        }
-                                    }
-                                } catch (_: Exception) {}
-                                setDataAndType(contentUri ?: Uri.parse(path), "video/*")
-                            }
-                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            if (decodeMode >= 0) {
-                                putExtra("decode_mode", decodeMode.toByte())
-                            }
-                            if (positionMs > 0) {
-                                putExtra("position", positionMs)
-                            }
-                            putExtra("return_result", true)
-                        }
-                        val pm = ctx.packageManager
-                        val mxPackages = listOf("com.mxtech.videoplayer.ad", "com.mxtech.videoplayer.pro")
-                        var mxFound = false
-                        for (pkg in mxPackages) {
-                            try {
-                                pm.getPackageInfo(pkg, 0)
-                                intent.setPackage(pkg)
-                                mxFound = true
-                                break
-                            } catch (_: Exception) {}
-                        }
-                        if (mxFound) {
-                            ctx.startActivity(intent)
-                        } else {
-                            val chooser = Intent.createChooser(intent, "Play Video With (MX Player / Any Player)").apply {
-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            }
-                            ctx.startActivity(chooser)
-                        }
-                        result.success(true)
-                    } catch (e: Exception) {
-                        result.error("OPEN_VIDEO_ERR", e.localizedMessage, null)
-                    }
+                    // Strictly pure in-app playback: external applications disabled as per user instruction
+                    result.success(true)
                 }
                 "acquireWakeLock" -> {
                     try {

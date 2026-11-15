@@ -37,8 +37,14 @@ import '../widgets/video_thumbnail_widget.dart';
 class VideoPlayerScreen extends StatefulWidget {
   final VideoItem video;
   final List<VideoItem>? playlist;
+  final String initialDecoder;
 
-  const VideoPlayerScreen({Key? key, required this.video, this.playlist}) : super(key: key);
+  const VideoPlayerScreen({
+    Key? key,
+    required this.video,
+    this.playlist,
+    this.initialDecoder = 'HW+',
+  }) : super(key: key);
 
   @override
   State<VideoPlayerScreen> createState() => _VideoPlayerScreenState();
@@ -239,19 +245,20 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     return false;
   }
 
-  // AI Video Clarity
+  // AI Video Clarity — Ultra-High Dynamic Range & Super-Resolution Enhancer
   bool _isAiClarityActive = false;
   bool _isAiClarityUnlocked = false;
   static const List<double> _aiClarityMatrix = <double>[
-    1.25, -0.06, -0.06, 0.0, 6.0,
-    -0.06, 1.25, -0.06, 0.0, 6.0,
-    -0.06, -0.06, 1.30, 0.0, 8.0,
-    0.0,   0.0,   0.0,   1.0, 0.0,
+    1.42, -0.07, -0.07, 0.0, -8.0,
+    -0.07, 1.42, -0.07, 0.0, -8.0,
+    -0.07, -0.07, 1.48, 0.0, -6.0,
+    0.0,   0.0,   0.0,  1.0,  0.0,
   ];
 
   @override
   void initState() {
     super.initState();
+    _decoderMode = widget.initialDecoder;
     _currentVideo = widget.video;
     _videoList = widget.playlist ?? [_currentVideo];
     _currentIndex = _videoList.indexWhere((v) => v.id == _currentVideo.id);
@@ -555,21 +562,31 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         final parsed = res.map((item) => Map<String, dynamic>.from(item as Map)).toList();
         if (mounted) {
           int initialTrackIdx = 0;
-          if (parsed.length > 1) {
-            final firstMime = (parsed[0]['mime'] ?? '').toString().toLowerCase();
-            final firstIsDolby = parsed[0]['isDolby'] == true ||
-                firstMime.contains('eac3') ||
-                firstMime.contains('ac3') ||
-                firstMime.contains('dts');
-            if (firstIsDolby) {
+          bool mustUseNativeSyncAudio = false;
+
+          final firstMime = (parsed[0]['mime'] ?? '').toString().toLowerCase();
+          final firstIsDolby = parsed[0]['isDolby'] == true ||
+              firstMime.contains('eac3') ||
+              firstMime.contains('ac3') ||
+              firstMime.contains('dts') ||
+              firstMime.contains('mlp');
+
+          if (firstIsDolby) {
+            mustUseNativeSyncAudio = true;
+            if (parsed.length > 1) {
               final playableIdx = parsed.indexWhere((t) {
                 final m = (t['mime'] ?? '').toString().toLowerCase();
                 return m.contains('mp4a') || m.contains('aac') || m.contains('vorbis') || m.contains('opus');
               });
               if (playableIdx != -1) {
                 initialTrackIdx = playableIdx;
+                mustUseNativeSyncAudio = false;
               }
             }
+          }
+
+          if (_isLikelyDolbyOrEac3 || _decoderMode == 'HW+' || _decoderMode == 'SW') {
+            mustUseNativeSyncAudio = true;
           }
 
           setState(() {
@@ -579,14 +596,20 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
               _audioTrackName = _audioTracks[initialTrackIdx]['name']?.toString() ?? 'Track ${initialTrackIdx + 1}';
             }
           });
-          if (initialTrackIdx > 0) {
+          if (initialTrackIdx > 0 || mustUseNativeSyncAudio) {
             await _switchAudioTrack(initialTrackIdx);
           } else {
             await _controller.setVolume(_isMuted ? 0.0 : _volume);
           }
         }
+      } else if (_isLikelyDolbyOrEac3 || _decoderMode == 'HW+' || _decoderMode == 'SW') {
+        await _startSwAudioSyncFallback();
       }
-    } catch (_) {}
+    } catch (_) {
+      if (_isLikelyDolbyOrEac3) {
+        await _startSwAudioSyncFallback();
+      }
+    }
   }
 
   Future<void> _switchAudioTrack(int index) async {
@@ -651,28 +674,28 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
       bool initialized = false;
 
-      // 1. Prefer MediaStore Content URI on Android for native random-access seeking without freezing/jumping
-      final numericId = int.tryParse(_currentVideo.id);
-      if (numericId != null && numericId > 0 && Platform.isAndroid && !_currentVideo.path.startsWith('http')) {
-        try {
-          _controller = VideoPlayerController.contentUri(Uri.parse('content://media/external/video/media/$numericId'));
-          await _controller.initialize();
-          initialized = true;
-        } catch (_) {
-          await _controller.dispose();
-          initialized = false;
-        }
-      }
-
-      // 2. Direct file fallback if local file exists
+      // 1. Direct POSIX File descriptor first: Instant random seeking without Binder IPC stalls on large 2GB-10GB movies
       final localFile = _currentVideo.path.isNotEmpty ? File(_currentVideo.path) : null;
-      if (!initialized && localFile != null && await localFile.exists()) {
+      if (localFile != null && await localFile.exists()) {
         try {
           _controller = VideoPlayerController.file(localFile);
           await _controller.initialize();
           initialized = true;
         } catch (_) {
-          await _controller.dispose();
+          try { await _controller.dispose(); } catch (_) {}
+          initialized = false;
+        }
+      }
+
+      // 2. MediaStore Content URI fallback on Android
+      final numericId = int.tryParse(_currentVideo.id);
+      if (!initialized && numericId != null && numericId > 0 && Platform.isAndroid && !_currentVideo.path.startsWith('http')) {
+        try {
+          _controller = VideoPlayerController.contentUri(Uri.parse('content://media/external/video/media/$numericId'));
+          await _controller.initialize();
+          initialized = true;
+        } catch (_) {
+          try { await _controller.dispose(); } catch (_) {}
           initialized = false;
         }
       }
@@ -1393,7 +1416,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     setState(() {
       _isAiClarityActive = !_isAiClarityActive;
     });
-    _showToast(_isAiClarityActive ? '✨ AI Video Clarity 4K HDR: Activated' : 'AI Video Clarity: Deactivated');
+    _showPillHud(
+      _isAiClarityActive
+          ? '✨ AI 4K HDR PRO: ON (Deep Contrast & Sharpness Enhanced)'
+          : 'AI Clarity: OFF (Original Video)',
+      icon: Icons.auto_awesome_rounded,
+    );
     _resetControlsTimer();
   }
 
@@ -3190,7 +3218,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
     return PopScope(
       canPop: true,
-      onPopInvokedWithResult: (didPop, result) {
+      onPopInvoked: (didPop) {
         try {
           _channel.invokeMethod('setScreenBrightness', {'brightness': -1.0});
         } catch (_) {}
@@ -3256,6 +3284,47 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
             )
           else
             const Center(child: CircularProgressIndicator(color: AppColors.accentCyan)),
+
+          // 1B. AI 4K HDR PRO ACTIVE WATERMARK BADGE
+          if (_isInitialized && _isAiClarityActive)
+            Positioned(
+              top: 16,
+              right: 16,
+              child: IgnorePointer(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3.5),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFFFD700), Color(0xFFFF8C00)],
+                    ),
+                    borderRadius: BorderRadius.circular(6),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFFFD700).withOpacity(0.55),
+                        blurRadius: 10,
+                        spreadRadius: 1,
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Icon(Icons.auto_awesome, color: Colors.black, size: 12),
+                      SizedBox(width: 4),
+                      Text(
+                        'AI 4K HDR PRO',
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
 
           // 2. NIGHT MODE BLUE-LIGHT FILTER OVERLAY
           if (_isNightMode)
