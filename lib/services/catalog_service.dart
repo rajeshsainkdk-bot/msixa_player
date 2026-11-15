@@ -65,10 +65,12 @@ class CatalogService {
     final List<Playlist> playlists = [];
     final Set<String> registeredPlaylistTitles = {};
 
-    // 1. Include all remote Cloud Playlists uploaded to R2 db/playlists.json
+    // 1. Include only remote Cloud Playlists whose songs actually exist in approved library
+    final approvedSongIds = baseSongs.map((s) => s.id).toSet();
     for (final pl in backend.cloudPlaylists) {
-      if (pl.songs.isNotEmpty && registeredPlaylistTitles.add(pl.title.toLowerCase().trim())) {
-        playlists.add(pl);
+      final validSongs = pl.songs.where((s) => approvedSongIds.contains(s.id)).toList();
+      if (validSongs.isNotEmpty && registeredPlaylistTitles.add(pl.title.toLowerCase().trim())) {
+        playlists.add(pl.copyWith(songs: validSongs));
       }
     }
 

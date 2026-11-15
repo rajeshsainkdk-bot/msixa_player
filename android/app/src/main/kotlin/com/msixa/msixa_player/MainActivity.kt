@@ -29,13 +29,36 @@ class MainActivity: AudioServiceActivity() {
     private var initialMediaMime: String? = null
     private var initialMediaName: String? = null
     private var syncAudioPlayer: MediaPlayer? = null
+    private var isVideoPlaying = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val lp = window.attributes
-        lp.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
-        window.attributes = lp
+        resetBrightnessToDefault()
         handleIncomingIntent(intent)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (!isVideoPlaying) {
+            resetBrightnessToDefault()
+        }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus && !isVideoPlaying) {
+            resetBrightnessToDefault()
+        }
+    }
+
+    private fun resetBrightnessToDefault() {
+        runOnUiThread {
+            try {
+                val lp = window.attributes
+                lp.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+                window.attributes = lp
+            } catch (_: Exception) {}
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -76,8 +99,10 @@ class MainActivity: AudioServiceActivity() {
                     runOnUiThread {
                         val lp = window.attributes
                         if (brightness < 0) {
+                            isVideoPlaying = false
                             lp.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
                         } else {
+                            isVideoPlaying = true
                             lp.screenBrightness = brightness.coerceIn(0.01f, 1.0f)
                         }
                         window.attributes = lp

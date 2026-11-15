@@ -290,7 +290,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      lang.isHindi ? '🚀 नया वर्ज़न उपलब्ध है: v$vName' : '🚀 New Update Available: v$vName',
+                                      lang.isHindi ? 'नया वर्ज़न उपलब्ध है: v$vName' : 'New Update Available: v$vName',
                                       style: const TextStyle(color: Colors.black, fontSize: 12, fontWeight: FontWeight.bold),
                                     ),
                                     Text(
@@ -411,7 +411,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                       ),
                                       const SizedBox(height: 2),
                                       Text(
-                                        '${heroSong.artist} • ${heroSong.genre}',
+                                        '${heroSong.artist} | ${heroSong.genre}',
                                         style: const TextStyle(
                                           color: AppColors.textSecondary,
                                           fontSize: 13,
@@ -624,7 +624,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 // ==========================================
                 _buildCategorySection(
                   context,
-                  title: '🕉️ Divine Bhakti & Hanuman Chants',
+                  title: 'Divine Bhakti & Hanuman Chants',
                   genreKey: 'Bhakti',
                   provider: provider,
                   songs: trending.where((s) => s.genre == 'Bhakti').toList(),
@@ -635,7 +635,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 // ==========================================
                 _buildCategorySection(
                   context,
-                  title: '🪕 Sufi & Punjabi (Satinder Sartaaj)',
+                  title: 'Sufi & Punjabi (Satinder Sartaaj)',
                   genreKey: 'Punjabi',
                   provider: provider,
                   songs: trending.where((s) => s.genre == 'Punjabi' || s.genre == 'Sufi').toList(),
@@ -646,7 +646,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 // ==========================================
                 _buildCategorySection(
                   context,
-                  title: '🎬 Bollywood & Indie Melodies',
+                  title: 'Bollywood & Indie Melodies',
                   genreKey: 'Bollywood',
                   provider: provider,
                   songs: trending.where((s) => s.genre == 'Bollywood' || s.genre == 'Indie Pop').toList(),
@@ -657,7 +657,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 // ==========================================
                 _buildCategorySection(
                   context,
-                  title: '🔱 Aghori & Spiritual Trance',
+                  title: 'Aghori & Spiritual Trance',
                   genreKey: 'Spiritual',
                   provider: provider,
                   songs: trending.where((s) => s.genre == 'Spiritual').toList(),
@@ -668,7 +668,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 // ==========================================
                 _buildCategorySection(
                   context,
-                  title: '☕ Desi Lo-Fi & Ghazals',
+                  title: 'Desi Lo-Fi & Ghazals',
                   genreKey: 'Desi Lo-Fi',
                   provider: provider,
                   songs: trending.where((s) => s.genre == 'Desi Lo-Fi' || s.genre == 'Ghazal').toList(),
@@ -679,7 +679,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 // ==========================================
                 _buildCategorySection(
                   context,
-                  title: '🐪 Rangeelo Rajasthani & Marwadi Hits',
+                  title: 'Rangeelo Rajasthani & Marwadi Hits',
                   genreKey: 'Rajasthani',
                   provider: provider,
                   songs: trending.where((s) => s.genre == 'Rajasthani').toList(),
@@ -690,7 +690,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 // ==========================================
                 _buildCategorySection(
                   context,
-                  title: '🌾 Haryanvi & Desi Beats',
+                  title: 'Haryanvi & Desi Beats',
                   genreKey: 'Haryanvi',
                   provider: provider,
                   songs: trending.where((s) => s.genre == 'Haryanvi').toList(),
@@ -701,7 +701,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 // ==========================================
                 _buildCategorySection(
                   context,
-                  title: '🎧 DJ Remix & Bass Boosted',
+                  title: 'DJ Remix & Bass Boosted',
                   genreKey: 'DJ Remix',
                   provider: provider,
                   songs: trending.where((s) => s.genre == 'DJ Remix').toList(),
@@ -726,7 +726,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     final genreSongs = trending.where((s) => s.genre.trim().toLowerCase() == genre.toLowerCase()).toList();
                     return _buildCategorySection(
                       context,
-                      title: '📁 $genre Songs',
+                      title: '$genre Songs',
                       genreKey: genre,
                       provider: provider,
                       songs: genreSongs,
@@ -958,7 +958,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     return Padding(
                       padding: const EdgeInsets.only(right: 8),
                       child: _buildSubCategoryChip(
-                        label: '📁 $sub ($count)',
+                        label: '$sub ($count)',
                         isSelected: selectedSub == sub,
                         onTap: () => setState(() => _selectedSubCategories[genreKey] = sub),
                       ),
@@ -1186,10 +1186,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildDiscoverFilterChips(LanguageService lang) {
     final chips = [
-      {'id': 'all', 'label': lang.isHindi ? '✨ सभी संगीत' : '✨ All Discover'},
-      {'id': 'artists', 'label': lang.isHindi ? '🎤 कलाकार (Artists)' : '🎤 Artists'},
-      {'id': 'albums', 'label': lang.isHindi ? '💿 एल्बम (Albums)' : '💿 Albums'},
-      {'id': 'playlists', 'label': lang.isHindi ? '📁 प्लेलिस्ट्स' : '📁 Playlists'},
+      {'id': 'all', 'label': lang.isHindi ? 'सभी संगीत' : 'All Discover', 'icon': Icons.explore_rounded},
+      {'id': 'artists', 'label': lang.isHindi ? 'कलाकार' : 'Artists', 'icon': Icons.person_rounded},
+      {'id': 'albums', 'label': lang.isHindi ? 'एल्बम' : 'Albums', 'icon': Icons.album_rounded},
+      {'id': 'playlists', 'label': lang.isHindi ? 'प्लेलिस्ट्स' : 'Playlists', 'icon': Icons.playlist_play_rounded},
     ];
 
     return SingleChildScrollView(
@@ -1201,6 +1201,11 @@ class _HomeScreenState extends State<HomeScreen> {
           return Padding(
             padding: const EdgeInsets.only(right: 8),
             child: ChoiceChip(
+              avatar: Icon(
+                c['icon'] as IconData,
+                size: 16,
+                color: isSelected ? Colors.black : const Color(0xFF00E5FF),
+              ),
               label: Text(
                 c['label'] as String,
                 style: TextStyle(
@@ -1243,7 +1248,7 @@ class _HomeScreenState extends State<HomeScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                lang.isHindi ? '🎤 प्रमुख कलाकार (Top Artists)' : '🎤 Top Artists',
+                lang.isHindi ? 'शीर्ष कलाकार' : 'Top Artists',
                 style: const TextStyle(
                   color: AppColors.textPrimary,
                   fontSize: 18,
@@ -1375,7 +1380,7 @@ class _HomeScreenState extends State<HomeScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                lang.isHindi ? '💿 लोकप्रिय एल्बम (Popular Albums)' : '💿 Popular Albums',
+                lang.isHindi ? 'लोकप्रिय एल्बम' : 'Popular Albums',
                 style: const TextStyle(
                   color: AppColors.textPrimary,
                   fontSize: 18,
@@ -1654,7 +1659,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
                   ),
                   subtitle: Text(
-                    '${pl.songs.length} ${lang.isHindi ? "गाने" : "Tracks"} • ${pl.description}',
+                    '${pl.songs.length} ${lang.isHindi ? "गाने" : "Tracks"} | ${pl.description}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),

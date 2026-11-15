@@ -28,15 +28,13 @@ class CloudBackendService extends ChangeNotifier {
   static const String _keyCatalogSeeded = 'msixa_catalog_seeded_v3';
   static const String _adminPin = '7777'; // Default Admin Master Key
 
-  // Shared file paths across User App and Admin App
+  // Shared file paths across User App and Admin App (Strictly internal app storage only)
   static final List<String> _sharedUserFilePaths = [
     '/data/data/com.msixa.player/files/msixa_shared_users.json',
     '/data/data/com.msixa.admin/files/msixa_shared_users.json',
     '/data/user/0/com.msixa.player/files/msixa_shared_users.json',
     '/data/user/0/com.msixa.admin/files/msixa_shared_users.json',
     '/data/data/com.msixa.msixa_player/files/msixa_shared_users.json',
-    '/storage/emulated/0/Download/msixa_shared_users.json',
-    '/sdcard/Download/msixa_shared_users.json',
   ];
 
   static final List<String> _sharedSongFilePaths = [
@@ -45,8 +43,6 @@ class CloudBackendService extends ChangeNotifier {
     '/data/user/0/com.msixa.player/files/msixa_shared_songs.json',
     '/data/user/0/com.msixa.admin/files/msixa_shared_songs.json',
     '/data/data/com.msixa.msixa_player/files/msixa_shared_songs.json',
-    '/storage/emulated/0/Download/msixa_shared_songs.json',
-    '/sdcard/Download/msixa_shared_songs.json',
   ];
 
   static final List<String> _sharedDeletedSongFilePaths = [
@@ -55,8 +51,6 @@ class CloudBackendService extends ChangeNotifier {
     '/data/user/0/com.msixa.player/files/msixa_deleted_songs.json',
     '/data/user/0/com.msixa.admin/files/msixa_deleted_songs.json',
     '/data/data/com.msixa.msixa_player/files/msixa_deleted_songs.json',
-    '/storage/emulated/0/Download/msixa_deleted_songs.json',
-    '/sdcard/Download/msixa_deleted_songs.json',
   ];
 
   static final List<String> _sharedPlaylistFilePaths = [
@@ -65,8 +59,6 @@ class CloudBackendService extends ChangeNotifier {
     '/data/user/0/com.msixa.player/files/msixa_shared_playlists.json',
     '/data/user/0/com.msixa.admin/files/msixa_shared_playlists.json',
     '/data/data/com.msixa.msixa_player/files/msixa_shared_playlists.json',
-    '/storage/emulated/0/Download/msixa_shared_playlists.json',
-    '/sdcard/Download/msixa_shared_playlists.json',
   ];
 
   UserProfile? _currentUser;
@@ -186,6 +178,22 @@ class CloudBackendService extends ChangeNotifier {
           if (!_deletedSongIds.contains(s.id)) {
             _communitySongs.add(s);
           }
+        } catch (_) {}
+      }
+    }
+
+    // Migration: Purge stale unplayable legacy playlists (e.g. dummy/test playlists)
+    final hasCleanedPlaylists = prefs.getBool('msixa_clean_stale_playlists_v15') ?? false;
+    if (!hasCleanedPlaylists) {
+      await prefs.remove(_keyCloudPlaylists);
+      await prefs.setBool('msixa_clean_stale_playlists_v15', true);
+      for (final legacyPath in [
+        '/storage/emulated/0/Download/msixa_shared_playlists.json',
+        '/sdcard/Download/msixa_shared_playlists.json',
+      ]) {
+        try {
+          final f = File(legacyPath);
+          if (await f.exists()) await f.delete();
         } catch (_) {}
       }
     }
@@ -1244,8 +1252,8 @@ class CloudBackendService extends ChangeNotifier {
       for (final item in jsonList) {
         try {
           final pl = Playlist.fromJson(item as Map<String, dynamic>);
-          // Filter any deleted songs from playlist
-          pl.songs.removeWhere((s) => _deletedSongIds.contains(s.id));
+          // Filter any deleted songs AND ensure songs actually exist in approved library!
+          pl.songs.removeWhere((s) => _deletedSongIds.contains(s.id) || !_communitySongs.any((cs) => cs.id == s.id));
           if (pl.songs.isEmpty) continue;
 
           final idx = _sharedPlaylists.indexWhere((p) => p.id == pl.id || p.title.toLowerCase() == pl.title.toLowerCase());

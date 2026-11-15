@@ -7,12 +7,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'language_service.dart';
 
-/// App Auto-Updater Service
+/// App Auto-Updater Service for Msixa Player & Msixa Admin
 /// Features:
-/// - Checks live update manifest on Cloudflare R2 CDN (update/version.json)
-/// - Background download with live progress indicator (0 - 100%)
-/// - Launches native Android package installer automatically via FileProvider
-/// - Supports both user-initiated check & silent app-startup auto-prompt
+/// - Real-time version check against Cloudflare R2 update manifest
+/// - Automatic popup dialog on app launch when a new version is detected
+/// - Background download with live progress bar and status indicator
+/// - Automatic dismissal of update dialog and banner once download completes & installer is launched
+/// - Default 100% clean English UI with full Hindi toggle support
 class UpdateService {
   static const String manifestUrl = 'https://pub-d4f2e58dc2594d0c8dc1f30bbae4344f.r2.dev/update/msixa_player_version.json';
   static const String adminManifestUrl = 'https://pub-d4f2e58dc2594d0c8dc1f30bbae4344f.r2.dev/update/msixa_admin_version.json';
@@ -20,7 +21,6 @@ class UpdateService {
   static const String _prefKeyLastChecked = 'msixa_last_update_check';
   static const String _prefKeyDismissedVersion = 'msixa_dismissed_update_version';
   static const String _prefKeyLastPromptTime = 'msixa_last_update_prompt_time';
-  static bool _hasCheckedThisSession = false;
   static final ValueNotifier<Map<String, dynamic>?> availableUpdateNotifier = ValueNotifier(null);
   static final ValueNotifier<Map<String, dynamic>?> adminAvailableUpdateNotifier = ValueNotifier(null);
 
@@ -40,11 +40,9 @@ class UpdateService {
 
   /// Check for latest update from Cloudflare R2
   static Future<void> checkForUpdate(BuildContext context, {bool autoPrompt = false, bool isAdmin = false}) async {
-    if (autoPrompt) return; // Completely disable automatic popups on startup for smooth experience
-
     final isHindi = LanguageService().isHindi;
 
-    // 1. Show immediate progress feedback for manual button click
+    // Show immediate progress feedback for manual button click
     if (!autoPrompt && context.mounted) {
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
@@ -59,8 +57,8 @@ class UpdateService {
               const SizedBox(width: 12),
               Text(
                 isAdmin
-                    ? (isHindi ? '🔍 Msixa Admin अपडेट चेक किया जा रहा है...' : '🔍 Checking Msixa Admin updates...')
-                    : (isHindi ? '🔍 अपडेट चेक किया जा रहा है...' : '🔍 Checking for updates...'),
+                    ? (isHindi ? 'Msixa Admin अपडेट चेक किया जा रहा है...' : 'Checking Msixa Admin updates...')
+                    : (isHindi ? 'अपडेट चेक किया जा रहा है...' : 'Checking for updates...'),
                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
               ),
             ],
@@ -90,8 +88,8 @@ class UpdateService {
           _showToast(
             context,
             isHindi
-                ? '⚠️ अपडेट सर्वर से कनेक्ट नहीं हो सका (HTTP ${resp.statusCode})'
-                : '⚠️ Could not connect to update server (HTTP ${resp.statusCode})',
+                ? 'अपडेट सर्वर से कनेक्ट नहीं हो सका (HTTP ${resp.statusCode})'
+                : 'Could not connect to update server (HTTP ${resp.statusCode})',
           );
         }
         return;
@@ -101,7 +99,7 @@ class UpdateService {
       final remoteCode = data['version_code'] as int? ?? 1;
       final remoteName = data['version_name'] as String? ?? '1.0.0';
       final apkUrl = data['apk_url'] as String? ?? '';
-      final sizeMb = (data['file_size_mb'] as num?)?.toDouble() ?? 23.0;
+      final sizeMb = (data['file_size_mb'] as num?)?.toDouble() ?? 24.0;
       final releaseNotes = data['release_notes'] as String? ?? (isHindi ? 'नए फीचर्स और बग फिक्स!' : 'New features & bug fixes!');
       final forceUpdate = data['force_update'] as bool? ?? false;
 
@@ -116,7 +114,7 @@ class UpdateService {
       final installedCode = installed['versionCode'] as int;
       final installedName = installed['versionName'] as String;
 
-      debugPrint('📱 ${isAdmin ? "Admin" : "Player"} Version Check: Installed=$installedCode (v$installedName), Remote=$remoteCode (v$remoteName)');
+      debugPrint('Msixa ${isAdmin ? "Admin" : "Player"} Version Check: Installed=$installedCode (v$installedName), Remote=$remoteCode (v$remoteName)');
 
       // If remote version is newer, register available update & prompt
       if (remoteCode > installedCode && apkUrl.isNotEmpty) {
@@ -137,8 +135,8 @@ class UpdateService {
         if (autoPrompt && !forceUpdate) {
           final dismissedCode = prefs.getInt(prefKeyDismissed) ?? 0;
           final lastPromptTime = prefs.getInt(prefKeyPrompt) ?? 0;
-          // Only suppress if user clicked Later in this exact 10-minute active testing window
-          if (dismissedCode >= remoteCode && (ts - lastPromptTime) < 10 * 60 * 1000) {
+          // Only suppress if user clicked Later in this exact 15-minute window
+          if (dismissedCode >= remoteCode && (ts - lastPromptTime) < 15 * 60 * 1000) {
             return;
           }
         }
@@ -178,7 +176,7 @@ class UpdateService {
         ScaffoldMessenger.of(context).hideCurrentSnackBar();
         _showToast(
           context,
-          isHindi ? '⚠️ अपडेट चेक करने में त्रुटि: $e' : '⚠️ Error checking for updates: $e',
+          isHindi ? 'अपडेट चेक करने में त्रुटि: $e' : 'Error checking for updates: $e',
         );
       }
     }
@@ -215,8 +213,8 @@ class UpdateService {
           children: [
             Text(
               isHindi
-                  ? '🎉 ${isAdmin ? "Msixa Player Admin" : "Msixa Player"} पहले से नवीनतम वर्ज़न पर चल रहा है!'
-                  : '🎉 ${isAdmin ? "Msixa Player Admin" : "Msixa Player"} is already running on the latest version!',
+                  ? '${isAdmin ? "Msixa Player Admin" : "Msixa Player"} पहले से नवीनतम वर्ज़न पर चल रहा है!'
+                  : '${isAdmin ? "Msixa Player Admin" : "Msixa Player"} is already running on the latest version!',
               style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 10),
@@ -225,20 +223,19 @@ class UpdateService {
               decoration: BoxDecoration(
                 color: const Color(0xFF1E293B),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.white12),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.verified_rounded, color: Color(0xFF00E5FF), size: 18),
-                  const SizedBox(width: 8),
+                  const Icon(Icons.verified_rounded, color: Color(0xFF00E5FF), size: 16),
+                  const SizedBox(width: 6),
                   Text(
-                    '${isHindi ? "वर्ज़न" : "Version"}: v$installedName (Build $installedCode)',
+                    'Installed: v$installedName (Build $installedCode)',
                     style: const TextStyle(color: Color(0xFF00E5FF), fontSize: 12, fontWeight: FontWeight.bold),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             Text(
               isHindi
                   ? 'क्लाउड पर कोई नया अपडेट पेंडिंग नहीं है। आपका ऐप पूरी तरह से अप-टू-डेट है।'
@@ -255,7 +252,7 @@ class UpdateService {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
             onPressed: () => Navigator.pop(ctx),
-            child: Text(isHindi ? 'ठीक है (OK)' : 'OK', style: const TextStyle(fontWeight: FontWeight.bold)),
+            child: Text(isHindi ? 'ठीक है' : 'OK', style: const TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -298,8 +295,8 @@ class UpdateService {
 
         return StatefulBuilder(
           builder: (dialogContext, setState) {
-            return WillPopScope(
-              onWillPop: () async => !forceUpdate && !isDownloading,
+            return PopScope(
+              canPop: !forceUpdate && !isDownloading,
               child: AlertDialog(
                 backgroundColor: const Color(0xFF131B2C),
                 shape: RoundedRectangleBorder(
@@ -328,7 +325,7 @@ class UpdateService {
                             style: GoogleFonts.syne(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
                           ),
                           Text(
-                            'v$remoteName • ${sizeMb.toStringAsFixed(1)} MB',
+                            'v$remoteName | ${sizeMb.toStringAsFixed(1)} MB',
                             style: const TextStyle(color: Color(0xFF00E5FF), fontSize: 12, fontWeight: FontWeight.bold),
                           ),
                         ],
@@ -352,7 +349,7 @@ class UpdateService {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            isHindi ? '✨ क्या नया है (What\'s New):' : '✨ What\'s New:',
+                            isHindi ? 'क्या नया है:' : 'What\'s New:',
                             style: const TextStyle(color: Color(0xFFFFB300), fontSize: 12, fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 4),
@@ -389,7 +386,7 @@ class UpdateService {
                     ] else ...[
                       Text(
                         isHindi
-                            ? 'यह अपडेट 1-क्लिक में बिना प्ले स्टोर के सीधे आपके फोन में इंस्टॉल हो जाएगा।'
+                            ? 'यह अपडेट 1-क्लिक में सीधे आपके फ़ोन में इंस्टॉल हो जाएगा।'
                             : 'This update will install directly on your phone with 1-click OTA.',
                         style: const TextStyle(color: Colors.grey, fontSize: 11),
                       ),
@@ -409,7 +406,7 @@ class UpdateService {
                           Navigator.pop(dialogContext);
                         }
                       },
-                      child: Text(isHindi ? 'बाद में (Later)' : 'Later', style: const TextStyle(color: Colors.grey)),
+                      child: Text(isHindi ? 'बाद में' : 'Later', style: const TextStyle(color: Colors.grey)),
                     ),
                   if (!isDownloading)
                     ElevatedButton.icon(
@@ -421,11 +418,11 @@ class UpdateService {
                       ),
                       icon: const Icon(Icons.download_rounded, size: 18),
                       label: Text(
-                        isHindi ? 'तुरंत अपडेट करें (Update Now)' : 'Update Now',
+                        isHindi ? 'अभी अपडेट करें' : 'Update Now',
                         style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                       ),
                       onPressed: () async {
-                        // 1. Check if Android "Install Unknown Apps" permission is granted BEFORE starting download
+                        // 1. Check if Android "Install Unknown Apps" permission is granted
                         try {
                           final canInstall = await _channel.invokeMethod<bool>('canInstallPackages') ?? true;
                           if (!canInstall) {
@@ -449,14 +446,14 @@ class UpdateService {
                                   ),
                                   content: Text(
                                     isHindi
-                                        ? 'ऐप को बिना प्ले स्टोर के सीधे अपडेट करने के लिए कृपया सेटिंग्स में "Allow from this source" (अज्ञात ऐप्स इंस्टॉल करें) की अनुमति चालू करें।\n\nअनुमति देने के बाद तुरंत अपडेट शुरू हो जाएगा।'
-                                        : 'To update the app directly without Play Store, please enable "Allow from this source" (Install unknown apps) in Android settings.\n\nUpdate will resume immediately after enabling.',
+                                        ? 'ऐप को सीधे अपडेट करने के लिए कृपया सेटिंग्स में "Allow from this source" की अनुमति चालू करें।\n\nअनुमति देने के बाद तुरंत अपडेट शुरू हो जाएगा।'
+                                        : 'To update the app directly, please enable "Allow from this source" in Android settings.\n\nUpdate will resume immediately after enabling.',
                                     style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
                                   ),
                                   actions: [
                                     TextButton(
                                       onPressed: () => Navigator.pop(permCtx, false),
-                                      child: Text(isHindi ? 'रद्द करें (Cancel)' : 'Cancel', style: const TextStyle(color: Colors.grey)),
+                                      child: Text(isHindi ? 'रद्द करें' : 'Cancel', style: const TextStyle(color: Colors.grey)),
                                     ),
                                     ElevatedButton(
                                       style: ElevatedButton.styleFrom(
@@ -465,7 +462,7 @@ class UpdateService {
                                       ),
                                       onPressed: () => Navigator.pop(permCtx, true),
                                       child: Text(
-                                        isHindi ? 'सेटिंग्स खोलें (Open Settings)' : 'Open Settings',
+                                        isHindi ? 'सेटिंग्स खोलें' : 'Open Settings',
                                         style: const TextStyle(fontWeight: FontWeight.bold),
                                       ),
                                     ),
@@ -523,30 +520,33 @@ class UpdateService {
                           await sink.flush();
                           await sink.close();
 
-                          // 1. Reset isDownloading immediately so WillPopScope won't block dialog dismissal
+                          // 1. Reset isDownloading immediately
                           setState(() {
                             isDownloading = false;
                             downloadProgress = 1.0;
                             statusText = isHindi ? 'डाउनलोड पूरा हुआ! इंस्टॉलेशन...' : 'Download complete! Installing...';
                           });
 
-                          // 2. Remember dismissed version code to avoid nagging on immediate restart
+                          // 2. Remember dismissed version
                           try {
                             final p = await SharedPreferences.getInstance();
                             await p.setInt(prefKeyDismissed, remoteCode);
                             await p.setInt(prefKeyPrompt, DateTime.now().millisecondsSinceEpoch);
                           } catch (_) {}
 
-                          // 3. Automatically dismiss the popup dialog immediately
-                          try {
-                            Navigator.of(dialogContext).pop();
-                          } catch (_) {
-                            try {
-                              Navigator.of(ctx, rootNavigator: true).pop();
-                            } catch (_) {}
+                          // 3. Clear banner notifiers immediately
+                          if (isAdmin) {
+                            adminAvailableUpdateNotifier.value = null;
+                          } else {
+                            availableUpdateNotifier.value = null;
                           }
 
-                          // 4. Show floating success notification
+                          // 4. Automatically dismiss the popup dialog immediately
+                          try {
+                            Navigator.of(dialogContext, rootNavigator: true).pop();
+                          } catch (_) {}
+
+                          // 5. Show floating success notification
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
@@ -563,7 +563,7 @@ class UpdateService {
                             );
                           }
 
-                          // 5. Launch Native APK Installer
+                          // 6. Launch Native APK Installer
                           try {
                             await _channel.invokeMethod('installApk', {'filePath': apkFile.path});
                           } on PlatformException catch (pe) {
@@ -584,19 +584,23 @@ class UpdateService {
                               } else {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
-                                    content: Text(isHindi ? 'इंस्टॉलर त्रुटि: ${pe.message}' : 'Installer error: ${pe.message}'),
+                                    content: Text(
+                                      isHindi ? 'इंस्टॉलर खोलने में त्रुटि: ${pe.message}' : 'Installer error: ${pe.message}',
+                                    ),
                                     backgroundColor: Colors.redAccent,
-                                    behavior: SnackBarBehavior.floating,
                                   ),
                                 );
                               }
                             }
                           }
-                        } catch (err) {
+                        } catch (e) {
                           setState(() {
                             isDownloading = false;
-                            statusText = isHindi ? 'डाउनलोड त्रुटि: $err' : 'Download error: $err';
+                            statusText = isHindi ? 'डाउनलोड विफल: $e' : 'Download failed: $e';
                           });
+                          if (context.mounted) {
+                            _showToast(context, isHindi ? 'डाउनलोड विफल: $e' : 'Download failed: $e');
+                          }
                         }
                       },
                     ),
@@ -609,4 +613,3 @@ class UpdateService {
     );
   }
 }
-

@@ -1,4 +1,4 @@
-﻿name: Build Android APK
+name: Build Android APK
 
 on:
   push:
@@ -195,13 +195,36 @@ jobs:
               private var initialMediaMime: String? = null
               private var initialMediaName: String? = null
               private var syncAudioPlayer: MediaPlayer? = null
+              private var isVideoPlaying = false
 
               override fun onCreate(savedInstanceState: Bundle?) {
                   super.onCreate(savedInstanceState)
-                  val lp = window.attributes
-                  lp.screenBrightness = android.view.WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
-                  window.attributes = lp
+                  resetBrightnessToDefault()
                   handleIncomingIntent(intent)
+              }
+
+              override fun onResume() {
+                  super.onResume()
+                  if (!isVideoPlaying) {
+                      resetBrightnessToDefault()
+                  }
+              }
+
+              override fun onWindowFocusChanged(hasFocus: Boolean) {
+                  super.onWindowFocusChanged(hasFocus)
+                  if (hasFocus && !isVideoPlaying) {
+                      resetBrightnessToDefault()
+                  }
+              }
+
+              private fun resetBrightnessToDefault() {
+                  runOnUiThread {
+                      try {
+                          val lp = window.attributes
+                          lp.screenBrightness = android.view.WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+                          window.attributes = lp
+                      } catch (_: Exception) {}
+                  }
               }
 
               override fun onNewIntent(intent: Intent) {
@@ -238,8 +261,10 @@ jobs:
                           runOnUiThread {
                               val lp = window.attributes
                               if (brightness < 0) {
+                                  isVideoPlaying = false
                                   lp.screenBrightness = android.view.WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
                               } else {
+                                  isVideoPlaying = true
                                   lp.screenBrightness = brightness.coerceIn(0.01f, 1.0f)
                               }
                               window.attributes = lp
@@ -1064,16 +1089,20 @@ jobs:
                   'version_name': f"1.0.{run_num}",
                   'apk_url': 'https://pub-d4f2e58dc2594d0c8dc1f30bbae4344f.r2.dev/update/msixa_player_latest.apk',
                   'file_size_mb': size_mb,
-                  'release_notes': 'Msixa Player OTA Auto-Update: Realtime sync and platform enhancements!',
+                  'release_notes': 'Msixa Player OTA Auto-Update: Default English UI, auto-popup prompt, and video performance enhancements!',
                   'force_update': False
               }
               print(f"Deploying Player update manifest: {manifest}")
-              s3.put_object(
-                  Bucket='msixa-music',
-                  Key='update/msixa_player_version.json',
-                  Body=json.dumps(manifest),
-                  ContentType='application/json'
-              )
+              for b in ['msixa-music', 'musixa-music']:
+                  try:
+                      s3.put_object(
+                          Bucket=b,
+                          Key='update/msixa_player_version.json',
+                          Body=json.dumps(manifest),
+                          ContentType='application/json'
+                      )
+                  except Exception as ex:
+                      print(f"Manifest to {b} warning: {ex}")
               print("Player OTA Auto-Update successfully deployed!")
 
           # 2. Deploy Admin Control App OTA Update
@@ -1093,16 +1122,20 @@ jobs:
                   'version_name': f"1.0.{run_num}",
                   'apk_url': 'https://pub-d4f2e58dc2594d0c8dc1f30bbae4344f.r2.dev/update/msixa_admin_latest.apk',
                   'file_size_mb': admin_size_mb,
-                  'release_notes': 'Msixa Admin OTA Auto-Update: Background uploading, R2 storage monitor & real-time sync!',
+                  'release_notes': 'Msixa Admin OTA Auto-Update: Default English UI, R2 storage monitor, and real-time sync!',
                   'force_update': False
               }
               print(f"Deploying Admin update manifest: {admin_manifest}")
-              s3.put_object(
-                  Bucket='msixa-music',
-                  Key='update/msixa_admin_version.json',
-                  Body=json.dumps(admin_manifest),
-                  ContentType='application/json'
-              )
+              for b in ['msixa-music', 'musixa-music']:
+                  try:
+                      s3.put_object(
+                          Bucket=b,
+                          Key='update/msixa_admin_version.json',
+                          Body=json.dumps(admin_manifest),
+                          ContentType='application/json'
+                      )
+                  except Exception as ex:
+                      print(f"Admin manifest to {b} warning: {ex}")
               print("Admin OTA Auto-Update successfully deployed!")
 
           # 3. Deploy Master msixa.zip Backup to Cloudflare R2

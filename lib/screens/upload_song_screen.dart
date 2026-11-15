@@ -154,7 +154,7 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
         });
       }
     } catch (e) {
-      setState(() => _errorMessage = 'फ़ाइल चुनने में समस्या: $e');
+      setState(() => _errorMessage = _lang.isHindi ? 'फ़ाइल चुनने में समस्या: $e' : 'Error selecting file: $e');
     }
   }
 
@@ -165,15 +165,15 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
     final cover = _coverUrlCtrl.text.trim();
 
     if (_pickedFilePath == null) {
-      setState(() => _errorMessage = 'कृपया फ़ोन से कोई MP3 गाना चुनें');
+      setState(() => _errorMessage = _lang.isHindi ? 'कृपया फ़ोन से कोई MP3 गाना चुनें' : 'Please select an MP3 audio file');
       return;
     }
     if (title.isEmpty) {
-      setState(() => _errorMessage = 'गाने का नाम (Title) दर्ज करें');
+      setState(() => _errorMessage = _lang.isHindi ? 'गाने का नाम दर्ज करें' : 'Please enter song title');
       return;
     }
     if (artist.isEmpty) {
-      setState(() => _errorMessage = _lang.isHindi ? 'गायक या आर्टिस्ट का नाम (Artist) दर्ज करें' : 'Please enter artist / singer name');
+      setState(() => _errorMessage = _lang.isHindi ? 'गायक या आर्टिस्ट का नाम दर्ज करें' : 'Please enter artist / singer name');
       return;
     }
 
@@ -192,7 +192,7 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
     setState(() {
       _isUploading = true;
       _uploadProgress = 0.1;
-      _uploadStatusText = 'गाना प्रोसेस हो रहा है...';
+      _uploadStatusText = _lang.isHindi ? 'गाना प्रोसेस हो रहा है...' : 'Processing audio track...';
       _errorMessage = null;
     });
 
@@ -202,7 +202,7 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
 
       if (r2.isConfigured) {
         setState(() {
-          _uploadStatusText = 'Cloudflare R2 क्लाउड पर अपलोड हो रहा है...';
+          _uploadStatusText = _lang.isHindi ? 'Cloudflare R2 क्लाउड पर अपलोड हो रहा है...' : 'Uploading to Cloudflare R2...';
           _uploadProgress = 0.3;
         });
 
@@ -248,10 +248,13 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
           backgroundColor: const Color(0xFF131A2A),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: Row(
-            children: const [
-              Icon(Icons.check_circle_rounded, color: Color(0xFF00E5FF), size: 28),
-              SizedBox(width: 10),
-              Text('गाना सबमिट हुआ!', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+            children: [
+              const Icon(Icons.check_circle_rounded, color: Color(0xFF00E5FF), size: 28),
+              const SizedBox(width: 10),
+              Text(
+                _lang.isHindi ? 'गाना सबमिट हुआ!' : 'Song Submitted!',
+                style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              ),
             ],
           ),
           content: Column(
@@ -259,7 +262,9 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'आपका गाना "${song.title}" रिव्यू के लिए एडमिन के पास भेज दिया गया है।',
+                _lang.isHindi
+                    ? 'आपका गाना "${song.title}" रिव्यू के लिए एडमिन के पास भेज दिया गया है।'
+                    : 'Your track "${song.title}" has been submitted for admin approval.',
                 style: const TextStyle(color: Colors.white70, fontSize: 14),
               ),
               const SizedBox(height: 12),
@@ -271,13 +276,15 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
                   border: Border.all(color: Colors.amberAccent.withOpacity(0.3)),
                 ),
                 child: Row(
-                  children: const [
-                    Icon(Icons.hourglass_top_rounded, color: Colors.amberAccent, size: 20),
-                    SizedBox(width: 8),
+                  children: [
+                    const Icon(Icons.hourglass_top_rounded, color: Colors.amberAccent, size: 20),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'एडमिन के अप्रूव (Approve) करते ही यह गाना सभी यूज़र्स के होम पेज पर दिखने लगेगा।',
-                        style: TextStyle(color: Colors.amberAccent, fontSize: 12),
+                        _lang.isHindi
+                            ? 'एडमिन के अप्रूव करते ही यह गाना सभी यूज़र्स के होम पेज पर दिखने लगेगा।'
+                            : 'Once approved by admin, this track will appear on the Home page for all listeners.',
+                        style: const TextStyle(color: Colors.amberAccent, fontSize: 12),
                       ),
                     ),
                   ],
@@ -295,7 +302,7 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
                 backgroundColor: const Color(0xFF00E5FF),
                 foregroundColor: Colors.black,
               ),
-              child: const Text('ठीक है (Done)', style: TextStyle(fontWeight: FontWeight.bold)),
+              child: Text(_lang.isHindi ? 'ठीक है' : 'Done', style: const TextStyle(fontWeight: FontWeight.bold)),
             ),
           ],
         ),
@@ -303,7 +310,7 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
     } catch (e) {
       setState(() {
         _isUploading = false;
-        _errorMessage = 'अपलोड करने में विफल: $e';
+        _errorMessage = _lang.isHindi ? 'अपलोड करने में विफल: $e' : 'Upload failed: $e';
       });
     }
   }
@@ -333,13 +340,13 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
         });
       }
     } catch (e) {
-      setState(() => _errorMessage = 'फ़ाइलें चुनने में समस्या: $e');
+      setState(() => _errorMessage = _lang.isHindi ? 'फ़ाइलें चुनने में समस्या: $e' : 'Error selecting files: $e');
     }
   }
 
   Future<void> _submitFolderUpload() async {
     if (_folderPickedFiles.isEmpty) {
-      setState(() => _errorMessage = 'कृपया पहले फ़ोल्डर या MP3 गाने चुनें');
+      setState(() => _errorMessage = _lang.isHindi ? 'कृपया पहले फ़ोल्डर या MP3 गाने चुनें' : 'Please select a folder or MP3 files first');
       return;
     }
 
@@ -354,7 +361,7 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
       _isUploading = true;
       _folderCurrentIndex = 0;
       _uploadProgress = 0.05;
-      _uploadStatusText = 'अपलोड शुरू हो रहा है...';
+      _uploadStatusText = _lang.isHindi ? 'अपलोड शुरू हो रहा है...' : 'Starting upload...';
       _errorMessage = null;
     });
 
@@ -383,7 +390,7 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
           setState(() {
             _folderCurrentIndex = i;
             _uploadProgress = (i + 1) / _folderPickedFiles.length;
-            _uploadStatusText = '⚠️ स्किप किया (Duplicate): $cleanName';
+            _uploadStatusText = _lang.isHindi ? '⚠️ स्किप किया (Duplicate): $cleanName' : '⚠️ Skipped (Duplicate): $cleanName';
           });
           await Future.delayed(const Duration(milliseconds: 200));
           continue;
@@ -394,7 +401,7 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
         setState(() {
           _folderCurrentIndex = i;
           _uploadProgress = (i + 0.3) / _folderPickedFiles.length;
-          _uploadStatusText = 'अपलोड हो रहा है (${i + 1}/${_folderPickedFiles.length}): $cleanName...';
+          _uploadStatusText = _lang.isHindi ? 'अपलोड हो रहा है (${i + 1}/${_folderPickedFiles.length}): $cleanName...' : 'Uploading (${i + 1}/${_folderPickedFiles.length}): $cleanName...';
         });
 
         String finalAudioUrl = pf.path!;
@@ -446,8 +453,10 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
     } finally {
       await BackgroundUploadService.releaseWakeLock();
       await BackgroundUploadService.showUploadNotification(
-        title: '🎉 फ़ोल्डर अपलोड पूरा हुआ!',
-        message: '$successCount गाने अपलोड हुए और "$playlistTitle" प्लेलिस्ट तैयार हो गई!' + (skippedCount > 0 ? ' ($skippedCount डुप्लीकेट स्किप)' : ''),
+        title: _lang.isHindi ? '🎉 फ़ोल्डर अपलोड पूरा हुआ!' : '🎉 Folder Upload Complete!',
+        message: _lang.isHindi
+            ? '$successCount गाने अपलोड हुए और "$playlistTitle" प्लेलिस्ट तैयार हो गई!' + (skippedCount > 0 ? ' ($skippedCount डुप्लीकेट स्किप)' : '')
+            : '$successCount songs uploaded and "$playlistTitle" playlist created!' + (skippedCount > 0 ? ' ($skippedCount duplicates skipped)' : ''),
       );
     }
 
@@ -462,10 +471,13 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
         backgroundColor: const Color(0xFF131A2A),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
-          children: const [
-            Icon(Icons.check_circle_rounded, color: Color(0xFF00E5FF), size: 28),
-            SizedBox(width: 10),
-            Text('फ़ोल्डर अपलोड पूरा हुआ!', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+          children: [
+            const Icon(Icons.check_circle_rounded, color: Color(0xFF00E5FF), size: 28),
+            const SizedBox(width: 10),
+            Text(
+              _lang.isHindi ? 'फ़ोल्डर अपलोड पूरा हुआ!' : 'Folder Upload Complete!',
+              style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            ),
           ],
         ),
         content: Column(
@@ -473,7 +485,9 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '🎉 $successCount गाने सफलतापूर्वक सबमिट हो गए!' + (skippedCount > 0 ? '\n⚠️ $skippedCount डुप्लीकेट गाने पहले से मौजूद थे इसलिए स्किप किए गए।' : ''),
+              _lang.isHindi
+                  ? '🎉 $successCount गाने सफलतापूर्वक सबमिट हो गए!' + (skippedCount > 0 ? '\n⚠️ $skippedCount डुप्लीकेट गाने पहले से मौजूद थे इसलिए स्किप किए गए।' : '')
+                  : '🎉 $successCount songs successfully submitted!' + (skippedCount > 0 ? '\n⚠️ $skippedCount duplicate songs skipped.' : ''),
               style: const TextStyle(color: Colors.white70, fontSize: 14),
             ),
             const SizedBox(height: 12),
@@ -491,7 +505,9 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        'आपकी लाइब्रेरी में "$playlistTitle" नाम से नई प्लेलिस्ट तैयार हो गई है जिसमें ये सभी $successCount गाने जोड़े गए हैं!',
+                        _lang.isHindi
+                            ? 'आपकी लाइब्रेरी में "$playlistTitle" नाम से नई प्लेलिस्ट तैयार हो गई है जिसमें ये सभी $successCount गाने जोड़े गए हैं!'
+                            : 'A new playlist "$playlistTitle" has been created in your Library with all $successCount songs!',
                         style: const TextStyle(color: Color(0xFF00E5FF), fontSize: 12, fontWeight: FontWeight.bold),
                       ),
                     ),
@@ -510,7 +526,7 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
               backgroundColor: const Color(0xFF00E5FF),
               foregroundColor: Colors.black,
             ),
-            child: const Text('ठीक है (Done)', style: TextStyle(fontWeight: FontWeight.bold)),
+            child: Text(_lang.isHindi ? 'ठीक है' : 'Done', style: const TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -751,13 +767,13 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
-                      children: const [
-                        Icon(Icons.warning_amber_rounded, color: Colors.amberAccent, size: 22),
-                        SizedBox(width: 8),
+                      children: [
+                        const Icon(Icons.warning_amber_rounded, color: Colors.amberAccent, size: 22),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'यह गाना पहले से उपलब्ध है! (Already in Library)',
-                            style: TextStyle(color: Colors.amberAccent, fontWeight: FontWeight.bold, fontSize: 13),
+                            _lang.isHindi ? 'यह गाना पहले से उपलब्ध है!' : 'Already in Library',
+                            style: const TextStyle(color: Colors.amberAccent, fontWeight: FontWeight.bold, fontSize: 13),
                           ),
                         ),
                       ],
@@ -795,7 +811,7 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
                             onPressed: () {
                               context.read<PlayerProvider>().playSong(_duplicateMatch!);
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('बजाया जा रहा है: ${_duplicateMatch!.title}')),
+                                SnackBar(content: Text(_lang.isHindi ? 'बजाया जा रहा है: ${_duplicateMatch!.title}' : 'Playing: ${_duplicateMatch!.title}')),
                               );
                             },
                             style: ElevatedButton.styleFrom(
@@ -805,7 +821,7 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
                               visualDensity: VisualDensity.compact,
                             ),
                             icon: const Icon(Icons.play_arrow_rounded, size: 18),
-                            label: const Text('सुनें', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                            label: Text(_lang.isHindi ? 'सुनें' : 'Play', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                           ),
                         ],
                       ),
@@ -823,10 +839,13 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
                   border: Border.all(color: Colors.green.withOpacity(0.3)),
                 ),
                 child: Row(
-                  children: const [
-                    Icon(Icons.check_circle_outline_rounded, color: Colors.greenAccent, size: 18),
-                    SizedBox(width: 8),
-                    Text('✅ नया गाना! यह हमारे डेटाबेस में पहले से नहीं है।', style: TextStyle(color: Colors.greenAccent, fontSize: 12)),
+                  children: [
+                    const Icon(Icons.check_circle_outline_rounded, color: Colors.greenAccent, size: 18),
+                    const SizedBox(width: 8),
+                    Text(
+                      _lang.isHindi ? '✅ नया गाना! यह हमारे डेटाबेस में पहले से नहीं है।' : '✅ New track! Not previously in catalog.',
+                      style: const TextStyle(color: Colors.greenAccent, fontSize: 12),
+                    ),
                   ],
                 ),
               ),
@@ -1245,7 +1264,7 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            _uploadStatusText ?? 'अपलोड हो रहा है...',
+            _uploadStatusText ?? (_lang.isHindi ? 'अपलोड हो रहा है...' : 'Uploading...'),
             textAlign: TextAlign.center,
             style: const TextStyle(color: Color(0xFF00E5FF), fontSize: 12, fontWeight: FontWeight.bold),
           ),
