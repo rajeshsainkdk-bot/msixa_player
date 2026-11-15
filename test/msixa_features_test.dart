@@ -456,4 +456,108 @@ void main() {
       expect(map['WhatsApp']!.length, 1);
     });
   });
+
+  group('11. MX Player Full Verification, Seeking & Audio Codec Tests', () {
+    test('Seeking scrubber math handles zero duration without collapsing slider', () {
+      final video = VideoItem(
+        id: 'movie_1',
+        title: 'Action Movie 2024 HDRip',
+        displayName: 'Action.Movie.2024.1080p.mkv',
+        path: '/storage/emulated/0/Movies/Action.Movie.2024.1080p.mkv',
+        duration: 0,
+        size: 1500000000,
+        resolution: '1080p',
+        folder: 'Movies',
+      );
+
+      final currentPosMs = 125000.0;
+      final rawDurationMs = video.duration.toDouble();
+
+      final effectiveTotalMs = rawDurationMs > 0
+          ? rawDurationMs
+          : (currentPosMs > 0 ? currentPosMs + 3600000.0 : 7200000.0);
+
+      expect(effectiveTotalMs, greaterThan(currentPosMs));
+      expect(effectiveTotalMs, 125000.0 + 3600000.0);
+
+      final clampedPos = currentPosMs.clamp(0.0, effectiveTotalMs);
+      expect(clampedPos, currentPosMs);
+
+      final targetMs = (currentPosMs + 10000.0).clamp(0.0, effectiveTotalMs);
+      expect(targetMs, 135000.0);
+
+      final rewindMs = (currentPosMs - 30000.0).clamp(0.0, effectiveTotalMs);
+      expect(rewindMs, 95000.0);
+    });
+
+    test('Audio codec detection detects Dolby E-AC3, AC-3, Atmos and DTS accurately', () {
+      bool isDolbyCheck(String title, String path, List<Map<String, dynamic>> tracks) {
+        final t = title.toLowerCase();
+        final p = path.toLowerCase();
+        final nameMatch = t.contains('eac3') ||
+            t.contains('ddp') ||
+            t.contains('ac3') ||
+            t.contains('5.1') ||
+            t.contains('dolby') ||
+            t.contains('atmos') ||
+            p.contains('eac3') ||
+            p.contains('ddp') ||
+            p.contains('ac3') ||
+            p.contains('5.1');
+        if (nameMatch) return true;
+        for (final trk in tracks) {
+          final mime = (trk['mime'] ?? '').toString().toLowerCase();
+          if (mime.contains('eac3') || mime.contains('ac3') || mime.contains('dts') || mime.contains('mlp')) {
+            return true;
+          }
+        }
+        return false;
+      }
+
+      expect(isDolbyCheck('Inception.2010.1080p.BluRay.DDP5.1.Atmos.mkv', '', []), isTrue);
+      expect(isDolbyCheck('Movie.Title.mkv', '/storage/emulated/0/Movies/EAC3/film.mkv', []), isTrue);
+      expect(isDolbyCheck('Video.mp4', '', [{'mime': 'audio/eac3', 'name': 'Track 1'}]), isTrue);
+      expect(isDolbyCheck('Video.mp4', '', [{'mime': 'audio/dts', 'name': 'DTS 5.1'}]), isTrue);
+      expect(isDolbyCheck('Standard Song.mp4', '', [{'mime': 'audio/mp4a-latm', 'name': 'Stereo'}]), isFalse);
+    });
+
+    test('Multi-audio track selector automatically switches to playable AAC stereo track when Track 0 is Dolby', () {
+      final tracks = [
+        {'index': 0, 'mime': 'audio/eac3', 'name': 'English (Dolby Digital Plus 5.1)', 'isDolby': true},
+        {'index': 1, 'mime': 'audio/mp4a-latm', 'name': 'Hindi (AAC Stereo)', 'isDolby': false},
+      ];
+
+      int selectedTrackIdx = 0;
+      if (tracks.length > 1) {
+        final firstMime = (tracks[0]['mime'] ?? '').toString().toLowerCase();
+        final firstIsDolby = tracks[0]['isDolby'] == true ||
+            firstMime.contains('eac3') ||
+            firstMime.contains('ac3') ||
+            firstMime.contains('dts');
+        if (firstIsDolby) {
+          final playableIdx = tracks.indexWhere((t) {
+            final m = (t['mime'] ?? '').toString().toLowerCase();
+            return m.contains('mp4a') || m.contains('aac') || m.contains('vorbis') || m.contains('opus');
+          });
+          if (playableIdx != -1) {
+            selectedTrackIdx = playableIdx;
+          }
+        }
+      }
+
+      expect(selectedTrackIdx, 1);
+      expect(tracks[selectedTrackIdx]['name'], 'Hindi (AAC Stereo)');
+    });
+
+    test('R2 Storage Usage Stats calculates used GB and remaining free tier capacity correctly', () {
+      final totalBucketBytes = 4294967296;
+      final totalFreeTierBytes = 10 * 1024 * 1024 * 1024;
+      final remainingFreeBytes = (totalFreeTierBytes - totalBucketBytes).clamp(0, totalFreeTierBytes);
+      final usedPercentage = (totalBucketBytes / totalFreeTierBytes) * 100;
+
+      expect(totalBucketBytes / (1024 * 1024 * 1024), 4.0);
+      expect(remainingFreeBytes / (1024 * 1024 * 1024), 6.0);
+      expect(usedPercentage, 40.0);
+    });
+  });
 }

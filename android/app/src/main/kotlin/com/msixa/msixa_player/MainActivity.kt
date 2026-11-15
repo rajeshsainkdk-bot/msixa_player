@@ -186,11 +186,22 @@ class MainActivity: AudioServiceActivity() {
                                 val title = if (titleCol != -1) c.getString(titleCol) else null
                                 val name = if (nameCol != -1) c.getString(nameCol) else null
                                 val path = if (pathCol != -1) c.getString(pathCol) else ""
-                                val duration = if (durCol != -1) c.getLong(durCol) else 0L
+                                var duration = if (durCol != -1) c.getLong(durCol) else 0L
                                 val size = if (sizeCol != -1) c.getLong(sizeCol) else 0L
                                 val resolution = if (resCol != -1) c.getString(resCol) else null
                                 val folder = if (bucketCol != -1) c.getString(bucketCol) else null
                                 val dateAdded = if (dateCol != -1) c.getLong(dateCol) else 0L
+
+                                // Fallback duration retrieval for movies/MKVs if MediaStore reports 0 duration
+                                if (duration <= 0L && path.isNotEmpty()) {
+                                    try {
+                                        val mmr = MediaMetadataRetriever()
+                                        mmr.setDataSource(path)
+                                        val durStr = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                                        duration = durStr?.toLongOrNull() ?: 0L
+                                        mmr.release()
+                                    } catch (_: Throwable) {}
+                                }
 
                                 val item = mutableMapOf<String, Any?>()
                                 item["id"] = id.toString()
@@ -218,16 +229,49 @@ class MainActivity: AudioServiceActivity() {
                             if (!idStr.isNullOrEmpty() && idStr.toLongOrNull() != null) {
                                 val u = ContentUris.withAppendedId(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, idStr.toLong())
                                 setDataAndType(u, "video/*")
-                            } else {
+                            } else if (path.startsWith("content://")) {
                                 setDataAndType(Uri.parse(path), "video/*")
+                            } else {
+                                var contentUri: Uri? = null
+                                try {
+                                    val cursor = ctx.contentResolver.query(
+                                        MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
+                                        arrayOf(MediaStore.Video.Media._ID),
+                                        "${MediaStore.Video.Media.DATA} = ?",
+                                        arrayOf(path),
+                                        null
+                                    )
+                                    cursor?.use {
+                                        if (it.moveToFirst()) {
+                                            val id = it.getLong(it.getColumnIndexOrThrow(MediaStore.Video.Media._ID))
+                                            contentUri = ContentUris.withAppendedId(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, id)
+                                        }
+                                    }
+                                } catch (_: Exception) {}
+                                setDataAndType(contentUri ?: Uri.parse(path), "video/*")
                             }
                             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                         }
-                        val chooser = Intent.createChooser(intent, "Play Video With").apply {
-                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        val pm = ctx.packageManager
+                        val mxPackages = listOf("com.mxtech.videoplayer.ad", "com.mxtech.videoplayer.pro")
+                        var mxFound = false
+                        for (pkg in mxPackages) {
+                            try {
+                                pm.getPackageInfo(pkg, 0)
+                                intent.setPackage(pkg)
+                                mxFound = true
+                                break
+                            } catch (_: Exception) {}
                         }
-                        ctx.startActivity(chooser)
+                        if (mxFound) {
+                            ctx.startActivity(intent)
+                        } else {
+                            val chooser = Intent.createChooser(intent, "Play Video With (MX Player / Any Player)").apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            ctx.startActivity(chooser)
+                        }
                         result.success(true)
                     } catch (e: Exception) {
                         result.error("OPEN_VIDEO_ERR", e.localizedMessage, null)
@@ -715,6 +759,26 @@ class MainActivity: AudioServiceActivity() {
                     } catch (e: Throwable) {
                         result.success(false)
                     }
+                }
+                "getVideoDuration" -> {
+                    val path = call.argument<String>("path") ?: ""
+                    Thread {
+                        var durationMs = 0L
+                        try {
+                            if (path.isNotEmpty()) {
+                                val mmr = MediaMetadataRetriever()
+                                if (path.startsWith("content://")) {
+                                    mmr.setDataSource(applicationContext, Uri.parse(path))
+                                } else {
+                                    mmr.setDataSource(path)
+                                }
+                                val durStr = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                                durationMs = durStr?.toLongOrNull() ?: 0L
+                                mmr.release()
+                            }
+                        } catch (_: Throwable) {}
+                        runOnUiThread { result.success(durationMs) }
+                    }.start()
                 }
                 else -> result.notImplemented()
             }

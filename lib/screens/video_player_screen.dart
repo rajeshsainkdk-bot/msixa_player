@@ -218,7 +218,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   bool get _isLikelyDolbyOrEac3 {
     final title = _currentVideo.title.toLowerCase();
     final path = _currentVideo.path.toLowerCase();
-    return title.contains('eac3') ||
+    final nameMatch = title.contains('eac3') ||
         title.contains('ddp') ||
         title.contains('ac3') ||
         title.contains('5.1') ||
@@ -228,6 +228,14 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         path.contains('ddp') ||
         path.contains('ac3') ||
         path.contains('5.1');
+    if (nameMatch) return true;
+    for (final trk in _audioTracks) {
+      final mime = (trk['mime'] ?? '').toString().toLowerCase();
+      if (mime.contains('eac3') || mime.contains('ac3') || mime.contains('dts') || mime.contains('mlp')) {
+        return true;
+      }
+    }
+    return false;
   }
 
   // AI Video Clarity
@@ -545,18 +553,51 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       if (res != null && res.isNotEmpty) {
         final parsed = res.map((item) => Map<String, dynamic>.from(item as Map)).toList();
         if (mounted) {
+          int initialTrackIdx = 0;
+          if (parsed.length > 1) {
+            final firstMime = (parsed[0]['mime'] ?? '').toString().toLowerCase();
+            final firstIsDolby = parsed[0]['isDolby'] == true ||
+                firstMime.contains('eac3') ||
+                firstMime.contains('ac3') ||
+                firstMime.contains('dts');
+            if (firstIsDolby) {
+              final playableIdx = parsed.indexWhere((t) {
+                final m = (t['mime'] ?? '').toString().toLowerCase();
+                return m.contains('mp4a') || m.contains('aac') || m.contains('vorbis') || m.contains('opus');
+              });
+              if (playableIdx != -1) {
+                initialTrackIdx = playableIdx;
+              }
+            }
+          }
+
           setState(() {
             _audioTracks = parsed;
+            _selectedAudioTrackIndex = initialTrackIdx;
             if (_audioTracks.isNotEmpty) {
-              _audioTrackName = _audioTracks[0]['name']?.toString() ?? 'Track 1 (Default)';
+              _audioTrackName = _audioTracks[initialTrackIdx]['name']?.toString() ?? 'Track ${initialTrackIdx + 1}';
             }
           });
           // If decoder is SW or if audio format requires fallback downmixing, auto-start SW audio sync
           if (_decoderMode == 'SW' || (_isLikelyDolbyOrEac3 && _decoderMode != 'HW+')) {
-            await _switchAudioTrack(0);
+            await _switchAudioTrack(initialTrackIdx);
+          } else if (initialTrackIdx != 0) {
+            await _switchAudioTrack(initialTrackIdx);
           }
         }
       }
+    } catch (_) {}
+  }
+
+  Future<void> _openInMxPlayer() async {
+    try {
+      if (_controller.value.isPlaying) {
+        await _controller.pause();
+      }
+      await DeviceVideoService.openExternalPlayer(
+        _currentVideo.path,
+        id: _currentVideo.id,
+      );
     } catch (_) {}
   }
 
@@ -621,39 +662,65 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       });
 
       bool initialized = false;
-      final numericId = int.tryParse(_currentVideo.id);
-      if (numericId != null && numericId > 0 && Platform.isAndroid && !_currentVideo.path.startsWith('http')) {
+
+      // 1. Prefer direct file path if file exists: critical for MKV/MP4 random-access seeking without snapping to 0:00
+      final localFile = _currentVideo.path.isNotEmpty ? File(_currentVideo.path) : null;
+      if (localFile != null && await localFile.exists()) {
         try {
-          _controller = VideoPlayerController.contentUri(Uri.parse('content://media/external/video/media/$numericId'));
+          _controller = VideoPlayerController.file(localFile);
           await _controller.initialize();
           initialized = true;
         } catch (_) {
           await _controller.dispose();
+          initialized = false;
         }
       }
 
+      // 2. If direct file failed or not a local file, try content URI with MediaStore ID
+      if (!initialized) {
+        final numericId = int.tryParse(_currentVideo.id);
+        if (numericId != null && numericId > 0 && Platform.isAndroid && !_currentVideo.path.startsWith('http')) {
+          try {
+            _controller = VideoPlayerController.contentUri(Uri.parse('content://media/external/video/media/$numericId'));
+            await _controller.initialize();
+            initialized = true;
+          } catch (_) {
+            await _controller.dispose();
+            initialized = false;
+          }
+        }
+      }
+
+      // 3. Fallback to generic Uri or path
       if (!initialized) {
         if (_currentVideo.path.startsWith('content://') ||
             _currentVideo.path.startsWith('http://') ||
             _currentVideo.path.startsWith('https://')) {
           _controller = VideoPlayerController.contentUri(Uri.parse(_currentVideo.path));
+        } else if (localFile != null && await localFile.exists()) {
+          _controller = VideoPlayerController.file(localFile);
+        } else if (_currentVideo.path.contains('://')) {
+          _controller = VideoPlayerController.contentUri(Uri.parse(_currentVideo.path));
         } else {
-          final file = File(_currentVideo.path);
-          if (!await file.exists()) {
-            if (_currentVideo.path.contains('://')) {
-              _controller = VideoPlayerController.contentUri(Uri.parse(_currentVideo.path));
-            } else {
-              setState(() {
-                _hasError = true;
-                _errorMessage = 'Video file does not exist at specified path:\n${_currentVideo.path}';
-              });
-              return;
-            }
-          } else {
-            _controller = VideoPlayerController.file(file);
-          }
+          setState(() {
+            _hasError = true;
+            _errorMessage = 'Video file does not exist at specified path:\n${_currentVideo.path}';
+          });
+          return;
         }
         await _controller.initialize();
+      }
+
+      // If video duration is 0 (common for MKVs and downloaded movies before MediaStore index), fetch exact duration natively
+      if (_currentVideo.duration <= 0 && _currentVideo.path.isNotEmpty) {
+        try {
+          final dur = await _channel.invokeMethod<num>('getVideoDuration', {'path': _currentVideo.path});
+          if (dur != null && dur > 0 && mounted) {
+            setState(() {
+              _currentVideo = _currentVideo.copyWith(duration: dur.toInt());
+            });
+          }
+        } catch (_) {}
       }
 
       _controller.addListener(_videoListener);
@@ -1274,7 +1341,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       final duration = _effectiveDuration;
       final totalMs = duration.inMilliseconds;
       // Never clamp to 0; allow seeking forward up to 6 hours if duration metadata is pending
-      final maxMs = totalMs > 0 ? totalMs : 21600000;
+      final maxMs = totalMs > 0 ? totalMs : (currentPos.inMilliseconds + 3600000).clamp(7200000, 21600000);
       final targetMs = (currentPos.inMilliseconds + _accumulatedSeekSeconds * 1000).clamp(0, maxMs);
       _accumulatedSeekSeconds = 0;
 
@@ -1529,6 +1596,56 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                               ),
                             ),
                             const SizedBox(height: 12),
+
+                            // 1-Tap MX Player Launcher with Dolby Digital / AC3 / DTS support
+                            Container(
+                              margin: const EdgeInsets.only(bottom: 14),
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    const Color(0xFF00E5FF).withOpacity(0.18),
+                                    const Color(0xFF2196F3).withOpacity(0.18),
+                                  ],
+                                ),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: const Color(0xFF00E5FF).withOpacity(0.5)),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.play_circle_fill_rounded, color: Color(0xFF00E5FF), size: 30),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: const [
+                                        Text(
+                                          'Open in MX Player',
+                                          style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                                        ),
+                                        Text(
+                                          'Full Dolby Digital / E-AC3 5.1 & DTS audio codec support',
+                                          style: TextStyle(color: Colors.white70, fontSize: 11),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF00E5FF),
+                                      foregroundColor: Colors.black,
+                                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    ),
+                                    onPressed: () {
+                                      Navigator.pop(ctx);
+                                      _openInMxPlayer();
+                                    },
+                                    child: const Text('OPEN', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                  ),
+                                ],
+                              ),
+                            ),
 
                             // Audio Track Selector (A14 / MX-758)
                             Row(
@@ -2364,7 +2481,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     if (_isSeekingGesture) {
       _seekDeltaSeconds += details.focalPointDelta.dx * 0.18;
       final totalSec = totalDuration.inSeconds;
-      final maxSec = totalSec > 0 ? totalSec : 21600;
+      final maxSec = totalSec > 0 ? totalSec : (_controller.value.position.inSeconds + 3600).clamp(7200, 21600);
       final targetSec = (_seekOrigin.inSeconds + _seekDeltaSeconds.toInt()).clamp(0, maxSec);
       setState(() {
         _seekTarget = Duration(seconds: targetSec);
@@ -2508,6 +2625,14 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                               runSpacing: 16,
                               alignment: WrapAlignment.center,
                               children: [
+                                _buildMoreOptionItem(
+                                  icon: Icons.smart_display_rounded,
+                                  label: 'MX Player',
+                                  onTap: () {
+                                    Navigator.pop(ctx);
+                                    _openInMxPlayer();
+                                  },
+                                ),
                                 _buildMoreOptionItem(
                                   icon: Icons.playlist_play_rounded,
                                   label: 'Queue',
@@ -3669,7 +3794,13 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                             Expanded(
                               child: Builder(
                                 builder: (ctx) {
-                                  final effectiveTotalMs = totalMs > 0 ? totalMs : (_currentVideo.duration > 0 ? _currentVideo.duration.toDouble() : 1.0);
+                                  final effectiveTotalMs = totalMs > 0
+                                      ? totalMs
+                                      : (_currentVideo.duration > 0
+                                          ? _currentVideo.duration.toDouble()
+                                          : (_controller.value.position.inMilliseconds > 0
+                                              ? (_controller.value.position.inMilliseconds + 3600000).toDouble()
+                                              : 7200000.0));
                                   return SliderTheme(
                                     data: SliderTheme.of(context).copyWith(
                                       trackHeight: 3.0,

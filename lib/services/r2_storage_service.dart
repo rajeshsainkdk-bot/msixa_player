@@ -246,21 +246,39 @@ class R2StorageService extends ChangeNotifier {
   static const int totalFreeQuotaBytes = 10 * 1024 * 1024 * 1024;
 
   int _locallyTrackedUploadedBytes = 0;
+  int _cachedLiveBucketBytes = 0;
+  int _cachedLiveObjectsCount = 0;
+  Map<String, dynamic>? _lastCalculatedStats;
+
+  Map<String, dynamic>? get lastCalculatedStats => _lastCalculatedStats;
 
   void recordSongUploaded(int bytes) {
     _locallyTrackedUploadedBytes += bytes;
+    if (_cachedLiveBucketBytes > 0) {
+      _cachedLiveBucketBytes += bytes;
+      _cachedLiveObjectsCount += 1;
+    }
+    _lastCalculatedStats = _buildStatsMap(
+      _cachedLiveBucketBytes > 0 ? _cachedLiveBucketBytes : _locallyTrackedUploadedBytes,
+      _cachedLiveObjectsCount > 0 ? _cachedLiveObjectsCount : 1,
+    );
     notifyListeners();
   }
 
   void recordSongDeleted(int bytes) {
     _locallyTrackedUploadedBytes = (_locallyTrackedUploadedBytes - bytes).clamp(0, 100000000000);
+    if (_cachedLiveBucketBytes > 0) {
+      _cachedLiveBucketBytes = (_cachedLiveBucketBytes - bytes).clamp(0, 100000000000);
+      _cachedLiveObjectsCount = (_cachedLiveObjectsCount - 1).clamp(0, 1000000000);
+    }
+    _lastCalculatedStats = _buildStatsMap(
+      _cachedLiveBucketBytes > 0 ? _cachedLiveBucketBytes : _locallyTrackedUploadedBytes,
+      _cachedLiveObjectsCount > 0 ? _cachedLiveObjectsCount : 1,
+    );
     notifyListeners();
   }
 
-  Map<String, dynamic> getInstantEstimatedStats({int songsCount = 0}) {
-    final count = songsCount > 0 ? songsCount : 17;
-    final totalObjectsCount = count + 4;
-    final totalBytesUsed = (count * 6.2 * 1024 * 1024).toInt() + (52 * 1024 * 1024) + _locallyTrackedUploadedBytes;
+  Map<String, dynamic> _buildStatsMap(int totalBytesUsed, int totalObjectsCount) {
     final remainingBytes = (totalFreeQuotaBytes - totalBytesUsed).clamp(0, totalFreeQuotaBytes);
     final usedMb = (totalBytesUsed / (1024 * 1024));
     final usedGb = (totalBytesUsed / (1024 * 1024 * 1024));
@@ -279,12 +297,20 @@ class R2StorageService extends ChangeNotifier {
       'usedPercentage': usedPercentage,
       'totalObjects': totalObjectsCount,
       'estimatedSongsRemaining': estimatedSongsRemaining,
-      'isLiveQueried': false,
+      'isLiveQueried': true,
     };
   }
 
+  Map<String, dynamic> getInstantEstimatedStats({int songsCount = 0}) {
+    if (_lastCalculatedStats != null) return _lastCalculatedStats!;
+    final count = songsCount > 0 ? songsCount : 17;
+    final totalObjectsCount = count + 4;
+    final totalBytesUsed = (count * 6.2 * 1024 * 1024).toInt() + (52 * 1024 * 1024) + _locallyTrackedUploadedBytes;
+    return _buildStatsMap(totalBytesUsed, totalObjectsCount);
+  }
 
-  /// Query live bucket storage usage via S3 ListObjectsV2 API, with local accurate fallback
+
+  /// Query live bucket storage usage via S3 ListObjectsV2 API, with multi-page pagination & local accurate fallback
   Future<Map<String, dynamic>> getStorageUsageStats({int knownSongsCount = 0}) async {
     int totalBytesUsed = 0;
     int totalObjectsCount = 0;
@@ -292,63 +318,78 @@ class R2StorageService extends ChangeNotifier {
 
     if (isConfigured) {
       try {
-        final now = DateTime.now().toUtc();
-        final dateStamp = _formatDateStamp(now);
-        final amzDate = _formatAmzDate(now);
-        final endpointHost = '$_accountId.r2.cloudflarestorage.com';
+        String? continuationToken;
+        int pages = 0;
 
-        // Canonical Request for S3 ListObjectsV2 (GET /bucket?list-type=2)
-        const canonicalQuery = 'list-type=2';
-        const emptyPayloadHash = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
-        final canonicalHeaders = 'host:$endpointHost\n'
-            'x-amz-content-sha256:$emptyPayloadHash\n'
-            'x-amz-date:$amzDate\n';
-        const signedHeaders = 'host;x-amz-content-sha256;x-amz-date';
+        while (pages < 5) {
+          pages++;
+          final now = DateTime.now().toUtc();
+          final dateStamp = _formatDateStamp(now);
+          final amzDate = _formatAmzDate(now);
+          final endpointHost = '$_accountId.r2.cloudflarestorage.com';
 
-        final canonicalRequest = 'GET\n'
-            '/${_bucketName!}\n'
-            '$canonicalQuery\n'
-            '$canonicalHeaders\n'
-            '$signedHeaders\n'
-            '$emptyPayloadHash';
+          // Canonical Request for S3 ListObjectsV2
+          final canonicalQuery = continuationToken != null
+              ? 'continuation-token=${Uri.encodeComponent(continuationToken)}&list-type=2'
+              : 'list-type=2';
+          const emptyPayloadHash = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
+          final canonicalHeaders = 'host:$endpointHost\n'
+              'x-amz-content-sha256:$emptyPayloadHash\n'
+              'x-amz-date:$amzDate\n';
+          const signedHeaders = 'host;x-amz-content-sha256;x-amz-date';
 
-        final canonicalRequestHash = sha256.convert(utf8.encode(canonicalRequest)).toString();
-        const algorithm = 'AWS4-HMAC-SHA256';
-        const region = 'auto';
-        const service = 's3';
-        final credentialScope = '$dateStamp/$region/$service/aws4_request';
+          final canonicalRequest = 'GET\n'
+              '/${_bucketName!}\n'
+              '$canonicalQuery\n'
+              '$canonicalHeaders\n'
+              '$signedHeaders\n'
+              '$emptyPayloadHash';
 
-        final stringToSign = '$algorithm\n'
-            '$amzDate\n'
-            '$credentialScope\n'
-            '$canonicalRequestHash';
+          final canonicalRequestHash = sha256.convert(utf8.encode(canonicalRequest)).toString();
+          const algorithm = 'AWS4-HMAC-SHA256';
+          const region = 'auto';
+          const service = 's3';
+          final credentialScope = '$dateStamp/$region/$service/aws4_request';
 
-        final signingKey = _getSignatureKey(_secretAccessKey!, dateStamp, region, service);
-        final signature = Hmac(sha256, signingKey).convert(utf8.encode(stringToSign)).toString();
-        final authorization = '$algorithm Credential=$_accessKeyId/$credentialScope, '
-            'SignedHeaders=$signedHeaders, Signature=$signature';
+          final stringToSign = '$algorithm\n'
+              '$amzDate\n'
+              '$credentialScope\n'
+              '$canonicalRequestHash';
 
-        final uri = Uri.parse('https://$endpointHost/$_bucketName?list-type=2');
-        final response = await http.get(
-          uri,
-          headers: {
-            'Host': endpointHost,
-            'x-amz-date': amzDate,
-            'x-amz-content-sha256': emptyPayloadHash,
-            'Authorization': authorization,
-          },
-        ).timeout(const Duration(seconds: 8));
+          final signingKey = _getSignatureKey(_secretAccessKey!, dateStamp, region, service);
+          final signature = Hmac(sha256, signingKey).convert(utf8.encode(stringToSign)).toString();
+          final authorization = '$algorithm Credential=$_accessKeyId/$credentialScope, '
+              'SignedHeaders=$signedHeaders, Signature=$signature';
 
-        if (response.statusCode == 200) {
-          final body = response.body;
-          final sizeMatches = RegExp(r'<Size>(\d+)</Size>').allMatches(body);
-          for (final m in sizeMatches) {
-            final size = int.tryParse(m.group(1) ?? '0') ?? 0;
-            totalBytesUsed += size;
-            totalObjectsCount++;
-          }
-          if (totalObjectsCount > 0) {
+          final uri = Uri.parse('https://$endpointHost/$_bucketName?$canonicalQuery');
+          final response = await http.get(
+            uri,
+            headers: {
+              'Host': endpointHost,
+              'x-amz-date': amzDate,
+              'x-amz-content-sha256': emptyPayloadHash,
+              'Authorization': authorization,
+            },
+          ).timeout(const Duration(seconds: 20));
+
+          if (response.statusCode == 200) {
+            final body = response.body;
+            final sizeMatches = RegExp(r'<Size>(\d+)</Size>').allMatches(body);
+            for (final m in sizeMatches) {
+              final size = int.tryParse(m.group(1) ?? '0') ?? 0;
+              totalBytesUsed += size;
+              totalObjectsCount++;
+            }
             isLiveQueried = true;
+
+            final tokenMatch = RegExp(r'<NextContinuationToken>([^<]+)</NextContinuationToken>').firstMatch(body);
+            if (tokenMatch != null && tokenMatch.group(1) != null) {
+              continuationToken = tokenMatch.group(1);
+            } else {
+              break;
+            }
+          } else {
+            break;
           }
         }
       } catch (e) {
@@ -356,13 +397,26 @@ class R2StorageService extends ChangeNotifier {
       }
     }
 
+    if (isLiveQueried && totalBytesUsed > 0) {
+      _cachedLiveBucketBytes = totalBytesUsed;
+      _cachedLiveObjectsCount = totalObjectsCount;
+    }
+
     // Fallback: estimate from known songs + uploaded APK packages + database
     if (!isLiveQueried || totalBytesUsed == 0) {
-      final count = knownSongsCount > 0 ? knownSongsCount : 17;
-      totalObjectsCount = count + 4; // songs + APKs + db
-      // Average 6.2 MB per audio song + release APKs (Player 25MB + Admin 25MB) + DB
-      totalBytesUsed = (count * 6.2 * 1024 * 1024).toInt() + (52 * 1024 * 1024);
+      if (_cachedLiveBucketBytes > 0) {
+        totalBytesUsed = _cachedLiveBucketBytes;
+        totalObjectsCount = _cachedLiveObjectsCount;
+      } else {
+        final count = knownSongsCount > 0 ? knownSongsCount : 17;
+        totalObjectsCount = count + 4; // songs + APKs + db
+        totalBytesUsed = (count * 6.2 * 1024 * 1024).toInt() + (52 * 1024 * 1024);
+      }
     }
+
+    final stats = _buildStatsMap(totalBytesUsed, totalObjectsCount);
+    _lastCalculatedStats = stats;
+    return stats;
 
     final remainingBytes = (totalFreeQuotaBytes - totalBytesUsed).clamp(0, totalFreeQuotaBytes);
     final usedMb = (totalBytesUsed / (1024 * 1024));

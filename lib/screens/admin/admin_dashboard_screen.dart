@@ -80,6 +80,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
     });
     _backend.addListener(_onUpdate);
     _lang.addListener(_onUpdate);
+    R2StorageService().addListener(_onR2Update);
 
     // Initial sync with shared storage
     _backend.syncSharedData();
@@ -152,6 +153,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
     if (mounted) setState(() {});
   }
 
+  void _onR2Update() {
+    if (mounted) {
+      setState(() {
+        _storageStats = R2StorageService().lastCalculatedStats ?? _storageStats;
+      });
+    }
+  }
+
   @override
   void dispose() {
     _syncTimer?.cancel();
@@ -160,6 +169,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
     _tabController.dispose();
     _backend.removeListener(_onUpdate);
     _lang.removeListener(_onUpdate);
+    R2StorageService().removeListener(_onR2Update);
     _player.dispose();
     super.dispose();
   }
