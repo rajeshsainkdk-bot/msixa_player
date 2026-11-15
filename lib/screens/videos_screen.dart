@@ -1408,49 +1408,6 @@ class _VideosScreenState extends State<VideosScreen> {
     );
   }
 
-  void _showRenameDialog(VideoItem video) {
-    final ctrl = TextEditingController(text: video.title);
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF212124),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        title: const Text('Rename Video', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-        content: TextField(
-          controller: ctrl,
-          style: const TextStyle(color: Colors.white),
-          decoration: const InputDecoration(
-            hintText: 'Enter new video name',
-            hintStyle: TextStyle(color: Colors.white38),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB), foregroundColor: Colors.white),
-            onPressed: () {
-              final newName = ctrl.text.trim();
-              if (newName.isNotEmpty) {
-                setState(() {
-                  final idx = _allVideos.indexWhere((v) => v.id == video.id);
-                  if (idx != -1) {
-                    _allVideos[idx] = _allVideos[idx].copyWith(title: newName);
-                  }
-                });
-                Navigator.pop(ctx);
-                _showSnackBar('Renamed to "$newName"');
-              }
-            },
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _showActionNotice(String msg) {
     _showSnackBar(msg);
   }
