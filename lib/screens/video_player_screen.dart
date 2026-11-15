@@ -115,6 +115,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   // Brightness Control on Left (A03)
   double _brightness = 0.80;
+  bool _hasUserAdjustedBrightness = false;
   bool _isBrightnessDrag = false;
   bool _showBrightnessHud = false;
   Timer? _brightnessHudTimer;
@@ -578,12 +579,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
               _audioTrackName = _audioTracks[initialTrackIdx]['name']?.toString() ?? 'Track ${initialTrackIdx + 1}';
             }
           });
-          // If decoder is SW or if audio format requires fallback downmixing, auto-start SW audio sync
-          if (_decoderMode == 'SW' || (_isLikelyDolbyOrEac3 && _decoderMode != 'HW+')) {
-            await _switchAudioTrack(initialTrackIdx);
-          } else if (initialTrackIdx != 0) {
-            await _switchAudioTrack(initialTrackIdx);
-          }
+          // Keep ExoPlayer native audio unmuted and active; do not auto-force secondary audio sync
+          await _controller.setVolume(_isMuted ? 0.0 : _volume);
         }
       }
     } catch (_) {}
@@ -666,11 +663,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
       bool initialized = false;
 
-      // 1. Prefer direct file path if file exists: critical for MKV/MP4 random-access seeking without snapping to 0:00
-      final localFile = _currentVideo.path.isNotEmpty ? File(_currentVideo.path) : null;
-      if (localFile != null && await localFile.exists()) {
+      // 1. Prefer MediaStore Content URI on Android for native random-access seeking without freezing/jumping
+      final numericId = int.tryParse(_currentVideo.id);
+      if (numericId != null && numericId > 0 && Platform.isAndroid && !_currentVideo.path.startsWith('http')) {
         try {
-          _controller = VideoPlayerController.file(localFile);
+          _controller = VideoPlayerController.contentUri(Uri.parse('content://media/external/video/media/$numericId'));
           await _controller.initialize();
           initialized = true;
         } catch (_) {
@@ -679,18 +676,16 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         }
       }
 
-      // 2. If direct file failed or not a local file, try content URI with MediaStore ID
-      if (!initialized) {
-        final numericId = int.tryParse(_currentVideo.id);
-        if (numericId != null && numericId > 0 && Platform.isAndroid && !_currentVideo.path.startsWith('http')) {
-          try {
-            _controller = VideoPlayerController.contentUri(Uri.parse('content://media/external/video/media/$numericId'));
-            await _controller.initialize();
-            initialized = true;
-          } catch (_) {
-            await _controller.dispose();
-            initialized = false;
-          }
+      // 2. Direct file fallback if local file exists
+      final localFile = _currentVideo.path.isNotEmpty ? File(_currentVideo.path) : null;
+      if (!initialized && localFile != null && await localFile.exists()) {
+        try {
+          _controller = VideoPlayerController.file(localFile);
+          await _controller.initialize();
+          initialized = true;
+        } catch (_) {
+          await _controller.dispose();
+          initialized = false;
         }
       }
 
@@ -1348,18 +1343,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       final targetMs = (currentPos.inMilliseconds + _accumulatedSeekSeconds * 1000).clamp(0, maxMs);
       _accumulatedSeekSeconds = 0;
 
-      final wasPlaying = _controller.value.isPlaying;
-      if (wasPlaying) {
-        await _controller.pause();
-      }
       await _controller.seekTo(Duration(milliseconds: targetMs));
       if (_isSyncAudioPlaying) {
         try {
           await _channel.invokeMethod('seekSyncAudio', {'positionMs': targetMs});
         } catch (_) {}
-      }
-      if (wasPlaying && mounted) {
-        await _controller.play();
       }
     });
 
@@ -2512,6 +2500,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         if (mounted) setState(() => _showVolumeHud = false);
       });
     } else if (_isBrightnessDrag) {
+      _hasUserAdjustedBrightness = true;
       final delta = -details.focalPointDelta.dy / (screenSize.height * 0.55);
       _brightness = (_brightness + delta).clamp(0.02, 1.0);
       _channel.invokeMethod('setScreenBrightness', {'brightness': _brightness});
@@ -3233,6 +3222,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     // Release Screen Wakelock
     _setWakeLock(false);
 
+    // Reset window brightness override so system phone brightness is fully restored
+    try {
+      _channel.invokeMethod('setScreenBrightness', {'brightness': -1.0});
+    } catch (_) {}
+
     if (_isSyncAudioPlaying) {
       try {
         _channel.invokeMethod('stopSyncAudio');
@@ -3335,7 +3329,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
             ),
 
           // 3. HARDWARE / SOFTWARE SCREEN DIMMING LAYER (Brightness)
-          if (_brightness < 0.99)
+          if (_hasUserAdjustedBrightness && _brightness < 0.99)
             Positioned.fill(
               child: IgnorePointer(
                 child: Container(
@@ -3837,18 +3831,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                         setState(() => _scrubValue = val);
                                       },
                                       onChangeEnd: (val) async {
-                                        final wasPlaying = _controller.value.isPlaying;
-                                        if (wasPlaying) {
-                                          await _controller.pause();
-                                        }
                                         await _controller.seekTo(Duration(milliseconds: val.toInt()));
                                         if (_isSyncAudioPlaying) {
                                           try {
                                             await _channel.invokeMethod('seekSyncAudio', {'positionMs': val.toInt()});
                                           } catch (_) {}
-                                        }
-                                        if (wasPlaying && mounted) {
-                                          await _controller.play();
                                         }
                                         setState(() => _isScrubbing = false);
                                         _startControlsTimer();

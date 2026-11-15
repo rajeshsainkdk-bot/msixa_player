@@ -14,8 +14,8 @@ import 'language_service.dart';
 /// - Launches native Android package installer automatically via FileProvider
 /// - Supports both user-initiated check & silent app-startup auto-prompt
 class UpdateService {
-  static const String manifestUrl = 'https://pub-d4f2e58dc2594d0c8dc1f30bbae4344f.r2.dev/update/version.json';
-  static const String adminManifestUrl = 'https://pub-d4f2e58dc2594d0c8dc1f30bbae4344f.r2.dev/update/admin_version.json';
+  static const String manifestUrl = 'https://pub-d4f2e58dc2594d0c8dc1f30bbae4344f.r2.dev/update/msixa_player_version.json';
+  static const String adminManifestUrl = 'https://pub-d4f2e58dc2594d0c8dc1f30bbae4344f.r2.dev/update/msixa_admin_version.json';
   static const MethodChannel _channel = MethodChannel('com.msixa.player/app_share');
   static const String _prefKeyLastChecked = 'msixa_last_update_check';
   static const String _prefKeyDismissedVersion = 'msixa_dismissed_update_version';
@@ -40,8 +40,7 @@ class UpdateService {
 
   /// Check for latest update from Cloudflare R2
   static Future<void> checkForUpdate(BuildContext context, {bool autoPrompt = false, bool isAdmin = false}) async {
-    if (autoPrompt && _hasCheckedThisSession) return;
-    if (autoPrompt) _hasCheckedThisSession = true;
+    if (autoPrompt) return; // Completely disable automatic popups on startup for smooth experience
 
     final isHindi = LanguageService().isHindi;
 

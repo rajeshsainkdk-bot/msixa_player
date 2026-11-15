@@ -32,6 +32,9 @@ class MainActivity: AudioServiceActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val lp = window.attributes
+        lp.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+        window.attributes = lp
         handleIncomingIntent(intent)
     }
 
@@ -72,7 +75,11 @@ class MainActivity: AudioServiceActivity() {
                     val brightness = call.argument<Double>("brightness")?.toFloat() ?: -1.0f
                     runOnUiThread {
                         val lp = window.attributes
-                        lp.screenBrightness = brightness.coerceIn(0.01f, 1.0f)
+                        if (brightness < 0) {
+                            lp.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+                        } else {
+                            lp.screenBrightness = brightness.coerceIn(0.01f, 1.0f)
+                        }
                         window.attributes = lp
                     }
                     result.success(true)
