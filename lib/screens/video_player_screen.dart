@@ -226,7 +226,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       });
 
       if (_isLikelyDolbyOrEac3) {
-        _showPillHud('Dolby EAC3 / 5.1 Surround detected (Tap 🎵 if silent)', icon: Icons.surround_sound_rounded);
+        _showPillHud('Dolby EAC3 / 5.1 Surround: Native In-App Audio Active', icon: Icons.surround_sound_rounded);
       }
 
       _startControlsTimer();
@@ -461,18 +461,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     _showPillHud(msg);
   }
 
-  Future<void> _openInExternalPlayer() async {
-    try {
-      await _channel.invokeMethod('openVideoWithApp', {
-        'path': _currentVideo.path,
-        'id': _currentVideo.id,
-      });
-      _showPillHud('Opening in External Video Player (MX / VLC)...', icon: Icons.open_in_new_rounded);
-    } catch (e) {
-      _showPillHud('Failed to open external player: $e', icon: Icons.error_outline_rounded);
-    }
-  }
-
   void _showAudioSettingsSheet() {
     showModalBottomSheet(
       context: context,
@@ -519,62 +507,51 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                   ),
                   const SizedBox(height: 12),
 
-                  // EAC3 / Dolby Digital Plus Surround Warning Banner
+                  // EAC3 / Dolby Digital Plus Surround Active In-App Status
                   if (_isLikelyDolbyOrEac3)
                     Container(
                       margin: const EdgeInsets.only(bottom: 16),
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: [
-                            const Color(0xFF2563EB).withOpacity(0.25),
-                            const Color(0xFF1D4ED8).withOpacity(0.12),
+                            const Color(0xFF10B981).withOpacity(0.20),
+                            const Color(0xFF059669).withOpacity(0.08),
                           ],
                         ),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFF3B82F6).withOpacity(0.5)),
+                        border: Border.all(color: const Color(0xFF10B981).withOpacity(0.4)),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      child: Row(
                         children: [
-                          Row(
-                            children: const [
-                              Icon(Icons.surround_sound_rounded, color: Color(0xFF60A5FA), size: 20),
-                              SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  'Dolby Digital Plus (E-AC3 / 5.1) Detected',
-                                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          const Text(
-                            'If this video has no voice or audio on your phone, standard Android player lacks EAC3 patent decoder. Tap below to play with MX Player or VLC for native Dolby surround decoding.',
-                            style: TextStyle(color: Colors.white70, fontSize: 11),
-                          ),
-                          const SizedBox(height: 10),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF2563EB),
-                                foregroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                padding: const EdgeInsets.symmetric(vertical: 10),
-                              ),
-                              icon: const Icon(Icons.open_in_new_rounded, size: 16),
-                              label: const Text(
-                                'Play in MX Player / VLC (Full EAC3 Audio)',
-                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                              ),
-                              onPressed: () {
-                                Navigator.pop(ctx);
-                                _openInExternalPlayer();
-                              },
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF10B981),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text(
+                              'DOLBY AUDIO',
+                              style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 10),
                             ),
                           ),
+                          const SizedBox(width: 10),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Dolby Digital Plus (E-AC3 / 5.1)',
+                                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                                ),
+                                Text(
+                                  'Native in-app multi-channel stereo downmixing active',
+                                  style: TextStyle(color: Colors.white70, fontSize: 11),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 20),
                         ],
                       ),
                     ),
@@ -729,26 +706,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                         ),
                       ),
                     ],
-                  ),
-                  const SizedBox(height: 20),
-
-                  // 4. Fallback button to launch system player / MX player
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.white,
-                        side: const BorderSide(color: Colors.white24),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        padding: const EdgeInsets.symmetric(vertical: 11),
-                      ),
-                      icon: const Icon(Icons.open_in_new_rounded, size: 16),
-                      label: const Text('Open with Other Installed Player (MX / VLC)', style: TextStyle(fontSize: 12)),
-                      onPressed: () {
-                        Navigator.pop(ctx);
-                        _openInExternalPlayer();
-                      },
-                    ),
                   ),
                 ],
               ),

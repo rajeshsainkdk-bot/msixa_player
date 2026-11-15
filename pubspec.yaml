@@ -19,8 +19,10 @@ dependencies:
   on_audio_query: ^2.9.0
   permission_handler: ^11.3.1
 
-  # Video Playback Engine (All Formats Supported)
+  # Video Playback Engine (All Formats Supported with Native EAC3/AC3/DTS In-App Decoding)
   video_player: ^2.8.2
+  video_player_media_kit: ^2.0.0
+  media_kit_libs_android_video: any
 
   # Native Sharing & File Picking
   share_plus: ^7.2.2
