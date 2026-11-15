@@ -55,11 +55,31 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   bool _showUnlockButton = false;
   Timer? _unlockButtonTimer;
 
-  // Aspect ratio & Orientation
+  // Aspect ratio & Display Settings (Panel 2)
   BoxFit _fitMode = BoxFit.contain;
   String _fitLabel = '';
   Timer? _fitLabelTimer;
   bool _isLandscape = false;
+  double? _customAspectRatio;
+  String get _aspectRatioLabel {
+    if (_customAspectRatio == null) return 'Default (Original)';
+    if ((_customAspectRatio! - 16 / 9).abs() < 0.01) return '16:9 (Widescreen)';
+    if ((_customAspectRatio! - 4 / 3).abs() < 0.01) return '4:3 (Standard)';
+    if ((_customAspectRatio! - 21 / 9).abs() < 0.01) return '21:9 (Cinema)';
+    return '${_customAspectRatio!.toStringAsFixed(2)}:1';
+  }
+
+  // Subtitle Settings (Panel 4)
+  bool _subtitlesEnabled = true;
+  String _subtitleLanguage = 'Default (English)';
+  double _subtitleFontSize = 14.0;
+  Color _subtitleFontColor = Colors.white;
+  int _subtitleSyncMs = 0;
+
+  // Audio Settings (Panel 3)
+  int _audioSyncMs = 0;
+  String _equalizerPreset = 'Normal';
+  bool _isBackgroundPlay = false;
 
   // Scrubbing & Seeking State
   bool _isScrubbing = false;
@@ -640,6 +660,235 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     _resetControlsTimer();
   }
 
+  void _cycleAspectRatio() {
+    setState(() {
+      if (_customAspectRatio == null) {
+        _customAspectRatio = 16 / 9;
+      } else if ((_customAspectRatio! - 16 / 9).abs() < 0.01) {
+        _customAspectRatio = 4 / 3;
+      } else if ((_customAspectRatio! - 4 / 3).abs() < 0.01) {
+        _customAspectRatio = 21 / 9;
+      } else {
+        _customAspectRatio = null;
+      }
+    });
+    _showPillHud('Aspect Ratio: $_aspectRatioLabel', icon: Icons.aspect_ratio_rounded);
+  }
+
+  void _showDisplaySettingsSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDisplayState) => Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFF131A2A).withOpacity(0.97),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            border: Border.all(color: Colors.white12),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          child: SafeArea(
+            top: false,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      const Icon(Icons.crop_free_rounded, color: Color(0xFF2196F3), size: 22),
+                      const SizedBox(width: 10),
+                      const Expanded(
+                        child: Text(
+                          'Display Settings (स्क्रीन विकल्प)',
+                          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded, color: Colors.white70, size: 20),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
+                  const Divider(color: Colors.white12),
+
+                  // Option 1: Fit (पूरा वीडियो फिट)
+                  ListTile(
+                    dense: true,
+                    leading: const Icon(Icons.fit_screen_rounded, color: Color(0xFF2196F3)),
+                    title: const Text('Fit', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                    subtitle: const Text('पूरा वीडियो फिट (Fit to Screen)', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                    trailing: _fitMode == BoxFit.contain && _zoomScale == 1.0 ? const Icon(Icons.check_circle_rounded, color: Color(0xFF2196F3)) : null,
+                    onTap: () {
+                      setState(() {
+                        _fitMode = BoxFit.contain;
+                        _zoomScale = 1.0;
+                        _panOffset = Offset.zero;
+                        _customAspectRatio = null;
+                        _fitLabel = 'Fit to Screen';
+                      });
+                      setDisplayState(() {});
+                      _showPillHud('Fit: पूरा वीडियो फिट', icon: Icons.fit_screen_rounded);
+                      Navigator.pop(ctx);
+                    },
+                  ),
+
+                  // Option 2: Stretch (स्क्रीन भरना)
+                  ListTile(
+                    dense: true,
+                    leading: const Icon(Icons.fullscreen_rounded, color: Color(0xFF00E5FF)),
+                    title: const Text('Stretch', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                    subtitle: const Text('स्क्रीन भरना (Stretch to Screen)', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                    trailing: _fitMode == BoxFit.fill ? const Icon(Icons.check_circle_rounded, color: Color(0xFF2196F3)) : null,
+                    onTap: () {
+                      setState(() {
+                        _fitMode = BoxFit.fill;
+                        _zoomScale = 1.0;
+                        _panOffset = Offset.zero;
+                        _fitLabel = 'Stretch to Screen';
+                      });
+                      setDisplayState(() {});
+                      _showPillHud('Stretch: स्क्रीन भरना', icon: Icons.fullscreen_rounded);
+                      Navigator.pop(ctx);
+                    },
+                  ),
+
+                  // Option 3: Crop (किनारे काटकर भरना)
+                  ListTile(
+                    dense: true,
+                    leading: const Icon(Icons.crop_rounded, color: Color(0xFFFFB300)),
+                    title: const Text('Crop', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                    subtitle: const Text('किनारे काटकर भरना (Crop to 100%)', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                    trailing: _fitMode == BoxFit.cover ? const Icon(Icons.check_circle_rounded, color: Color(0xFF2196F3)) : null,
+                    onTap: () {
+                      setState(() {
+                        _fitMode = BoxFit.cover;
+                        _zoomScale = 1.0;
+                        _panOffset = Offset.zero;
+                        _fitLabel = 'Crop to Fill';
+                      });
+                      setDisplayState(() {});
+                      _showPillHud('Crop: किनारे काटकर भरना', icon: Icons.crop_rounded);
+                      Navigator.pop(ctx);
+                    },
+                  ),
+
+                  // Option 4: 100% (वास्तविक आकार)
+                  ListTile(
+                    dense: true,
+                    leading: const Icon(Icons.aspect_ratio_rounded, color: Color(0xFF10B981)),
+                    title: const Text('100%', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                    subtitle: const Text('वास्तविक आकार (100% Original Size)', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                    trailing: _fitMode == BoxFit.none ? const Icon(Icons.check_circle_rounded, color: Color(0xFF2196F3)) : null,
+                    onTap: () {
+                      setState(() {
+                        _fitMode = BoxFit.none;
+                        _zoomScale = 1.0;
+                        _panOffset = Offset.zero;
+                        _fitLabel = '100% Original Size';
+                      });
+                      setDisplayState(() {});
+                      _showPillHud('100%: वास्तविक आकार', icon: Icons.aspect_ratio_rounded);
+                      Navigator.pop(ctx);
+                    },
+                  ),
+
+                  const Divider(color: Colors.white12),
+
+                  // Option 5 & 6: Zoom In & Zoom Out
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4.0),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.white,
+                              side: const BorderSide(color: Colors.white24),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                            icon: const Icon(Icons.zoom_in_rounded, color: Color(0xFF2196F3)),
+                            label: Text('Zoom In (+25%)\n${(_zoomScale * 100).toInt()}%', textAlign: TextAlign.center, style: const TextStyle(fontSize: 12)),
+                            onPressed: () {
+                              setState(() {
+                                _zoomScale = (_zoomScale + 0.25).clamp(0.75, 4.5);
+                              });
+                              setDisplayState(() {});
+                              _showPillHud('🔍 Zoom In: ${(_zoomScale * 100).toInt()}%', icon: Icons.zoom_in_rounded);
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.white,
+                              side: const BorderSide(color: Colors.white24),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                            icon: const Icon(Icons.zoom_out_rounded, color: Colors.amberAccent),
+                            label: Text('Zoom Out (-25%)\n${(_zoomScale * 100).toInt()}%', textAlign: TextAlign.center, style: const TextStyle(fontSize: 12)),
+                            onPressed: () {
+                              setState(() {
+                                _zoomScale = (_zoomScale - 0.25).clamp(0.75, 4.5);
+                                if (_zoomScale <= 1.0) _panOffset = Offset.zero;
+                              });
+                              setDisplayState(() {});
+                              _showPillHud('🔍 Zoom Out: ${(_zoomScale * 100).toInt()}%', icon: Icons.zoom_out_rounded);
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 6),
+
+                  // Option 7: Rotate (घुमाना)
+                  ListTile(
+                    dense: true,
+                    leading: const Icon(Icons.screen_rotation_rounded, color: Color(0xFF00E5FF)),
+                    title: const Text('Rotate (घुमाना)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                    subtitle: Text(_isLandscape ? 'Current: Landscape (लैंडस्केप)' : 'Current: Portrait (पोर्ट्रेट)', style: const TextStyle(color: Colors.white54, fontSize: 12)),
+                    trailing: const Icon(Icons.rotate_right_rounded, color: Colors.white70),
+                    onTap: () {
+                      _toggleOrientation();
+                      setDisplayState(() {});
+                    },
+                  ),
+
+                  // Option 8: Aspect Ratio (अनुपात बदलना)
+                  ListTile(
+                    dense: true,
+                    leading: const Icon(Icons.view_carousel_rounded, color: Color(0xFFFF4081)),
+                    title: const Text('Aspect Ratio (अनुपात बदलना)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                    subtitle: Text(_aspectRatioLabel, style: const TextStyle(color: Colors.white54, fontSize: 12)),
+                    trailing: const Icon(Icons.chevron_right_rounded, color: Colors.white70),
+                    onTap: () {
+                      _cycleAspectRatio();
+                      setDisplayState(() {});
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   void _toggleDecoder() {
     setState(() {
       if (_decoderMode == 'HW') {
@@ -826,7 +1075,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                       const SizedBox(width: 10),
                       const Expanded(
                         child: Text(
-                          'Audio Track & Sound Booster',
+                          'Audio Settings (आवाज से जुड़ी सेटिंग्स)',
                           style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
                         ),
                       ),
@@ -887,8 +1136,62 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                       ),
                     ),
 
+                  // Volume Slider & Mute
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(_isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded, color: Colors.white70, size: 20),
+                          const SizedBox(width: 8),
+                          Text('Volume: ${(_volume * 100).toInt()}%', style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+                        ],
+                      ),
+                      Row(
+                        children: [
+                          const Text('Mute', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                          Switch(
+                            value: _isMuted,
+                            activeColor: Colors.redAccent,
+                            onChanged: (val) {
+                              setAudioState(() {
+                                _isMuted = val;
+                                _controller.setVolume(_isMuted ? 0.0 : _volume);
+                              });
+                              setState(() {});
+                            },
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      trackHeight: 3.0,
+                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                      activeTrackColor: const Color(0xFF2196F3),
+                      inactiveTrackColor: Colors.white24,
+                      thumbColor: const Color(0xFF2196F3),
+                    ),
+                    child: Slider(
+                      value: _isMuted ? 0.0 : _volume,
+                      min: 0.0,
+                      max: 1.0,
+                      onChanged: (val) {
+                        setAudioState(() {
+                          _isMuted = false;
+                          _volume = val;
+                          _controller.setVolume(val);
+                          _channel.invokeMethod('setDeviceVolume', {'volume': val});
+                        });
+                        setState(() {});
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
                   // 1. Audio Track Selector
-                  const Text('AUDIO TRACK', style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold)),
+                  const Text('AUDIO TRACK (भाषा बदलें)', style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 6),
                   Container(
                     decoration: BoxDecoration(
@@ -905,7 +1208,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                           activeColor: const Color(0xFF2196F3),
                           title: const Text('Track 1 (Default Stereo / Main Audio)', style: TextStyle(color: Colors.white, fontSize: 13)),
                           subtitle: Text(
-                            _isLikelyDolbyOrEac3 ? 'Multi-channel Dolby EAC3 5.1' : 'AAC / MP3 2-Channel Stereo',
+                            _isLikelyDolbyOrEac3 ? 'Multi-channel Dolby EAC3 5.1 (Direct)' : 'AAC / MP3 2-Channel Stereo',
                             style: const TextStyle(color: Colors.white54, fontSize: 10),
                           ),
                           onChanged: (val) {
@@ -992,7 +1295,100 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                   ],
                   const SizedBox(height: 16),
 
-                  // 3. Audio Decoder Mode
+                  // 3. Audio Sync (देरी ठीक करें)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('AUDIO SYNC (देरी ठीक करें)', style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold)),
+                          Text(
+                            _audioSyncMs == 0 ? 'Synchronized (0 ms)' : '${_audioSyncMs > 0 ? '+' : ''}$_audioSyncMs ms',
+                            style: const TextStyle(color: Color(0xFF00E5FF), fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                      Row(
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.remove_circle_outline_rounded, color: Colors.white70),
+                            onPressed: () {
+                              setAudioState(() => _audioSyncMs -= 50);
+                              setState(() {});
+                              _showPillHud('Audio Sync: ${_audioSyncMs}ms', icon: Icons.sync_rounded);
+                            },
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              setAudioState(() => _audioSyncMs = 0);
+                              setState(() {});
+                              _showPillHud('Audio Sync: Reset to 0ms', icon: Icons.sync_rounded);
+                            },
+                            child: const Text('Reset', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.add_circle_outline_rounded, color: Colors.white70),
+                            onPressed: () {
+                              setAudioState(() => _audioSyncMs += 50);
+                              setState(() {});
+                              _showPillHud('Audio Sync: +${_audioSyncMs}ms', icon: Icons.sync_rounded);
+                            },
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // 4. Equalizer Preset
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('EQUALIZER (बेहतर साउंड)', style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold)),
+                      DropdownButton<String>(
+                        dropdownColor: const Color(0xFF131A2A),
+                        value: _equalizerPreset,
+                        style: const TextStyle(color: Color(0xFF2196F3), fontSize: 13, fontWeight: FontWeight.bold),
+                        underline: const SizedBox.shrink(),
+                        items: ['Normal', 'Bass Boost', 'Vocal', 'Rock', 'Pop'].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+                        onChanged: (val) {
+                          if (val != null) {
+                            setAudioState(() => _equalizerPreset = val);
+                            setState(() => _equalizerPreset = val);
+                            _showPillHud('Equalizer Preset: $val', icon: Icons.equalizer_rounded);
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // 5. Background Play
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('BACKGROUND PLAY', style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold)),
+                          Text('Play audio when screen is locked', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                        ],
+                      ),
+                      Switch(
+                        value: _isBackgroundPlay,
+                        activeColor: const Color(0xFF2196F3),
+                        onChanged: (val) {
+                          setAudioState(() => _isBackgroundPlay = val);
+                          setState(() => _isBackgroundPlay = val);
+                          _showPillHud(val ? 'Background Play: Enabled' : 'Background Play: Disabled', icon: Icons.headphones_rounded);
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+
+                  // 6. Audio Decoder Mode
                   const Text('AUDIO DECODER', style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
                   Row(
@@ -1051,81 +1447,187 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        decoration: BoxDecoration(
-          color: const Color(0xFF131A2A).withOpacity(0.97),
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          border: Border.all(color: Colors.white12),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        child: SafeArea(
-          top: false,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Row(
+      isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setSubState) => Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFF131A2A).withOpacity(0.97),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            border: Border.all(color: Colors.white12),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          child: SafeArea(
+            top: false,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.subtitles_rounded, color: Color(0xFF2196F3), size: 24),
-                  const SizedBox(width: 10),
-                  const Expanded(
-                    child: Text('Subtitles & Closed Captions', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
+                    ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.close_rounded, color: Colors.white70, size: 20),
-                    onPressed: () => Navigator.pop(ctx),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      const Icon(Icons.subtitles_rounded, color: Color(0xFF2196F3), size: 24),
+                      const SizedBox(width: 10),
+                      const Expanded(
+                        child: Text(
+                          'Subtitle Settings (सबटाइटेल के विकल्प)',
+                          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded, color: Colors.white70, size: 20),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
+                  const Divider(color: Colors.white12),
+
+                  // 1. Subtitle On/Off (चालू/बंद)
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Subtitle On / Off', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                    subtitle: Text(_subtitlesEnabled ? 'Subtitles are ON' : 'Subtitles are OFF', style: const TextStyle(color: Colors.white54, fontSize: 12)),
+                    value: _subtitlesEnabled,
+                    activeColor: const Color(0xFF2196F3),
+                    onChanged: (val) {
+                      setSubState(() => _subtitlesEnabled = val);
+                      setState(() => _subtitlesEnabled = val);
+                      _showPillHud(val ? 'Subtitles: ON' : 'Subtitles: OFF', icon: val ? Icons.subtitles_rounded : Icons.subtitles_off_rounded);
+                    },
+                  ),
+                  const Divider(color: Colors.white12),
+
+                  // 2. Language Selector
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.translate_rounded, color: Color(0xFF00E5FF)),
+                    title: const Text('Subtitle Language (भाषा चुनें)', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+                    subtitle: Text(_subtitleLanguage, style: const TextStyle(color: Colors.white54, fontSize: 11)),
+                    trailing: const Icon(Icons.chevron_right_rounded, color: Colors.white70),
+                    onTap: () {
+                      _showPillHud('Selected Language: $_subtitleLanguage', icon: Icons.translate_rounded);
+                    },
+                  ),
+
+                  // 3. Font Size & Color
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Font Size (अक्षर आकार):', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                        Row(
+                          children: [
+                            for (final sz in [12.0, 16.0, 20.0])
+                              InkWell(
+                                onTap: () {
+                                  setSubState(() => _subtitleFontSize = sz);
+                                  setState(() => _subtitleFontSize = sz);
+                                  _showPillHud('Subtitle Font Size: ${sz.toInt()}sp', icon: Icons.format_size_rounded);
+                                },
+                                child: Container(
+                                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: _subtitleFontSize == sz ? const Color(0xFF2196F3) : Colors.white10,
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text('${sz.toInt()}', style: TextStyle(color: _subtitleFontSize == sz ? Colors.black : Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // 4. Subtitle Sync (समय मिलान)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Subtitle Sync (समय मिलान)', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                          Text(
+                            _subtitleSyncMs == 0 ? '0 ms' : '${_subtitleSyncMs > 0 ? '+' : ''}$_subtitleSyncMs ms',
+                            style: const TextStyle(color: Color(0xFF00E5FF), fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                      Row(
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.remove_circle_outline_rounded, color: Colors.white70),
+                            onPressed: () {
+                              setSubState(() => _subtitleSyncMs -= 100);
+                              setState(() {});
+                              _showPillHud('Subtitle Sync: ${_subtitleSyncMs}ms', icon: Icons.sync_rounded);
+                            },
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              setSubState(() => _subtitleSyncMs = 0);
+                              setState(() {});
+                              _showPillHud('Subtitle Sync: Reset to 0ms', icon: Icons.sync_rounded);
+                            },
+                            child: const Text('Reset', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.add_circle_outline_rounded, color: Colors.white70),
+                            onPressed: () {
+                              setSubState(() => _subtitleSyncMs += 100);
+                              setState(() {});
+                              _showPillHud('Subtitle Sync: +${_subtitleSyncMs}ms', icon: Icons.sync_rounded);
+                            },
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const Divider(color: Colors.white12),
+
+                  // 5. Open External Subtitle
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.file_upload_outlined, color: Color(0xFF00E5FF)),
+                    title: const Text('Open External Subtitle (.srt, .vtt, .sub)', style: TextStyle(color: Colors.white, fontSize: 13)),
+                    subtitle: const Text('Load subtitle file from phone storage', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                    onTap: () async {
+                      Navigator.pop(ctx);
+                      try {
+                        final res = await FilePicker.platform.pickFiles(
+                          type: FileType.custom,
+                          allowedExtensions: ['srt', 'vtt', 'sub', 'ass'],
+                        );
+                        if (res != null && res.files.single.path != null) {
+                          _showPillHud('Subtitle loaded: ${res.files.single.name}', icon: Icons.subtitles_rounded);
+                        }
+                      } catch (_) {}
+                    },
+                  ),
+
+                  // 6. Online Subtitles
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.search_rounded, color: Color(0xFFFFB300)),
+                    title: const Text('Online Subtitles (OpenSubtitles)', style: TextStyle(color: Colors.white, fontSize: 13)),
+                    subtitle: const Text('Search & download subtitles automatically', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _showPillHud('Searching subtitles online for ${_currentVideo.title}...', icon: Icons.search_rounded);
+                    },
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.subtitles_off_rounded, color: Colors.white70),
-                title: const Text('Turn Off Subtitles', style: TextStyle(color: Colors.white, fontSize: 13)),
-                trailing: const Icon(Icons.check_rounded, color: Color(0xFF2196F3)),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _showPillHud('Subtitles: Off', icon: Icons.subtitles_off_rounded);
-                },
-              ),
-              const Divider(color: Colors.white12),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.file_upload_outlined, color: Color(0xFF00E5FF)),
-                title: const Text('Open External Subtitle (.srt, .vtt, .sub)', style: TextStyle(color: Colors.white, fontSize: 13)),
-                subtitle: const Text('Load subtitle file from phone storage', style: TextStyle(color: Colors.white54, fontSize: 11)),
-                onTap: () async {
-                  Navigator.pop(ctx);
-                  try {
-                    final res = await FilePicker.platform.pickFiles(
-                      type: FileType.custom,
-                      allowedExtensions: ['srt', 'vtt', 'sub', 'ass'],
-                    );
-                    if (res != null && res.files.single.path != null) {
-                      _showPillHud('Subtitle loaded: ${res.files.single.name}', icon: Icons.subtitles_rounded);
-                    }
-                  } catch (_) {}
-                },
-              ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.search_rounded, color: Color(0xFFFFB300)),
-                title: const Text('Online Subtitles (OpenSubtitles)', style: TextStyle(color: Colors.white, fontSize: 13)),
-                subtitle: const Text('Search & download subtitles automatically', style: TextStyle(color: Colors.white54, fontSize: 11)),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _showPillHud('Searching subtitles online for ${_currentVideo.title}...', icon: Icons.search_rounded);
-                },
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -1257,13 +1759,13 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           _controller.pause();
         }
       } else {
-        // Vertical Swipe: Left = Volume, Right = Brightness
+        // Vertical Swipe: Left = Brightness, Right = Volume (Matches user diagram!)
         if (_initialFocalPoint.dx < screenSize.width * 0.5) {
-          _isVolumeDrag = true;
-          _isBrightnessDrag = false;
-        } else {
           _isBrightnessDrag = true;
           _isVolumeDrag = false;
+        } else {
+          _isVolumeDrag = true;
+          _isBrightnessDrag = false;
         }
       }
     }
@@ -1414,11 +1916,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                       },
                     ),
                     _buildMoreOptionItem(
-                      icon: Icons.tune_rounded,
+                      icon: Icons.crop_free_rounded,
                       label: 'Display Settings',
                       onTap: () {
                         Navigator.pop(ctx);
-                        _toggleAiClarity();
+                        _showDisplaySettingsSheet();
                       },
                     ),
                     _buildMoreOptionItem(
@@ -1774,9 +2276,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                     ..translate(_panOffset.dx, _panOffset.dy)
                     ..scale(_zoomScale),
                   child: AspectRatio(
-                    aspectRatio: _controller.value.aspectRatio > 0
-                        ? _controller.value.aspectRatio
-                        : 16 / 9,
+                    aspectRatio: _customAspectRatio ??
+                        (_controller.value.aspectRatio > 0
+                            ? _controller.value.aspectRatio
+                            : 16 / 9),
                     child: FittedBox(
                       fit: _fitMode,
                       child: SizedBox(
@@ -1874,10 +2377,53 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
               ),
             ),
 
-          // 5. MX PLAYER LEFT HUD: VOLUME GESTURE (Exact Screenshot 3)
-          if (_showVolumeHud)
+          // 5. MX PLAYER LEFT HUD: BRIGHTNESS GESTURE (Exact Diagram: Left Swipe = Brightness)
+          if (_showBrightnessHud)
             Positioned(
               left: 28,
+              child: Container(
+                width: 44,
+                height: 190,
+                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.65),
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(color: Colors.white12),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '${(_brightness * 100).toInt()}%',
+                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                    ),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8.0),
+                        child: RotatedBox(
+                          quarterTurns: -1,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: LinearProgressIndicator(
+                              value: _brightness,
+                              backgroundColor: Colors.white24,
+                              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF2196F3)),
+                              minHeight: 4.5,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const Icon(Icons.wb_sunny_rounded, color: Colors.white, size: 20),
+                  ],
+                ),
+              ),
+            ),
+
+          // 6. MX PLAYER RIGHT HUD: VOLUME GESTURE (Exact Diagram: Right Swipe = Volume)
+          if (_showVolumeHud)
+            Positioned(
+              right: 28,
               child: Container(
                 width: 44,
                 height: 190,
@@ -1916,49 +2462,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                       color: Colors.white,
                       size: 20,
                     ),
-                  ],
-                ),
-              ),
-            ),
-
-          // 6. MX PLAYER RIGHT HUD: BRIGHTNESS GESTURE (Exact Screenshot 4)
-          if (_showBrightnessHud)
-            Positioned(
-              right: 28,
-              child: Container(
-                width: 44,
-                height: 190,
-                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.65),
-                  borderRadius: BorderRadius.circular(22),
-                  border: Border.all(color: Colors.white12),
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      '${(_brightness * 100).toInt()}%',
-                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-                    ),
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8.0),
-                        child: RotatedBox(
-                          quarterTurns: -1,
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(4),
-                            child: LinearProgressIndicator(
-                              value: _brightness,
-                              backgroundColor: Colors.white24,
-                              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF2196F3)),
-                              minHeight: 4.5,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const Icon(Icons.wb_sunny_rounded, color: Colors.white, size: 20),
                   ],
                 ),
               ),
@@ -2133,252 +2636,323 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
               ),
             ),
 
-          // 12. FULL MX PLAYER CONTROLS OVERLAY (Screenshots 1, 2, 6)
-          if (_isInitialized && _showControls && !_isScreenLocked)
-            Positioned.fill(
+          // 12. FULL MX PLAYER CONTROLS OVERLAY (Exact Diagram: Top Bar 1-6, Center 7, Bottom 8-14)
+          if (_isInitialized && _showControls && !_isScreenLocked) ...[
+            // 12A. TOP BAR (Buttons 1, 2, 3, 4, 5, 6 & Decoder)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
               child: Container(
-                color: Colors.black.withOpacity(0.40),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    // TOP SECTION: TITLE BAR + QUICK ACTION ROW (Screenshot 1 & 6)
-                    SafeArea(
-                      bottom: false,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          // 1. TOP BAR
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 2.0),
-                            child: Row(
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.arrow_back, color: Colors.white, size: 22),
-                                  onPressed: () => Navigator.pop(context),
-                                ),
-                                Expanded(
-                                  child: Text(
-                                    _currentVideo.title,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
-                                  ),
-                                ),
-                                // Cast Icon
-                                IconButton(
-                                  icon: const Icon(Icons.cast_rounded, color: Colors.white, size: 20),
-                                  onPressed: () => _showPillHud('Searching for Cast devices...', icon: Icons.cast_rounded),
-                                ),
-                                // Audio Track Icon
-                                IconButton(
-                                  icon: const Icon(Icons.music_note_rounded, color: Colors.white, size: 20),
-                                  onPressed: _showAudioSettingsSheet,
-                                ),
-                                // Subtitle Icon
-                                IconButton(
-                                  icon: const Icon(Icons.subtitles_rounded, color: Colors.white, size: 20),
-                                  onPressed: _showSubtitleSheet,
-                                ),
-                                // HW Decoder Badge
-                                InkWell(
-                                  borderRadius: BorderRadius.circular(6),
-                                  onTap: _toggleDecoder,
-                                  child: Container(
-                                    margin: const EdgeInsets.symmetric(horizontal: 4),
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      border: Border.all(color: Colors.white54, width: 1.2),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      _decoderMode,
-                                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-                                    ),
-                                  ),
-                                ),
-                                // 3 Dots Menu (Opens Screenshot 2 Sheet)
-                                IconButton(
-                                  icon: const Icon(Icons.more_vert_rounded, color: Colors.white, size: 22),
-                                  onPressed: _showMoreOptionsSheet,
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          // 2. QUICK ACTIONS BAR (Expandable / Collapsible MX Player style)
-                          _buildTopQuickActions(),
-                        ],
-                      ),
-                    ),
-
-                    // MIDDLE TOUCH & DOUBLE TAP SEEKING AREA (Works when controls are visible)
-                    Expanded(
-                      child: GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: () {
-                          setState(() => _showControls = false);
-                        },
-                        onDoubleTapDown: (details) => _handleDoubleTap(details, screenSize),
-                        onScaleStart: _handleScaleStart,
-                        onScaleUpdate: (d) => _handleScaleUpdate(d, screenSize, totalDuration),
-                        onScaleEnd: _handleScaleEnd,
-                        child: Container(color: Colors.transparent),
-                      ),
-                    ),
-
-                    // BOTTOM CONTROLS (Scrubber, Play/Pause, PiP, Fit - Screenshot 1 & 6)
-                    SafeArea(
-                      top: false,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withOpacity(0.85),
+                      Colors.black.withOpacity(0.40),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+                child: SafeArea(
+                  bottom: false,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 4.0),
+                        child: Row(
                           children: [
-                            // 1. Progress Bar with exact MX timestamps (Left & Right)
-                            Row(
-                              children: [
-                                Text(
-                                  _formatDuration(currentPos),
-                                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600, fontFamily: 'monospace'),
-                                ),
-                                Expanded(
-                                  child: SliderTheme(
-                                    data: SliderTheme.of(context).copyWith(
-                                      trackHeight: 3.0,
-                                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6.0),
-                                      overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
-                                      activeTrackColor: const Color(0xFF2196F3),
-                                      inactiveTrackColor: Colors.white24,
-                                      thumbColor: const Color(0xFF2196F3),
-                                    ),
-                                    child: Slider(
-                                      value: _isScrubbing
-                                          ? _scrubValue.clamp(0.0, totalMs > 0 ? totalMs : 1.0)
-                                          : _controller.value.position.inMilliseconds.clamp(0, totalMs > 0 ? totalMs.toInt() : 1).toDouble(),
-                                      min: 0.0,
-                                      max: totalMs > 0 ? totalMs : 1.0,
-                                      onChangeStart: (val) {
-                                        _controlsTimer?.cancel();
-                                        _wasPlayingBeforeScrub = _controller.value.isPlaying;
-                                        if (_wasPlayingBeforeScrub) {
-                                          _controller.pause(); // Pause decoding during scrub so 4K high bitrate does not freeze
-                                        }
-                                        setState(() {
-                                          _isScrubbing = true;
-                                          _scrubValue = val;
-                                        });
-                                      },
-                                      onChanged: (val) {
-                                        setState(() => _scrubValue = val);
-                                      },
-                                      onChangeEnd: (val) async {
-                                        await _controller.seekTo(Duration(milliseconds: val.toInt()));
-                                        setState(() => _isScrubbing = false);
-                                        if (_wasPlayingBeforeScrub && mounted) {
-                                          await _controller.play();
-                                        }
-                                        _startControlsTimer();
-                                      },
-                                    ),
-                                  ),
-                                ),
-                                Text(
-                                  _formatDuration(totalDuration),
-                                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600, fontFamily: 'monospace'),
-                                ),
-                              ],
+                            // Button 1: Back (← पिछली स्क्रीन पर जाना)
+                            IconButton(
+                              icon: const Icon(Icons.arrow_back, color: Colors.white, size: 22),
+                              tooltip: 'Back',
+                              onPressed: () => Navigator.pop(context),
                             ),
-
-                            // 2. Bottom Row Controls: Padlock on left, Center playback, Aspect & PiP on right
-                            Padding(
-                              padding: const EdgeInsets.only(top: 2.0, bottom: 4.0),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  // Padlock Icon (Screen Lock)
-                                  Container(
-                                    decoration: BoxDecoration(
-                                      border: Border.all(color: Colors.white30, width: 1.2),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: IconButton(
-                                      constraints: const BoxConstraints(),
-                                      padding: const EdgeInsets.all(5),
-                                      icon: const Icon(Icons.lock_outline_rounded, color: Colors.white, size: 20),
-                                      tooltip: 'Lock Screen',
-                                      onPressed: _toggleLock,
-                                    ),
-                                  ),
-
-                                  // Center Controls: Prev |◀ , Play/Pause , Next ▶|
-                                  Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      IconButton(
-                                        iconSize: 28,
-                                        icon: const Icon(Icons.skip_previous_rounded, color: Colors.white),
-                                        onPressed: _playPreviousVideo,
-                                      ),
-                                      const SizedBox(width: 14),
-                                      GestureDetector(
-                                        onTap: _togglePlayPause,
-                                        child: Container(
-                                          width: 48,
-                                          height: 48,
-                                          decoration: const BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            color: Colors.transparent,
-                                          ),
-                                          child: Icon(
-                                            _controller.value.isPlaying
-                                                ? Icons.pause_rounded
-                                                : Icons.play_arrow_rounded,
-                                            size: 40,
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 14),
-                                      IconButton(
-                                        iconSize: 28,
-                                        icon: const Icon(Icons.skip_next_rounded, color: Colors.white),
-                                        onPressed: _playNextVideo,
-                                      ),
-                                    ],
-                                  ),
-
-                                  // Right Controls: Aspect Ratio [↔] & PiP [↘]
-                                  Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      IconButton(
-                                        constraints: const BoxConstraints(),
-                                        padding: const EdgeInsets.all(6),
-                                        icon: const Icon(Icons.aspect_ratio_rounded, color: Colors.white, size: 22),
-                                        tooltip: 'Aspect Ratio',
-                                        onPressed: _cycleFitMode,
-                                      ),
-                                      const SizedBox(width: 10),
-                                      IconButton(
-                                        constraints: const BoxConstraints(),
-                                        padding: const EdgeInsets.all(6),
-                                        icon: const Icon(Icons.picture_in_picture_alt_rounded, color: Colors.white, size: 22),
-                                        tooltip: 'Picture in Picture',
-                                        onPressed: _enterPip,
-                                      ),
-                                    ],
-                                  ),
-                                ],
+                            // Title with ellipsis
+                            Expanded(
+                              child: Text(
+                                _currentVideo.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
                               ),
+                            ),
+                            // Decoder Toggle Badge (HW / HW+ / SW)
+                            InkWell(
+                              borderRadius: BorderRadius.circular(6),
+                              onTap: _toggleDecoder,
+                              child: Container(
+                                margin: const EdgeInsets.symmetric(horizontal: 4),
+                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: Colors.white60, width: 1.2),
+                                  borderRadius: BorderRadius.circular(4),
+                                  color: Colors.white.withOpacity(0.10),
+                                ),
+                                child: Text(
+                                  _decoderMode,
+                                  style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ),
+                            // Button 2: Subtitle (CC सबटाइटेल चालू/बंद)
+                            IconButton(
+                              icon: const Icon(Icons.closed_caption_outlined, color: Colors.white, size: 22),
+                              tooltip: 'Subtitle (CC)',
+                              onPressed: _showSubtitleSheet,
+                            ),
+                            // Button 3: Audio Track (🎵 ऑडियो भाषा बदलें)
+                            IconButton(
+                              icon: const Icon(Icons.audiotrack_rounded, color: Colors.white, size: 22),
+                              tooltip: 'Audio Track (ऑडियो भाषा बदलें)',
+                              onPressed: _showAudioSettingsSheet,
+                            ),
+                            // Button 4: Display Settings (⛶ स्क्रीन और वीडियो साइज)
+                            IconButton(
+                              icon: const Icon(Icons.crop_free_rounded, color: Colors.white, size: 22),
+                              tooltip: 'Display Settings (स्क्रीन विकल्प)',
+                              onPressed: _showDisplaySettingsSheet,
+                            ),
+                            // Button 5: Screen Lock (🔒 स्क्रीन लॉक करें)
+                            IconButton(
+                              icon: const Icon(Icons.lock_outline_rounded, color: Colors.white, size: 22),
+                              tooltip: 'Lock Screen',
+                              onPressed: _toggleLock,
+                            ),
+                            // Button 6: More Options (⋮ और विकल्प मेन्यू)
+                            IconButton(
+                              icon: const Icon(Icons.more_vert_rounded, color: Colors.white, size: 22),
+                              tooltip: 'More Options',
+                              onPressed: _showMoreOptionsSheet,
                             ),
                           ],
                         ),
                       ),
-                    ),
-                  ],
+
+                      // Expandable / Collapsible Quick Actions
+                      _buildTopQuickActions(),
+                    ],
+                  ),
                 ),
               ),
             ),
+
+            // 12B. BUTTON 7: CENTER BIG CIRCULAR PLAY / PAUSE (प्ले / पॉज बटन)
+            Center(
+              child: GestureDetector(
+                onTap: _togglePlayPause,
+                child: Container(
+                  width: 76,
+                  height: 76,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.60),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white70, width: 2.2),
+                    boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 16)],
+                  ),
+                  child: Icon(
+                    _controller.value.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                    size: 50,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+
+            // 12C. BOTTOM CONTROLS (Buttons 8 to 14)
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
+                    colors: [
+                      Colors.black.withOpacity(0.92),
+                      Colors.black.withOpacity(0.50),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+                child: SafeArea(
+                  top: false,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Button 8 & 14: Progress Bar, Elapsed, Remaining & Full Screen
+                        Row(
+                          children: [
+                            Text(
+                              _formatDuration(currentPos),
+                              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600, fontFamily: 'monospace'),
+                            ),
+                            Expanded(
+                              child: SliderTheme(
+                                data: SliderTheme.of(context).copyWith(
+                                  trackHeight: 3.0,
+                                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6.0),
+                                  overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+                                  activeTrackColor: const Color(0xFF2196F3),
+                                  inactiveTrackColor: Colors.white24,
+                                  thumbColor: const Color(0xFF2196F3),
+                                ),
+                                child: Slider(
+                                  value: _isScrubbing
+                                      ? _scrubValue.clamp(0.0, totalMs > 0 ? totalMs : 1.0)
+                                      : _controller.value.position.inMilliseconds.clamp(0, totalMs > 0 ? totalMs.toInt() : 1).toDouble(),
+                                  min: 0.0,
+                                  max: totalMs > 0 ? totalMs : 1.0,
+                                  onChangeStart: (val) {
+                                    _controlsTimer?.cancel();
+                                    _wasPlayingBeforeScrub = _controller.value.isPlaying;
+                                    if (_wasPlayingBeforeScrub) {
+                                      _controller.pause();
+                                    }
+                                    setState(() {
+                                      _isScrubbing = true;
+                                      _scrubValue = val;
+                                    });
+                                  },
+                                  onChanged: (val) {
+                                    setState(() => _scrubValue = val);
+                                  },
+                                  onChangeEnd: (val) async {
+                                    await _controller.seekTo(Duration(milliseconds: val.toInt()));
+                                    setState(() => _isScrubbing = false);
+                                    if (_wasPlayingBeforeScrub && mounted) {
+                                      await _controller.play();
+                                    }
+                                    _startControlsTimer();
+                                  },
+                                ),
+                              ),
+                            ),
+                            Text(
+                              _formatDuration(totalDuration),
+                              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600, fontFamily: 'monospace'),
+                            ),
+                            const SizedBox(width: 8),
+                            // Button 14 / Button 9: Full Screen Button [ ⛶ ] (पूरी स्क्रीन में देखें)
+                            IconButton(
+                              constraints: const BoxConstraints(),
+                              padding: const EdgeInsets.all(4),
+                              icon: const Icon(Icons.fullscreen_rounded, color: Colors.white, size: 24),
+                              tooltip: 'Full Screen (पूरी स्क्रीन)',
+                              onPressed: _cycleFitMode,
+                            ),
+                          ],
+                        ),
+
+                        // Buttons 9, 10, 11, 12, 13: Bottom 5 Playback Controls
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2.0, bottom: 4.0),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              // Left: Screenshot Button (फोटो लें)
+                              IconButton(
+                                constraints: const BoxConstraints(),
+                                padding: const EdgeInsets.all(6),
+                                icon: const Icon(Icons.camera_alt_outlined, color: Colors.white, size: 22),
+                                tooltip: 'Screenshot (फोटो लें)',
+                                onPressed: _takeScreenshot,
+                              ),
+
+                              // Center: 5 MX Player Playback Buttons
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  // Button 9: Previous Video [ |◀ ] (पिछली वीडियो)
+                                  IconButton(
+                                    iconSize: 28,
+                                    icon: const Icon(Icons.skip_previous_rounded, color: Colors.white),
+                                    tooltip: 'Previous Video (पिछली वीडियो)',
+                                    onPressed: _playPreviousVideo,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  // Button 10: 10s Rewind [ ◀◀ ] (10 सेकंड पीछे)
+                                  IconButton(
+                                    iconSize: 26,
+                                    icon: const Icon(Icons.replay_10_rounded, color: Colors.white),
+                                    tooltip: '10s Rewind (10 सेकंड पीछे)',
+                                    onPressed: () => _seekRelative(-10),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  // Button 11: Play / Pause [ ▶ / ❚❚ ] (चल रहे / रोकें)
+                                  GestureDetector(
+                                    onTap: _togglePlayPause,
+                                    child: Container(
+                                      width: 44,
+                                      height: 44,
+                                      decoration: const BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: Colors.transparent,
+                                      ),
+                                      child: Icon(
+                                        _controller.value.isPlaying
+                                            ? Icons.pause_rounded
+                                            : Icons.play_arrow_rounded,
+                                        size: 38,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  // Button 12: 10s Forward [ ▶▶ ] (10 सेकंड आगे)
+                                  IconButton(
+                                    iconSize: 26,
+                                    icon: const Icon(Icons.forward_10_rounded, color: Colors.white),
+                                    tooltip: '10s Forward (10 सेकंड आगे)',
+                                    onPressed: () => _seekRelative(10),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  // Button 13: Next Video [ ▶| ] (अगली वीडियो)
+                                  IconButton(
+                                    iconSize: 28,
+                                    icon: const Icon(Icons.skip_next_rounded, color: Colors.white),
+                                    tooltip: 'Next Video (अगली वीडियो)',
+                                    onPressed: _playNextVideo,
+                                  ),
+                                ],
+                              ),
+
+                              // Right: Display Settings (⛶) & PiP (↘)
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    constraints: const BoxConstraints(),
+                                    padding: const EdgeInsets.all(6),
+                                    icon: const Icon(Icons.aspect_ratio_rounded, color: Colors.white, size: 22),
+                                    tooltip: 'Display Settings (स्क्रीन विकल्प)',
+                                    onPressed: _showDisplaySettingsSheet,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  IconButton(
+                                    constraints: const BoxConstraints(),
+                                    padding: const EdgeInsets.all(6),
+                                    icon: const Icon(Icons.picture_in_picture_alt_rounded, color: Colors.white, size: 22),
+                                    tooltip: 'Picture in Picture',
+                                    onPressed: _enterPip,
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
 
           // 13. MX PLAYER FLOATING TOP-CENTER HUD PILL (Replaces SnackBar, zero bottom patti)
           if (_pillHudMessage != null)

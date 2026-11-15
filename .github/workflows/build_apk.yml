@@ -605,8 +605,8 @@ jobs:
                                       } catch (_: Throwable) {}
                                   }
 
-                                  val bmp = bitmap
-                                   if (bmp != null) {
+                                       val bmp = bitmap
+                                       if (bmp != null) {
                                       val stream = java.io.ByteArrayOutputStream()
                                       bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, 75, stream)
                                       val bytes = stream.toByteArray()
@@ -642,8 +642,8 @@ jobs:
                                       }
                                   }
 
-                                  val bmp = bitmap
-                                   if (bmp != null) {
+                                       val bmp = bitmap
+                                       if (bmp != null) {
                                       val fileName = "Msixa_${System.currentTimeMillis()}.jpg"
                                       var saved = false
                                       var savedPath = ""
