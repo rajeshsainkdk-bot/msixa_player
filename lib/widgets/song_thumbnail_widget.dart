@@ -350,7 +350,6 @@ class SongThumbnailWidget extends StatelessWidget {
                   barCount: 3,
                   maxHeight: 18,
                   barWidth: 3,
-                  color: AppColors.accentCyan,
                 ),
               ),
             ),
