@@ -2708,8 +2708,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
     final Set<String> selectedPhones = allUsersWithPhone.map((u) => u.phoneNumber.trim()).toSet();
     final TextEditingController msgController = TextEditingController(
       text: _lang.isHindi
-          ? "नमस्ते {name}!\n\nMusixa Player पर आपके लिए नए गाने रिलीज हुए हैं। अभी ऐप खोलें और बेहतरीन एचडी म्यूजिक का आनंद लें!\n\nडाउनलोड ऐप: https://pub-d4f2e58dc2594d0c8dc1f30bbae4344f.r2.dev/apk/musixa-player.apk"
-          : "Hello {name}!\n\nNew songs are now live on Musixa Player. Open the app now and enjoy premium HD music!\n\nDownload: https://pub-d4f2e58dc2594d0c8dc1f30bbae4344f.r2.dev/apk/musixa-player.apk",
+          ? "नमस्ते {name}!\n\nMsixa Player पर आपके लिए नए गाने रिलीज हुए हैं। अभी ऐप खोलें और बेहतरीन एचडी म्यूजिक का आनंद लें!\n\nडाउनलोड ऐप: https://pub-d4f2e58dc2594d0c8dc1f30bbae4344f.r2.dev/apk/msixa-player.apk"
+          : "Hello {name}!\n\nNew songs are now live on Msixa Player. Open the app now and enjoy premium HD music!\n\nDownload: https://pub-d4f2e58dc2594d0c8dc1f30bbae4344f.r2.dev/apk/msixa-player.apk",
     );
     String? attachedFilePath;
     String? attachedFileName;
@@ -2799,8 +2799,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                                 onPressed: () {
                                   setModalState(() {
                                     msgController.text = _lang.isHindi
-                                        ? "नमस्ते {name}!\n\nMusixa Player पर आज नया धमाकेदार गाना रिलीज हुआ है। अभी ऐप खोलें और सुनें!\n\nडाउनलोड ऐप: https://pub-d4f2e58dc2594d0c8dc1f30bbae4344f.r2.dev/apk/musixa-player.apk"
-                                        : "Hello {name}!\n\nA brand new hit track is live on Musixa Player. Open the app now and listen in HD!\n\nDownload: https://pub-d4f2e58dc2594d0c8dc1f30bbae4344f.r2.dev/apk/musixa-player.apk";
+                                        ? "नमस्ते {name}!\n\nMsixa Player पर आज नया धमाकेदार गाना रिलीज हुआ है। अभी ऐप खोलें और सुनें!\n\nडाउनलोड ऐप: https://pub-d4f2e58dc2594d0c8dc1f30bbae4344f.r2.dev/apk/msixa-player.apk"
+                                        : "Hello {name}!\n\nA brand new hit track is live on Msixa Player. Open the app now and listen in HD!\n\nDownload: https://pub-d4f2e58dc2594d0c8dc1f30bbae4344f.r2.dev/apk/msixa-player.apk";
                                   });
                                 },
                               ),
@@ -2815,8 +2815,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                                 onPressed: () {
                                   setModalState(() {
                                     msgController.text = _lang.isHindi
-                                        ? "नमस्ते {name}!\n\nMusixa Player का नया अपडेट लाइव हो गया है जिसमें हाई क्वालिटी वीडियो प्लेयर, ईक्वलाइज़र और फास्ट डाउनलोडिंग शामिल है। तुरंत अपडेट करें!\n\nअपडेट लिंक: https://pub-d4f2e58dc2594d0c8dc1f30bbae4344f.r2.dev/apk/musixa-player.apk"
-                                        : "Hello {name}!\n\nA major update for Musixa Player is live featuring 4K video player, smart equalizer, and instant streaming. Update now!\n\nDownload: https://pub-d4f2e58dc2594d0c8dc1f30bbae4344f.r2.dev/apk/musixa-player.apk";
+                                        ? "नमस्ते {name}!\n\nMsixa Player का नया अपडेट लाइव हो गया है जिसमें हाई क्वालिटी वीडियो प्लेयर, ईक्वलाइज़र और फास्ट डाउनलोडिंग शामिल है। तुरंत अपडेट करें!\n\nअपडेट लिंक: https://pub-d4f2e58dc2594d0c8dc1f30bbae4344f.r2.dev/apk/msixa-player.apk"
+                                        : "Hello {name}!\n\nA major update for Msixa Player is live featuring 4K video player, smart equalizer, and instant streaming. Update now!\n\nDownload: https://pub-d4f2e58dc2594d0c8dc1f30bbae4344f.r2.dev/apk/msixa-player.apk";
                                   });
                                 },
                               ),
@@ -2831,8 +2831,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                                 onPressed: () {
                                   setModalState(() {
                                     msgController.text = _lang.isHindi
-                                        ? "नमस्ते {name}!\n\nMusixa Player परिवार की ओर से आपको और आपके पूरे परिवार को हार्दिक शुभकामनाएं! सदा खुश रहें और मधुर संगीत का आनंद लें।"
-                                        : "Warm greetings {name}!\n\nBest wishes from the Musixa Player family. Enjoy pure music with us!";
+                                        ? "नमस्ते {name}!\n\nMsixa Player परिवार की ओर से आपको और आपके पूरे परिवार को हार्दिक शुभकामनाएं! सदा खुश रहें और मधुर संगीत का आनंद लें।"
+                                        : "Warm greetings {name}!\n\nBest wishes from the Msixa Player family. Enjoy pure music with us!";
                                   });
                                 },
                               ),
