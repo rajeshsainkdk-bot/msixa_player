@@ -1022,7 +1022,7 @@ jobs:
 
       - name: Build User APK (Release)
         run: |
-          flutter build apk --release --build-name=1.0.${{ github.run_number }} --build-number=${{ github.run_number }} --no-tree-shake-icons
+          flutter build apk --release --build-name=1.0.${{ github.run_number }} --build-number=$((2000 + ${{ github.run_number }})) --no-tree-shake-icons
           cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/msixa-player-release.apk
 
       - name: Build Admin Control APK (Release)
@@ -1034,7 +1034,7 @@ jobs:
           sed -i 's/android:label="Msixa Player"/android:label="Msixa Player Admin"/' android/app/src/main/AndroidManifest.xml || true
           rm -rf build/app/outputs/flutter-apk/app-release.apk
 
-          flutter build apk --release --target=lib/main_admin.dart --build-name=1.0.${{ github.run_number }} --build-number=${{ github.run_number }} --no-tree-shake-icons
+          flutter build apk --release --target=lib/main_admin.dart --build-name=1.0.${{ github.run_number }} --build-number=$((2000 + ${{ github.run_number }})) --no-tree-shake-icons
           cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/msixa-admin-release.apk
 
       - name: Deploy Live Dual OTA Update Packages to Cloudflare R2
@@ -1052,6 +1052,7 @@ jobs:
           )
 
           run_num = int(os.environ.get('GITHUB_RUN_NUMBER', 1))
+          v_code = 2000 + run_num
 
           # 1. Deploy Player App OTA Update
           player_apk = 'build/app/outputs/flutter-apk/msixa-player-release.apk'
@@ -1066,12 +1067,12 @@ jobs:
               )
 
               manifest = {
-                  'version_code': run_num,
+                  'version_code': v_code,
                   'version_name': f"1.0.{run_num}",
                   'apk_url': 'https://pub-d4f2e58dc2594d0c8dc1f30bbae4344f.r2.dev/update/msixa_player_latest.apk',
                   'file_size_mb': size_mb,
                   'release_notes': 'Msixa Player OTA Auto-Update: Default English UI, auto-popup prompt, and video performance enhancements!',
-                  'force_update': False
+                  'force_update': True
               }
               print(f"Deploying Player update manifest: {manifest}")
               for b in ['msixa-music', 'musixa-music']:
@@ -1099,12 +1100,12 @@ jobs:
               )
 
               admin_manifest = {
-                  'version_code': run_num,
+                  'version_code': v_code,
                   'version_name': f"1.0.{run_num}",
                   'apk_url': 'https://pub-d4f2e58dc2594d0c8dc1f30bbae4344f.r2.dev/update/msixa_admin_latest.apk',
                   'file_size_mb': admin_size_mb,
                   'release_notes': 'Msixa Admin OTA Auto-Update: Default English UI, R2 storage monitor, and real-time sync!',
-                  'force_update': False
+                  'force_update': True
               }
               print(f"Deploying Admin update manifest: {admin_manifest}")
               for b in ['msixa-music', 'musixa-music']:
