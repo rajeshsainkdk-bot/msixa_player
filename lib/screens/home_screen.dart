@@ -14,10 +14,12 @@ import '../widgets/song_list_tile.dart';
 import '../widgets/song_thumbnail_widget.dart';
 import '../services/language_service.dart';
 import '../services/update_service.dart';
+import '../services/jiosaavn_service.dart';
 import 'upload_song_screen.dart';
 import 'profile_screen.dart';
 import 'artist_detail_screen.dart';
 import 'album_detail_screen.dart';
+import 'search_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -145,12 +147,14 @@ class _HomeScreenState extends State<HomeScreen> {
           return Consumer<PlayerProvider>(
             builder: (context, provider, child) {
               final trending = provider.trendingSongs;
-              final heroSong = trending.isNotEmpty ? trending.first : null;
+              final heroSong = provider.onlineTrendingSongs.isNotEmpty
+                  ? provider.onlineTrendingSongs.first
+                  : (trending.isNotEmpty ? trending.first : null);
 
               return RefreshIndicator(
                 color: AppColors.accentCyan,
                 backgroundColor: AppColors.surface,
-                onRefresh: () => provider.refreshCatalog(),
+                onRefresh: () => provider.loadOnlineTrending(forceRefresh: true),
                 child: SingleChildScrollView(
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.only(bottom: 120),
@@ -345,7 +349,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: GestureDetector(
-                      onTap: () => provider.playSong(heroSong, queueContext: trending),
+                      onTap: () => provider.playSong(
+                        heroSong,
+                        queueContext: provider.onlineTrendingSongs.isNotEmpty ? provider.onlineTrendingSongs : trending,
+                      ),
                       child: Container(
                         height: 180,
                         decoration: BoxDecoration(
@@ -619,140 +626,79 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
 
                 // ==========================================
-                // 🎤 POPULAR ARTISTS & 💿 TOP ALBUMS CAROUSELS
+                // 🔥 SECTION 1: TRENDING NOW (India Top 50)
                 // ==========================================
-                _buildArtistsCarousel(context, provider, lang),
-                _buildAlbumsCarousel(context, provider, lang),
-
-                // ==========================================
-                // 🔥 NEWLY ADDED BY COMMUNITY (Approved User Songs)
-                // ==========================================
-                _buildCommunitySection(context, provider),
-
-                // ==========================================
-                // 🔥 ONLINE TRENDING HITS (Ultra HD 320kbps Live Stream)
-                // ==========================================
-                _buildOnlineTrendingSection(context, provider, lang),
-
-                // ==========================================
-                // 🌍 GLOBAL TOP 50 HITS (International & Chartbusters)
-                // ==========================================
-                _buildOnlineGlobalSection(context, provider, lang),
-
-                // ==========================================
-                // SECTION 1: DIVINE BHAKTI & HANUMAN CHANTS
-                // ==========================================
-                _buildCategorySection(
-                  context,
-                  title: 'Divine Bhakti & Hanuman Chants',
-                  genreKey: 'Bhakti',
+                _buildOnlineSection(
+                  context: context,
+                  title: 'Trending Now (Top 50 Hits)',
+                  hindiTitle: 'ट्रेंडिंग नाउ (टॉप 50 हिट्स)',
+                  icon: Icons.whatshot_rounded,
+                  iconColor: const Color(0xFFFF6D00),
+                  songs: provider.onlineTrendingSongs,
                   provider: provider,
-                  songs: trending.where((s) => s.genre == 'Bhakti').toList(),
+                  lang: lang,
                 ),
 
                 // ==========================================
-                // SECTION 2: SUFI & PUNJABI (SATINDER SARTAAJ)
+                // 🎤 SECTION 2: POPULAR ARTISTS (Circle Avatars)
                 // ==========================================
-                _buildCategorySection(
-                  context,
-                  title: 'Sufi & Punjabi (Satinder Sartaaj)',
-                  genreKey: 'Punjabi',
+                _buildTopArtistsSection(context, lang),
+
+                // ==========================================
+                // 🌍 SECTION 3: GLOBAL TOP 50 HITS (International Charts)
+                // ==========================================
+                _buildOnlineSection(
+                  context: context,
+                  title: 'Global Top 50 Hits',
+                  hindiTitle: 'ग्लोबल टॉप 50 हिट्स',
+                  icon: Icons.public_rounded,
+                  iconColor: const Color(0xFF00E5FF),
+                  songs: provider.onlineGlobalSongs,
                   provider: provider,
-                  songs: trending.where((s) => s.genre == 'Punjabi' || s.genre == 'Sufi').toList(),
+                  lang: lang,
                 ),
 
                 // ==========================================
-                // SECTION 3: BOLLYWOOD & INDIE MELODIES
+                // ❤️ SECTION 4: ROMANTIC MELODIES (Most Streamed Love Songs)
                 // ==========================================
-                _buildCategorySection(
-                  context,
-                  title: 'Bollywood & Indie Melodies',
-                  genreKey: 'Bollywood',
+                _buildOnlineSection(
+                  context: context,
+                  title: 'Romantic Melodies',
+                  hindiTitle: 'रोमांटिक मेलोडीज़ (लव सोंग्स)',
+                  icon: Icons.favorite_rounded,
+                  iconColor: const Color(0xFFFF4081),
+                  songs: provider.onlineRomanticSongs,
                   provider: provider,
-                  songs: trending.where((s) => s.genre == 'Bollywood' || s.genre == 'Indie Pop').toList(),
+                  lang: lang,
                 ),
 
                 // ==========================================
-                // SECTION 4: AGHORI & SPIRITUAL TRANCE
+                // ⚡ SECTION 5: PUNJABI SUPERHITS (High Energy Beats)
                 // ==========================================
-                _buildCategorySection(
-                  context,
-                  title: 'Aghori & Spiritual Trance',
-                  genreKey: 'Spiritual',
+                _buildOnlineSection(
+                  context: context,
+                  title: 'Punjabi Superhits',
+                  hindiTitle: 'पंजाबी सुपरहिट्स (धमाकेदार बीट्स)',
+                  icon: Icons.bolt_rounded,
+                  iconColor: const Color(0xFFFFB300),
+                  songs: provider.onlinePunjabiSongs,
                   provider: provider,
-                  songs: trending.where((s) => s.genre == 'Spiritual').toList(),
+                  lang: lang,
                 ),
 
                 // ==========================================
-                // SECTION 5: DESI LO-FI & GHAZALS
+                // 🙏 SECTION 6: BHAKTI & DEVOTION (Sacred Chants)
                 // ==========================================
-                _buildCategorySection(
-                  context,
-                  title: 'Desi Lo-Fi & Ghazals',
-                  genreKey: 'Desi Lo-Fi',
+                _buildOnlineSection(
+                  context: context,
+                  title: 'Bhakti & Devotion',
+                  hindiTitle: 'दिव्य भक्ति व पावन भजन',
+                  icon: Icons.self_improvement_rounded,
+                  iconColor: const Color(0xFFFF9100),
+                  songs: provider.onlineBhaktiSongs,
                   provider: provider,
-                  songs: trending.where((s) => s.genre == 'Desi Lo-Fi' || s.genre == 'Ghazal').toList(),
+                  lang: lang,
                 ),
-
-                // ==========================================
-                // SECTION 6: RANGEELO RAJASTHANI & MARWADI HITS
-                // ==========================================
-                _buildCategorySection(
-                  context,
-                  title: 'Rangeelo Rajasthani & Marwadi Hits',
-                  genreKey: 'Rajasthani',
-                  provider: provider,
-                  songs: trending.where((s) => s.genre == 'Rajasthani').toList(),
-                ),
-
-                // ==========================================
-                // SECTION 7: HARYANVI & DESI BEATS
-                // ==========================================
-                _buildCategorySection(
-                  context,
-                  title: 'Haryanvi & Desi Beats',
-                  genreKey: 'Haryanvi',
-                  provider: provider,
-                  songs: trending.where((s) => s.genre == 'Haryanvi').toList(),
-                ),
-
-                // ==========================================
-                // SECTION 8: DJ REMIX & BASS BOOSTED
-                // ==========================================
-                _buildCategorySection(
-                  context,
-                  title: 'DJ Remix & Bass Boosted',
-                  genreKey: 'DJ Remix',
-                  provider: provider,
-                  songs: trending.where((s) => s.genre == 'DJ Remix').toList(),
-                ),
-
-                // ==========================================
-                // DYNAMIC CATEGORIES ADDED BY ADMIN / COMMUNITY
-                // ==========================================
-                ...(() {
-                  final knownGenres = {
-                    'bhakti', 'punjabi', 'sufi', 'bollywood', 'indie pop',
-                    'spiritual', 'desi lo-fi', 'ghazal', 'rajasthani', 'haryanvi', 'dj remix'
-                  };
-                  final dynamicGenres = <String>{};
-                  for (final s in trending) {
-                    final g = s.genre.trim();
-                    if (g.isNotEmpty && !knownGenres.contains(g.toLowerCase())) {
-                      dynamicGenres.add(g);
-                    }
-                  }
-                  return dynamicGenres.map((genre) {
-                    final genreSongs = trending.where((s) => s.genre.trim().toLowerCase() == genre.toLowerCase()).toList();
-                    return _buildCategorySection(
-                      context,
-                      title: '$genre Songs',
-                      genreKey: genre,
-                      provider: provider,
-                      songs: genreSongs,
-                    );
-                  }).toList();
-                })(),
 
                 const SizedBox(height: 20),
 
@@ -1094,9 +1040,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Text(
-                      'FREE',
+                      '320k HD',
                       style: TextStyle(
-                        color: Colors.white,
+                        color: Color(0xFF00E5FF),
                         fontSize: 9,
                         fontWeight: FontWeight.bold,
                       ),
@@ -1132,149 +1078,17 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildCommunitySection(BuildContext context, PlayerProvider provider) {
-    final backend = CloudBackendService();
-    final approved = backend.approvedSongs;
-    final lang = LanguageService();
-
-    if (approved.isEmpty) return const SizedBox.shrink();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 4,
-                    height: 18,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF00E5FF),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    lang.t('community_shelf_title'),
-                    style: const TextStyle(
-                      color: AppColors.textPrimary,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF00E5FF).withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFF00E5FF).withOpacity(0.4)),
-                ),
-                child: Text(
-                  '${approved.length} ${lang.t('live_badge')}',
-                  style: const TextStyle(
-                    color: Color(0xFF00E5FF),
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        SizedBox(
-          height: 190,
-          child: ListView.separated(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            scrollDirection: Axis.horizontal,
-            itemCount: approved.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 14),
-            itemBuilder: (context, index) {
-              final song = approved[index];
-              return _buildIndianSongCard(context, song, provider, approved);
-            },
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildOnlineTrendingSection(
-    BuildContext context,
-    PlayerProvider provider,
-    LanguageService lang,
-  ) {
-    final onlineSongs = provider.onlineTrendingSongs;
-    if (onlineSongs.isEmpty && !provider.isLoadingOnlineTrending) return const SizedBox.shrink();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.whatshot_rounded, color: Color(0xFFFF6D00), size: 22),
-                  const SizedBox(width: 8),
-                  Text(
-                    lang.isHindi ? 'ऑनलाइन ट्रेंडिंग हिट्स' : 'Online Trending Hits',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF00E5FF).withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFF00E5FF).withOpacity(0.3)),
-                ),
-                child: const Text(
-                  'Ultra HD 320k',
-                  style: TextStyle(color: Color(0xFF00E5FF), fontSize: 10, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ],
-          ),
-        ),
-        if (provider.isLoadingOnlineTrending && onlineSongs.isEmpty)
-          const SizedBox(
-            height: 190,
-            child: Center(child: CircularProgressIndicator(color: Color(0xFF00E5FF))),
-          )
-        else
-          SizedBox(
-            height: 190,
-            child: ListView.separated(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              scrollDirection: Axis.horizontal,
-              itemCount: onlineSongs.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 14),
-              itemBuilder: (context, index) {
-                final song = onlineSongs[index];
-                return _buildIndianSongCard(context, song, provider, onlineSongs);
-              },
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildOnlineGlobalSection(BuildContext context, PlayerProvider provider, LanguageService lang) {
-    final globalSongs = provider.onlineGlobalSongs;
-    if (globalSongs.isEmpty && !provider.isLoadingOnlineTrending) {
+  Widget _buildOnlineSection({
+    required BuildContext context,
+    required String title,
+    required String hindiTitle,
+    required IconData icon,
+    required Color iconColor,
+    required List<Song> songs,
+    required PlayerProvider provider,
+    required LanguageService lang,
+  }) {
+    if (songs.isEmpty && !provider.isLoadingOnlineTrending) {
       return const SizedBox.shrink();
     }
 
@@ -1288,10 +1102,10 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               Row(
                 children: [
-                  const Icon(Icons.public_rounded, color: Color(0xFF00E5FF), size: 22),
+                  Icon(icon, color: iconColor, size: 22),
                   const SizedBox(width: 8),
                   Text(
-                    lang.isHindi ? 'ग्लोबल टॉप 50 हिट्स' : 'Global Top 50 Hits',
+                    lang.isHindi ? hindiTitle : title,
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 18,
@@ -1315,7 +1129,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
         ),
-        if (provider.isLoadingOnlineTrending && globalSongs.isEmpty)
+        if (provider.isLoadingOnlineTrending && songs.isEmpty)
           const SizedBox(
             height: 190,
             child: Center(child: CircularProgressIndicator(color: Color(0xFF00E5FF))),
@@ -1326,14 +1140,117 @@ class _HomeScreenState extends State<HomeScreen> {
             child: ListView.separated(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               scrollDirection: Axis.horizontal,
-              itemCount: globalSongs.length,
+              itemCount: songs.length,
               separatorBuilder: (_, __) => const SizedBox(width: 14),
               itemBuilder: (context, index) {
-                final song = globalSongs[index];
-                return _buildIndianSongCard(context, song, provider, globalSongs);
+                final song = songs[index];
+                return _buildIndianSongCard(context, song, provider, songs);
               },
             ),
           ),
+      ],
+    );
+  }
+
+  Widget _buildTopArtistsSection(BuildContext context, LanguageService lang) {
+    final artists = JioSaavnService.getTopArtists();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 14),
+          child: Row(
+            children: [
+              const Icon(Icons.mic_external_on_rounded, color: Color(0xFFFF4081), size: 22),
+              const SizedBox(width: 8),
+              Text(
+                lang.isHindi ? 'लोकप्रिय कलाकार' : 'Popular Artists',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: 115,
+          child: ListView.separated(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            scrollDirection: Axis.horizontal,
+            itemCount: artists.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 16),
+            itemBuilder: (context, index) {
+              final artist = artists[index];
+              final name = artist['name'] ?? '';
+              final imageUrl = artist['image'] ?? '';
+
+              return GestureDetector(
+                onTap: () {
+                  final provider = Provider.of<PlayerProvider>(context, listen: false);
+                  provider.searchOnline(name);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const Scaffold(
+                        body: SearchScreen(),
+                      ),
+                    ),
+                  );
+                },
+                child: SizedBox(
+                  width: 78,
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 70,
+                        height: 70,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: const Color(0xFF00E5FF).withOpacity(0.5), width: 2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF00E5FF).withOpacity(0.2),
+                              blurRadius: 8,
+                            ),
+                          ],
+                        ),
+                        child: ClipOval(
+                          child: CachedNetworkImage(
+                            imageUrl: imageUrl,
+                            fit: BoxFit.cover,
+                            placeholder: (_, __) => Container(
+                              color: const Color(0xFF1E293B),
+                              child: const Icon(Icons.person_rounded, color: Colors.white38),
+                            ),
+                            errorBuilder: (_, __, ___) => Container(
+                              color: const Color(0xFF1E293B),
+                              child: const Icon(Icons.person_rounded, color: Colors.white38),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
       ],
     );
   }

@@ -255,6 +255,64 @@ class JioSaavnService {
   Future<List<Song>> getPunjabiTop50({int limit = 50}) =>
       getPlaylistSongs('1134543511', genre: 'Punjabi', subCategory: 'Punjabi Hits', defaultAlbum: 'Punjabi Top 50', limit: limit);
 
+  /// Most Streamed Romantic Love Songs
+  Future<List<Song>> getRomanticTop50({int limit = 50}) =>
+      getPlaylistSongs('1139074020', genre: 'Romantic', subCategory: 'Love Songs', defaultAlbum: 'Romantic Hits', limit: limit);
+
+  /// Devotional & Bhakti Sacred Chants
+  Future<List<Song>> getBhaktiTop50({int limit = 50}) =>
+      getPlaylistSongs('1296588511', genre: 'Bhakti', subCategory: 'Devotional Chants', defaultAlbum: 'Divine Bhakti', limit: limit);
+
+  /// Curated Top Artists with verified 500x500 HD official artwork
+  static List<Map<String, String>> getTopArtists() {
+    return const [
+      {
+        'name': 'Arijit Singh',
+        'image': 'https://c.saavncdn.com/artists/Arijit_Singh_004_20241118063717_500x500.webp',
+      },
+      {
+        'name': 'Sidhu Moose Wala',
+        'image': 'https://c.saavncdn.com/artists/Sidhu_Moose_Wala_005_20240327073238_500x500.webp',
+      },
+      {
+        'name': 'Diljit Dosanjh',
+        'image': 'https://c.saavncdn.com/artists/Diljit_Dosanjh_006_20240327072412_500x500.webp',
+      },
+      {
+        'name': 'Shreya Ghoshal',
+        'image': 'https://c.saavncdn.com/artists/Shreya_Ghoshal_004_20241118064112_500x500.webp',
+      },
+      {
+        'name': 'Ed Sheeran',
+        'image': 'https://c.saavncdn.com/artists/Ed_Sheeran_500x500.jpg',
+      },
+      {
+        'name': 'Taylor Swift',
+        'image': 'https://c.saavncdn.com/artists/Taylor_Swift_500x500.jpg',
+      },
+      {
+        'name': 'Karan Aujla',
+        'image': 'https://c.saavncdn.com/artists/Karan_Aujla_004_20240327074218_500x500.webp',
+      },
+      {
+        'name': 'Yo Yo Honey Singh',
+        'image': 'https://c.saavncdn.com/artists/Yo_Yo_Honey_Singh_002_20241118064512_500x500.webp',
+      },
+      {
+        'name': 'Jubin Nautiyal',
+        'image': 'https://c.saavncdn.com/artists/Jubin_Nautiyal_003_20241118064821_500x500.webp',
+      },
+      {
+        'name': 'Atif Aslam',
+        'image': 'https://c.saavncdn.com/artists/Atif_Aslam_004_20240327071205_500x500.webp',
+      },
+      {
+        'name': 'B Praak',
+        'image': 'https://c.saavncdn.com/artists/B_Praak_003_20240327073845_500x500.webp',
+      },
+    ];
+  }
+
   /// Fetch Top Popular Charts metadata (India Superhits, Bhakti, Trending, Lo-Fi)
   Future<List<Map<String, dynamic>>> getTopCharts() async {
     try {

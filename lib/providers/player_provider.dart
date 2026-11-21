@@ -36,6 +36,9 @@ class PlayerProvider extends ChangeNotifier {
   bool _isSearchingOnline = false;
   List<Song> _onlineTrendingSongs = [];
   List<Song> _onlineGlobalSongs = [];
+  List<Song> _onlineRomanticSongs = [];
+  List<Song> _onlinePunjabiSongs = [];
+  List<Song> _onlineBhaktiSongs = [];
   bool _isLoadingOnlineTrending = false;
 
   bool _isLoadingTrending = false;
@@ -91,6 +94,9 @@ class PlayerProvider extends ChangeNotifier {
   bool get isSearchingOnline => _isSearchingOnline;
   List<Song> get onlineTrendingSongs => _onlineTrendingSongs;
   List<Song> get onlineGlobalSongs => _onlineGlobalSongs;
+  List<Song> get onlineRomanticSongs => _onlineRomanticSongs;
+  List<Song> get onlinePunjabiSongs => _onlinePunjabiSongs;
+  List<Song> get onlineBhaktiSongs => _onlineBhaktiSongs;
   bool get isLoadingOnlineTrending => _isLoadingOnlineTrending;
 
   bool get isLoadingTrending => _isLoadingTrending;
@@ -192,8 +198,11 @@ class PlayerProvider extends ChangeNotifier {
       });
     }
 
-    // 4. Load online catalog
-    await refreshCatalog();
+    // 4. Load cached online streaming sections immediately from disk cache (0ms instant startup)
+    _loadCachedOnlineSections();
+
+    // 5. Load online catalog in background without blocking UI startup!
+    Future.microtask(() => refreshCatalog());
   }
 
   /// Called immediately when a user registers or logs in on any device
@@ -527,28 +536,108 @@ class PlayerProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Load Today's Trending Hits & Global Top 50 directly from Ultra HD catalog
+  /// Load Today's Trending Hits, Global Top 50, Romantic, Punjabi & Bhakti
   Future<void> loadOnlineTrending({bool forceRefresh = false}) async {
-    if (_onlineTrendingSongs.isNotEmpty && _onlineGlobalSongs.isNotEmpty && !forceRefresh) return;
+    final hasData = _onlineTrendingSongs.isNotEmpty &&
+        _onlineGlobalSongs.isNotEmpty &&
+        _onlineRomanticSongs.isNotEmpty &&
+        _onlinePunjabiSongs.isNotEmpty &&
+        _onlineBhaktiSongs.isNotEmpty;
 
-    _isLoadingOnlineTrending = true;
-    notifyListeners();
+    if (hasData && !forceRefresh) return;
+
+    if (!hasData) {
+      _isLoadingOnlineTrending = true;
+      notifyListeners();
+    }
 
     try {
       final futures = await Future.wait([
         _saavnService.getTrendingToday(),
         _saavnService.getGlobalTop50(),
+        _saavnService.getRomanticTop50(),
+        _saavnService.getPunjabiTop50(),
+        _saavnService.getBhaktiTop50(),
       ]);
       _onlineTrendingSongs = futures[0];
       _onlineGlobalSongs = futures[1];
+      _onlineRomanticSongs = futures[2];
+      _onlinePunjabiSongs = futures[3];
+      _onlineBhaktiSongs = futures[4];
+
       _syncFavoritesFlag(_onlineTrendingSongs);
       _syncFavoritesFlag(_onlineGlobalSongs);
+      _syncFavoritesFlag(_onlineRomanticSongs);
+      _syncFavoritesFlag(_onlinePunjabiSongs);
+      _syncFavoritesFlag(_onlineBhaktiSongs);
+
+      _saveCachedOnlineSections();
     } catch (e) {
-      debugPrint('Error loading online trending & global: $e');
+      debugPrint('Error loading online streaming sections: $e');
     }
 
     _isLoadingOnlineTrending = false;
     notifyListeners();
+  }
+
+  Future<void> _loadCachedOnlineSections() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final trRaw = prefs.getString('cache_online_trending');
+      final glRaw = prefs.getString('cache_online_global');
+      final roRaw = prefs.getString('cache_online_romantic');
+      final puRaw = prefs.getString('cache_online_punjabi');
+      final bhRaw = prefs.getString('cache_online_bhakti');
+
+      if (trRaw != null) _onlineTrendingSongs = _restoreSongsFromCache(trRaw);
+      if (glRaw != null) _onlineGlobalSongs = _restoreSongsFromCache(glRaw);
+      if (roRaw != null) _onlineRomanticSongs = _restoreSongsFromCache(roRaw);
+      if (puRaw != null) _onlinePunjabiSongs = _restoreSongsFromCache(puRaw);
+      if (bhRaw != null) _onlineBhaktiSongs = _restoreSongsFromCache(bhRaw);
+
+      if (_onlineTrendingSongs.isNotEmpty) {
+        _syncFavoritesFlag(_onlineTrendingSongs);
+        _syncFavoritesFlag(_onlineGlobalSongs);
+        _syncFavoritesFlag(_onlineRomanticSongs);
+        _syncFavoritesFlag(_onlinePunjabiSongs);
+        _syncFavoritesFlag(_onlineBhaktiSongs);
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Error loading cached online sections: $e');
+    }
+  }
+
+  Future<void> _saveCachedOnlineSections() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (_onlineTrendingSongs.isNotEmpty) {
+        prefs.setString('cache_online_trending', jsonEncode(_onlineTrendingSongs.map((s) => s.toJson()).toList()));
+      }
+      if (_onlineGlobalSongs.isNotEmpty) {
+        prefs.setString('cache_online_global', jsonEncode(_onlineGlobalSongs.map((s) => s.toJson()).toList()));
+      }
+      if (_onlineRomanticSongs.isNotEmpty) {
+        prefs.setString('cache_online_romantic', jsonEncode(_onlineRomanticSongs.map((s) => s.toJson()).toList()));
+      }
+      if (_onlinePunjabiSongs.isNotEmpty) {
+        prefs.setString('cache_online_punjabi', jsonEncode(_onlinePunjabiSongs.map((s) => s.toJson()).toList()));
+      }
+      if (_onlineBhaktiSongs.isNotEmpty) {
+        prefs.setString('cache_online_bhakti', jsonEncode(_onlineBhaktiSongs.map((s) => s.toJson()).toList()));
+      }
+    } catch (e) {
+      debugPrint('Error saving cached online sections: $e');
+    }
+  }
+
+  List<Song> _restoreSongsFromCache(String rawJson) {
+    try {
+      final list = jsonDecode(rawJson) as List? ?? [];
+      return list.map((item) => Song.fromJson(Map<String, dynamic>.from(item))).toList();
+    } catch (_) {
+      return [];
+    }
   }
 
   Future<void> selectGenre(String genre) async {
