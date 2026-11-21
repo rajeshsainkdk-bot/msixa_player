@@ -37,6 +37,7 @@ class _HomeScreenState extends State<HomeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final provider = Provider.of<PlayerProvider>(context, listen: false);
       provider.loadOnlineTrending();
+      UpdateService.checkForUpdate(context, autoPrompt: true);
     });
   }
 

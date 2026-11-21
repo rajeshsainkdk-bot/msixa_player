@@ -52,7 +52,7 @@ class AdminRootView extends StatefulWidget {
   State<AdminRootView> createState() => _AdminRootViewState();
 }
 
-class _AdminRootViewState extends State<AdminRootView> {
+class _AdminRootViewState extends State<AdminRootView> with WidgetsBindingObserver {
   final _backend = CloudBackendService();
   final _lang = LanguageService();
   final _pinCtrl = TextEditingController();
@@ -62,6 +62,7 @@ class _AdminRootViewState extends State<AdminRootView> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       UpdateService.checkForUpdate(context, autoPrompt: true, isAdmin: true);
     });
@@ -69,8 +70,16 @@ class _AdminRootViewState extends State<AdminRootView> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _pinCtrl.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      UpdateService.checkForUpdate(context, autoPrompt: true, isAdmin: true);
+    }
   }
 
   Future<void> _loginAdmin() async {

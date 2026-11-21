@@ -23,6 +23,7 @@ class UpdateService {
   static const String _prefKeyLastPromptTime = 'msixa_last_update_prompt_time';
   static final ValueNotifier<Map<String, dynamic>?> availableUpdateNotifier = ValueNotifier(null);
   static final ValueNotifier<Map<String, dynamic>?> adminAvailableUpdateNotifier = ValueNotifier(null);
+  static bool _isDialogShowing = false;
 
   /// Read exact installed package version dynamically from Android PackageManager
   static Future<Map<String, dynamic>> getInstalledVersion() async {
@@ -133,13 +134,18 @@ class UpdateService {
         }
 
         if (autoPrompt) {
-          final dismissedCode = prefs.getInt(prefKeyDismissed) ?? 0;
-          final lastPromptTime = prefs.getInt(prefKeyPrompt) ?? 0;
-          // Suppress repeated auto-prompts if user just updated or dismissed in this 10-minute window
-          if (dismissedCode >= remoteCode && (ts - lastPromptTime) < 10 * 60 * 1000) {
-            return;
+          // If force update is true, always prompt the user!
+          // Only suppress if user explicitly tapped 'Later' on a NON-forced update in the last 5 minutes
+          if (!forceUpdate) {
+            final dismissedCode = prefs.getInt(prefKeyDismissed) ?? 0;
+            final lastPromptTime = prefs.getInt(prefKeyPrompt) ?? 0;
+            if (dismissedCode >= remoteCode && (ts - lastPromptTime) < 5 * 60 * 1000) {
+              return;
+            }
           }
         }
+
+        if (_isDialogShowing) return;
 
         await prefs.setInt(prefKeyPrompt, ts);
         if (context.mounted) {
@@ -280,6 +286,9 @@ class UpdateService {
     required int remoteCode,
     bool isAdmin = false,
   }) {
+    if (_isDialogShowing) return;
+    _isDialogShowing = true;
+
     showDialog(
       context: context,
       barrierDismissible: !forceUpdate,
@@ -527,14 +536,7 @@ class UpdateService {
                             statusText = isHindi ? 'डाउनलोड पूरा हुआ! इंस्टॉलेशन...' : 'Download complete! Installing...';
                           });
 
-                          // 2. Remember dismissed version
-                          try {
-                            final p = await SharedPreferences.getInstance();
-                            await p.setInt(prefKeyDismissed, remoteCode);
-                            await p.setInt(prefKeyPrompt, DateTime.now().millisecondsSinceEpoch);
-                          } catch (_) {}
-
-                          // 3. Clear banner notifiers immediately
+                          // 2. Clear banner notifiers on successful install launch
                           if (isAdmin) {
                             adminAvailableUpdateNotifier.value = null;
                           } else {
@@ -610,6 +612,8 @@ class UpdateService {
           },
         );
       },
-    );
+    ).then((_) {
+      _isDialogShowing = false;
+    });
   }
 }

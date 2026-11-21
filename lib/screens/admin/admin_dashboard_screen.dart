@@ -31,7 +31,7 @@ class AdminDashboardScreen extends StatefulWidget {
   State<AdminDashboardScreen> createState() => _AdminDashboardScreenState();
 }
 
-class _AdminDashboardScreenState extends State<AdminDashboardScreen> with SingleTickerProviderStateMixin {
+class _AdminDashboardScreenState extends State<AdminDashboardScreen> with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   final _backend = CloudBackendService();
   final _lang = LanguageService();
   final _player = AudioPlayer();
@@ -73,6 +73,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging) {
@@ -164,6 +165,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _syncTimer?.cancel();
     _posSub?.cancel();
     _durSub?.cancel();
@@ -173,6 +175,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
     R2StorageService().removeListener(_onR2Update);
     _player.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      UpdateService.checkForUpdate(context, autoPrompt: true, isAdmin: true);
+    }
   }
 
   String _formatPreviewDuration(Duration d) {
