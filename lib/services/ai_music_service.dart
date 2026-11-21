@@ -1,6 +1,7 @@
 import '../models/song.dart';
 import '../models/artist.dart';
 import '../models/album.dart';
+import 'song_artwork_resolver.dart';
 
 class AiMusicService {
   static final AiMusicService _instance = AiMusicService._internal();
