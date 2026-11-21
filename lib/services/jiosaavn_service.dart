@@ -158,11 +158,17 @@ class JioSaavnService {
     }
   }
 
-  /// Fetch India's Top 50 Trending Songs directly from JioSaavn Trending Today chart
-  Future<List<Song>> getTrendingToday({int limit = 50}) async {
+  /// Fetch songs from any curated catalog playlist
+  Future<List<Song>> getPlaylistSongs(
+    String listId, {
+    String genre = 'Trending',
+    String subCategory = 'Top 50 Hits',
+    String defaultAlbum = 'Top Hits',
+    int limit = 50,
+  }) async {
     try {
       final uri = Uri.parse(
-        '$_baseUrl?__call=playlist.getDetails&listid=110858205&_format=json&_marker=0&api_version=4&ctx=web6dot0',
+        '$_baseUrl?__call=playlist.getDetails&listid=$listId&_format=json&_marker=0&api_version=4&ctx=web6dot0',
       );
 
       final resp = await http.get(uri, headers: {
@@ -192,8 +198,8 @@ class JioSaavnService {
         final item = list[i];
         final moreInfo = item['more_info'] as Map<String, dynamic>? ?? {};
 
-        final id = item['id']?.toString() ?? 'saavn_trend_$i';
-        final title = _cleanHtml(item['title']?.toString() ?? 'Trending Track');
+        final id = item['id']?.toString() ?? 'pl_${listId}_$i';
+        final title = _cleanHtml(item['title']?.toString() ?? 'Track');
 
         String artist = 'Various Artists';
         final artistMap = moreInfo['artistMap'] as Map<String, dynamic>? ?? {};
@@ -205,7 +211,7 @@ class JioSaavnService {
           artist = _cleanHtml(item['subtitle'].toString());
         }
 
-        final album = _cleanHtml(moreInfo['album']?.toString() ?? 'Top 50 India');
+        final album = _cleanHtml(moreInfo['album']?.toString() ?? defaultAlbum);
         final durationSec = int.tryParse(moreInfo['duration']?.toString() ?? '240') ?? 240;
         final coverUrl = _upgradeArtwork(item['image']?.toString());
         final streamUrl = i < decryptedLinks.length && decryptedLinks[i].isNotEmpty
@@ -222,8 +228,8 @@ class JioSaavnService {
           duration: durationSec,
           streamUrl: streamUrl,
           coverUrl: coverUrl,
-          genre: 'Trending',
-          subCategory: 'Top 50 Hits',
+          genre: genre,
+          subCategory: subCategory,
           source: 'Ultra HD 320kbps',
           isFavorite: false,
           status: 'approved',
@@ -232,10 +238,22 @@ class JioSaavnService {
 
       return songs;
     } catch (e) {
-      debugPrint('JioSaavn getTrendingToday error: $e');
+      debugPrint('Online getPlaylistSongs error: $e');
       return [];
     }
   }
+
+  /// Today's Top 50 Trending Hits
+  Future<List<Song>> getTrendingToday({int limit = 50}) =>
+      getPlaylistSongs('110858205', genre: 'Trending', subCategory: 'Today\'s Hits', defaultAlbum: 'Top 50 Hits', limit: limit);
+
+  /// Global Top 50 Hits (International English & Global Charts)
+  Future<List<Song>> getGlobalTop50({int limit = 50}) =>
+      getPlaylistSongs('1134595537', genre: 'International', subCategory: 'Global Top 50', defaultAlbum: 'Global Hits', limit: limit);
+
+  /// Punjabi Top 50 Hits
+  Future<List<Song>> getPunjabiTop50({int limit = 50}) =>
+      getPlaylistSongs('1134543511', genre: 'Punjabi', subCategory: 'Punjabi Hits', defaultAlbum: 'Punjabi Top 50', limit: limit);
 
   /// Fetch Top Popular Charts metadata (India Superhits, Bhakti, Trending, Lo-Fi)
   Future<List<Map<String, dynamic>>> getTopCharts() async {

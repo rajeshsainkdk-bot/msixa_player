@@ -31,10 +31,11 @@ class PlayerProvider extends ChangeNotifier {
   List<Playlist> _customPlaylists = [];
   List<Song> _deviceSongs = [];
 
-  // JioSaavn Free Online Streaming State
+  // Online Streaming State (Ultra HD 320kbps)
   List<Song> _onlineSearchResults = [];
   bool _isSearchingOnline = false;
   List<Song> _onlineTrendingSongs = [];
+  List<Song> _onlineGlobalSongs = [];
   bool _isLoadingOnlineTrending = false;
 
   bool _isLoadingTrending = false;
@@ -89,6 +90,7 @@ class PlayerProvider extends ChangeNotifier {
   List<Song> get onlineSearchResults => _onlineSearchResults;
   bool get isSearchingOnline => _isSearchingOnline;
   List<Song> get onlineTrendingSongs => _onlineTrendingSongs;
+  List<Song> get onlineGlobalSongs => _onlineGlobalSongs;
   bool get isLoadingOnlineTrending => _isLoadingOnlineTrending;
 
   bool get isLoadingTrending => _isLoadingTrending;
@@ -525,18 +527,24 @@ class PlayerProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Load India's Top 50 Trending Tracks directly from JioSaavn
+  /// Load Today's Trending Hits & Global Top 50 directly from Ultra HD catalog
   Future<void> loadOnlineTrending({bool forceRefresh = false}) async {
-    if (_onlineTrendingSongs.isNotEmpty && !forceRefresh) return;
+    if (_onlineTrendingSongs.isNotEmpty && _onlineGlobalSongs.isNotEmpty && !forceRefresh) return;
 
     _isLoadingOnlineTrending = true;
     notifyListeners();
 
     try {
-      _onlineTrendingSongs = await _saavnService.getTrendingToday();
+      final futures = await Future.wait([
+        _saavnService.getTrendingToday(),
+        _saavnService.getGlobalTop50(),
+      ]);
+      _onlineTrendingSongs = futures[0];
+      _onlineGlobalSongs = futures[1];
       _syncFavoritesFlag(_onlineTrendingSongs);
+      _syncFavoritesFlag(_onlineGlobalSongs);
     } catch (e) {
-      debugPrint('Error loading online trending: $e');
+      debugPrint('Error loading online trending & global: $e');
     }
 
     _isLoadingOnlineTrending = false;

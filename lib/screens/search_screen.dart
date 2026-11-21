@@ -18,18 +18,21 @@ class SearchScreen extends StatefulWidget {
 class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController _searchController = TextEditingController();
   Timer? _debounce;
-  int _activeTab = 0; // 0: Online Music (JioSaavn), 1: Local & Uploads
+  int _activeTab = 0; // 0: Online Music (Ultra HD 320k), 1: Local & Uploads
 
   static const List<String> _quickTags = [
     'Arijit Singh',
-    'Yo Yo Honey Singh',
+    'Ed Sheeran',
     'Sidhu Moose Wala',
-    'Karan Aujla',
     'Diljit Dosanjh',
+    'Taylor Swift',
+    'Yo Yo Honey Singh',
+    'Alan Walker',
+    'Karan Aujla',
     'B Praak',
-    'Satinder Sartaaj',
     'Hanuman Chalisa',
     'Bollywood Hits',
+    'Global Pop',
     'Marwadi Songs',
     'Desi Lo-Fi',
   ];

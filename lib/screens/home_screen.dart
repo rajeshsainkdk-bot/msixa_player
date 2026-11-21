@@ -629,9 +629,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 _buildCommunitySection(context, provider),
 
                 // ==========================================
-                // 🔥 ONLINE TRENDING HITS (JioSaavn 320kbps Live Stream)
+                // 🔥 ONLINE TRENDING HITS (Ultra HD 320kbps Live Stream)
                 // ==========================================
                 _buildOnlineTrendingSection(context, provider, lang),
+
+                // ==========================================
+                // 🌍 GLOBAL TOP 50 HITS (International & Chartbusters)
+                // ==========================================
+                _buildOnlineGlobalSection(context, provider, lang),
 
                 // ==========================================
                 // SECTION 1: DIVINE BHAKTI & HANUMAN CHANTS
@@ -1259,6 +1264,72 @@ class _HomeScreenState extends State<HomeScreen> {
               itemBuilder: (context, index) {
                 final song = onlineSongs[index];
                 return _buildIndianSongCard(context, song, provider, onlineSongs);
+              },
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildOnlineGlobalSection(BuildContext context, PlayerProvider provider, LanguageService lang) {
+    final globalSongs = provider.onlineGlobalSongs;
+    if (globalSongs.isEmpty && !provider.isLoadingOnlineTrending) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.public_rounded, color: Color(0xFF00E5FF), size: 22),
+                  const SizedBox(width: 8),
+                  Text(
+                    lang.isHindi ? 'ग्लोबल टॉप 50 हिट्स' : 'Global Top 50 Hits',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF00E5FF).withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFF00E5FF).withOpacity(0.3)),
+                ),
+                child: const Text(
+                  'Ultra HD 320k',
+                  style: TextStyle(color: Color(0xFF00E5FF), fontSize: 10, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (provider.isLoadingOnlineTrending && globalSongs.isEmpty)
+          const SizedBox(
+            height: 190,
+            child: Center(child: CircularProgressIndicator(color: Color(0xFF00E5FF))),
+          )
+        else
+          SizedBox(
+            height: 190,
+            child: ListView.separated(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              scrollDirection: Axis.horizontal,
+              itemCount: globalSongs.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 14),
+              itemBuilder: (context, index) {
+                final song = globalSongs[index];
+                return _buildIndianSongCard(context, song, provider, globalSongs);
               },
             ),
           ),
