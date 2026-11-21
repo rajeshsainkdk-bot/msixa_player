@@ -124,7 +124,7 @@ class JioSaavnService {
           artist = _cleanHtml(item['subtitle'].toString());
         }
 
-        final album = _cleanHtml(moreInfo['album']?.toString() ?? 'JioSaavn Single');
+        final album = _cleanHtml(moreInfo['album']?.toString() ?? 'Single');
         final durationSec = int.tryParse(moreInfo['duration']?.toString() ?? '240') ?? 240;
         final coverUrl = _upgradeArtwork(item['image']?.toString());
         final streamUrl = i < decryptedLinks.length && decryptedLinks[i].isNotEmpty
@@ -144,8 +144,8 @@ class JioSaavnService {
           streamUrl: streamUrl,
           coverUrl: coverUrl,
           genre: lang,
-          subCategory: 'JioSaavn Online Stream',
-          source: 'JioSaavn HD 320kbps',
+          subCategory: 'Online Streaming',
+          source: 'Ultra HD 320kbps',
           isFavorite: false,
           status: 'approved',
         ));
@@ -224,7 +224,7 @@ class JioSaavnService {
           coverUrl: coverUrl,
           genre: 'Trending',
           subCategory: 'Top 50 Hits',
-          source: 'JioSaavn HD 320kbps',
+          source: 'Ultra HD 320kbps',
           isFavorite: false,
           status: 'approved',
         ));
@@ -254,7 +254,7 @@ class JioSaavnService {
           'title': _cleanHtml(item['title']?.toString() ?? 'Chart'),
           'image': _upgradeArtwork(item['image']?.toString()),
           'count': item['count'] ?? 50,
-          'subtitle': item['subtitle']?.toString() ?? 'JioSaavn Charts',
+          'subtitle': item['subtitle']?.toString() ?? 'Top Charts',
         };
       }).toList();
     } catch (e) {

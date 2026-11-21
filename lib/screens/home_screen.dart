@@ -1236,7 +1236,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   border: Border.all(color: const Color(0xFF00E5FF).withOpacity(0.3)),
                 ),
                 child: const Text(
-                  'JioSaavn 320k',
+                  'Ultra HD 320k',
                   style: TextStyle(color: Color(0xFF00E5FF), fontSize: 10, fontWeight: FontWeight.bold),
                 ),
               ),

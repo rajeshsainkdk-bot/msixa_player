@@ -300,7 +300,7 @@ class _SearchScreenState extends State<SearchScreen> {
             CircularProgressIndicator(color: Color(0xFF00E5FF)),
             SizedBox(height: 12),
             Text(
-              'Fetching 320kbps HD Audio from JioSaavn...',
+              'Fetching 320kbps Studio Audio...',
               style: TextStyle(color: Colors.white60, fontSize: 12),
             ),
           ],
@@ -394,7 +394,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   Icon(Icons.whatshot_rounded, color: Color(0xFFFF6D00), size: 20),
                   SizedBox(width: 6),
                   Text(
-                    'India Top 50 Trending (JioSaavn)',
+                    "Today's Top 50 Trending Hits",
                     style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
                   ),
                 ],
@@ -487,7 +487,7 @@ class _SearchScreenState extends State<SearchScreen> {
               borderRadius: BorderRadius.circular(4),
             ),
             child: const Text(
-              'JioSaavn',
+              'Ultra HD',
               style: TextStyle(color: Color(0xFF00E5FF), fontSize: 9, fontWeight: FontWeight.bold),
             ),
           ),
