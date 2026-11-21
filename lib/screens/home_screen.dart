@@ -31,6 +31,15 @@ class _HomeScreenState extends State<HomeScreen> {
   final Map<String, String> _selectedSubCategories = {};
   String _activeDiscoverTab = 'all'; // 'all' | 'artists' | 'albums' | 'playlists'
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final provider = Provider.of<PlayerProvider>(context, listen: false);
+      provider.loadOnlineTrending();
+    });
+  }
+
   static const List<Map<String, dynamic>> _genres = [
     {
       'title': 'All Indian',
@@ -620,6 +629,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 _buildCommunitySection(context, provider),
 
                 // ==========================================
+                // 🔥 ONLINE TRENDING HITS (JioSaavn 320kbps Live Stream)
+                // ==========================================
+                _buildOnlineTrendingSection(context, provider, lang),
+
+                // ==========================================
                 // SECTION 1: DIVINE BHAKTI & HANUMAN CHANTS
                 // ==========================================
                 _buildCategorySection(
@@ -1180,6 +1194,74 @@ class _HomeScreenState extends State<HomeScreen> {
             },
           ),
         ),
+      ],
+    );
+  }
+
+  Widget _buildOnlineTrendingSection(
+    BuildContext context,
+    PlayerProvider provider,
+    LanguageService lang,
+  ) {
+    final onlineSongs = provider.onlineTrendingSongs;
+    if (onlineSongs.isEmpty && !provider.isLoadingOnlineTrending) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.whatshot_rounded, color: Color(0xFFFF6D00), size: 22),
+                  const SizedBox(width: 8),
+                  Text(
+                    lang.isHindi ? 'ऑनलाइन ट्रेंडिंग हिट्स' : 'Online Trending Hits',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF00E5FF).withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFF00E5FF).withOpacity(0.3)),
+                ),
+                child: const Text(
+                  'JioSaavn 320k',
+                  style: TextStyle(color: Color(0xFF00E5FF), fontSize: 10, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (provider.isLoadingOnlineTrending && onlineSongs.isEmpty)
+          const SizedBox(
+            height: 190,
+            child: Center(child: CircularProgressIndicator(color: Color(0xFF00E5FF))),
+          )
+        else
+          SizedBox(
+            height: 190,
+            child: ListView.separated(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              scrollDirection: Axis.horizontal,
+              itemCount: onlineSongs.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 14),
+              itemBuilder: (context, index) {
+                final song = onlineSongs[index];
+                return _buildIndianSongCard(context, song, provider, onlineSongs);
+              },
+            ),
+          ),
       ],
     );
   }

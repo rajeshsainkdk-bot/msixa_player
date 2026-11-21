@@ -873,6 +873,53 @@ jobs:
                            } catch (e: Throwable) {
                                result.success(false)
                            }
+                       } else if (call.method == "decryptSaavnUrl") {
+                           try {
+                               val enc = call.argument<String>("encrypted") ?: ""
+                               if (enc.isEmpty()) {
+                                   result.success("")
+                               } else {
+                                   val keyBytes = "38346591".toByteArray(Charsets.UTF_8)
+                                   val keySpec = javax.crypto.spec.SecretKeySpec(keyBytes, "DES")
+                                   val cipher = javax.crypto.Cipher.getInstance("DES/ECB/PKCS5Padding")
+                                   cipher.init(javax.crypto.Cipher.DECRYPT_MODE, keySpec)
+                                   val decoded = android.util.Base64.decode(enc, android.util.Base64.DEFAULT)
+                                   val decryptedBytes = cipher.doFinal(decoded)
+                                   var url = String(decryptedBytes, Charsets.UTF_8)
+                                   if (url.contains("_96.mp4")) {
+                                       url = url.replace("_96.mp4", "_320.mp4")
+                                   } else if (url.contains("_160.mp4")) {
+                                       url = url.replace("_160.mp4", "_320.mp4")
+                                   }
+                                   result.success(url)
+                               }
+                           } catch (e: Exception) {
+                               result.error("DECRYPT_ERROR", e.localizedMessage, null)
+                           }
+                       } else if (call.method == "decryptSaavnUrls") {
+                           try {
+                               val list = call.argument<List<String>>("encryptedList") ?: emptyList()
+                               val keyBytes = "38346591".toByteArray(Charsets.UTF_8)
+                               val keySpec = javax.crypto.spec.SecretKeySpec(keyBytes, "DES")
+                               val cipher = javax.crypto.Cipher.getInstance("DES/ECB/PKCS5Padding")
+                               cipher.init(javax.crypto.Cipher.DECRYPT_MODE, keySpec)
+                               val res = list.map { enc ->
+                                   try {
+                                       if (enc.isEmpty()) ""
+                                       else {
+                                           val decoded = android.util.Base64.decode(enc, android.util.Base64.DEFAULT)
+                                           val decryptedBytes = cipher.doFinal(decoded)
+                                           var url = String(decryptedBytes, Charsets.UTF_8)
+                                           if (url.contains("_96.mp4")) url = url.replace("_96.mp4", "_320.mp4")
+                                           else if (url.contains("_160.mp4")) url = url.replace("_160.mp4", "_320.mp4")
+                                           url
+                                       }
+                                   } catch (_: Throwable) { "" }
+                               }
+                               result.success(res)
+                           } catch (e: Exception) {
+                               result.error("DECRYPT_ERROR", e.localizedMessage, null)
+                           }
                       } else {
                           result.notImplemented()
                       }

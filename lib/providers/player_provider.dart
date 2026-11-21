@@ -13,12 +13,14 @@ import '../services/device_audio_service.dart';
 import '../services/cloud_backend_service.dart';
 import '../services/ai_music_service.dart';
 import '../services/song_artwork_resolver.dart';
+import '../services/jiosaavn_service.dart';
 
 class PlayerProvider extends ChangeNotifier {
   final AudioPlayerService _audioService = AudioPlayerService();
   final CatalogService _catalogService = CatalogService();
   final StorageService _storageService = StorageService();
   final DeviceAudioService _deviceAudioService = DeviceAudioService();
+  final JioSaavnService _saavnService = JioSaavnService();
 
   // State collections
   List<Song> _trendingSongs = [];
@@ -28,6 +30,12 @@ class PlayerProvider extends ChangeNotifier {
   List<Song> _recentlyPlayed = [];
   List<Playlist> _customPlaylists = [];
   List<Song> _deviceSongs = [];
+
+  // JioSaavn Free Online Streaming State
+  List<Song> _onlineSearchResults = [];
+  bool _isSearchingOnline = false;
+  List<Song> _onlineTrendingSongs = [];
+  bool _isLoadingOnlineTrending = false;
 
   bool _isLoadingTrending = false;
   bool _isSearching = false;
@@ -78,6 +86,10 @@ class PlayerProvider extends ChangeNotifier {
   List<Song> get recentlyPlayed => _recentlyPlayed;
   List<Playlist> get customPlaylists => _customPlaylists;
   List<Song> get deviceSongs => _deviceSongs;
+  List<Song> get onlineSearchResults => _onlineSearchResults;
+  bool get isSearchingOnline => _isSearchingOnline;
+  List<Song> get onlineTrendingSongs => _onlineTrendingSongs;
+  bool get isLoadingOnlineTrending => _isLoadingOnlineTrending;
 
   bool get isLoadingTrending => _isLoadingTrending;
   bool get isSearching => _isSearching;
@@ -485,6 +497,49 @@ class PlayerProvider extends ChangeNotifier {
     _searchResults = [...catalogResults, ...deviceResults];
     _syncFavoritesFlag(_searchResults);
     _isSearching = false;
+    notifyListeners();
+  }
+
+  /// Live Search on JioSaavn database with millions of online streaming songs
+  Future<void> searchOnline(String query) async {
+    final clean = query.trim();
+    if (clean.isEmpty) {
+      _onlineSearchResults = [];
+      _isSearchingOnline = false;
+      notifyListeners();
+      return;
+    }
+
+    _isSearchingOnline = true;
+    notifyListeners();
+
+    try {
+      _onlineSearchResults = await _saavnService.searchSongs(clean);
+      _syncFavoritesFlag(_onlineSearchResults);
+    } catch (e) {
+      debugPrint('Error searching online JioSaavn: $e');
+      _onlineSearchResults = [];
+    }
+
+    _isSearchingOnline = false;
+    notifyListeners();
+  }
+
+  /// Load India's Top 50 Trending Tracks directly from JioSaavn
+  Future<void> loadOnlineTrending({bool forceRefresh = false}) async {
+    if (_onlineTrendingSongs.isNotEmpty && !forceRefresh) return;
+
+    _isLoadingOnlineTrending = true;
+    notifyListeners();
+
+    try {
+      _onlineTrendingSongs = await _saavnService.getTrendingToday();
+      _syncFavoritesFlag(_onlineTrendingSongs);
+    } catch (e) {
+      debugPrint('Error loading online trending: $e');
+    }
+
+    _isLoadingOnlineTrending = false;
     notifyListeners();
   }
 
