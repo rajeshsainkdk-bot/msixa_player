@@ -585,10 +585,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
             }
           }
 
-          if (_isLikelyDolbyOrEac3 || _decoderMode == 'HW+' || _decoderMode == 'SW') {
-            mustUseNativeSyncAudio = true;
-          }
-
           setState(() {
             _audioTracks = parsed;
             _selectedAudioTrackIndex = initialTrackIdx;
@@ -596,14 +592,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
               _audioTrackName = _audioTracks[initialTrackIdx]['name']?.toString() ?? 'Track ${initialTrackIdx + 1}';
             }
           });
-          if (initialTrackIdx > 0 || mustUseNativeSyncAudio) {
+          // Always ensure ExoPlayer's hardware audio is active and unmuted
+          await _controller.setVolume(_isMuted ? 0.0 : _volume);
+          if (initialTrackIdx > 0) {
             await _switchAudioTrack(initialTrackIdx);
-          } else {
-            await _controller.setVolume(_isMuted ? 0.0 : _volume);
           }
         }
-      } else if (_isLikelyDolbyOrEac3 || _decoderMode == 'HW+' || _decoderMode == 'SW') {
-        await _startSwAudioSyncFallback();
       }
     } catch (_) {
       if (_isLikelyDolbyOrEac3) {

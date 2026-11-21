@@ -132,11 +132,11 @@ class UpdateService {
           availableUpdateNotifier.value = updateInfo;
         }
 
-        if (autoPrompt && !forceUpdate) {
+        if (autoPrompt) {
           final dismissedCode = prefs.getInt(prefKeyDismissed) ?? 0;
           final lastPromptTime = prefs.getInt(prefKeyPrompt) ?? 0;
-          // Only suppress if user clicked Later in this exact 15-minute window
-          if (dismissedCode >= remoteCode && (ts - lastPromptTime) < 15 * 60 * 1000) {
+          // Suppress repeated auto-prompts if user just updated or dismissed in this 10-minute window
+          if (dismissedCode >= remoteCode && (ts - lastPromptTime) < 10 * 60 * 1000) {
             return;
           }
         }

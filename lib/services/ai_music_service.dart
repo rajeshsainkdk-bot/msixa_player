@@ -280,19 +280,42 @@ class AiMusicService {
     final Map<String, List<Song>> map = {};
     for (final song in songs) {
       final cleaned = cleanAndOptimizeSong(song);
-      final albumKey = '${cleaned.artist} • ${cleaned.album}'.trim();
+      final rawAlbum = cleaned.album.trim();
+      final albumName = (rawAlbum.isNotEmpty && rawAlbum.toLowerCase() != 'msixa library' && rawAlbum.toLowerCase() != 'musixa library')
+          ? rawAlbum
+          : (song.subCategory != null && song.subCategory!.trim().isNotEmpty
+              ? song.subCategory!.trim()
+              : '${cleaned.artist} Essentials');
+      final albumKey = albumName.toLowerCase().replaceAll(RegExp(r'\s+'), ' ').trim();
       map.putIfAbsent(albumKey, () => []).add(cleaned);
     }
 
     final List<Album> albums = [];
     map.forEach((key, albumSongs) {
       final first = albumSongs.first;
-      final cover = albumSongs.firstWhere((s) => s.coverUrl.startsWith('http'), orElse: () => first).coverUrl;
+      final albumTitle = first.album.trim().isNotEmpty ? first.album.trim() : (first.subCategory ?? 'Master Collection');
+      final distinctArtists = albumSongs.map((s) => s.artist.trim().toLowerCase()).toSet();
+      final artistName = distinctArtists.length == 1 ? first.artist : 'Various Artists';
+
+      String cover = '';
+      for (final s in albumSongs) {
+        if (s.coverUrl.trim().startsWith('http') && !SongArtworkResolver.isGenericMicUrl(s.coverUrl)) {
+          cover = s.coverUrl.trim();
+          break;
+        }
+      }
+      if (cover.isEmpty) {
+        cover = SongArtworkResolver.resolveArtwork(
+          title: first.title,
+          artist: first.artist,
+          genre: first.genre,
+        );
+      }
 
       albums.add(Album(
-        id: 'album_${first.album.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_')}',
-        title: first.album,
-        artist: first.artist,
+        id: 'album_${key.replaceAll(RegExp(r'[^a-z0-9]'), '_')}',
+        title: albumTitle,
+        artist: artistName,
         songCount: albumSongs.length,
         songs: albumSongs,
         genre: first.genre,

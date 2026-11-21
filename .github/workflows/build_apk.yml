@@ -1031,7 +1031,7 @@ jobs:
           sed -i -E 's/applicationId[[:space:]=]+"[^"]+"/applicationId = "com.msixa.admin"/' android/app/build.gradle || true
           sed -i 's/applicationId "com.msixa.msixa_player"/applicationId "com.msixa.admin"/' android/app/build.gradle || true
           sed -i 's/applicationId "com.msixa.player"/applicationId "com.msixa.admin"/' android/app/build.gradle || true
-          sed -i 's/android:label="Msixa Player"/android:label="Msixa Player Admin"/' android/app/src/main/AndroidManifest.xml || true
+          sed -i -E 's/android:label="[^"]+"/android:label="Msixa Admin"/' android/app/src/main/AndroidManifest.xml || true
           rm -rf build/app/outputs/flutter-apk/app-release.apk
 
           flutter build apk --release --target=lib/main_admin.dart --build-name=1.0.${{ github.run_number }} --build-number=$((2000 + ${{ github.run_number }})) --no-tree-shake-icons

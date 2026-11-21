@@ -650,44 +650,52 @@ class MainActivity: AudioServiceActivity() {
                     val positionMs = (call.argument<Number>("positionMs"))?.toLong() ?: 0L
                     val volume = call.argument<Double>("volume") ?: 1.0
 
-                    try {
-                        syncAudioPlayer?.stop()
-                        syncAudioPlayer?.release()
-                        syncAudioPlayer = null
+                    Thread {
+                        try {
+                            syncAudioPlayer?.stop()
+                            syncAudioPlayer?.release()
+                            syncAudioPlayer = null
 
-                        val player = MediaPlayer()
-                        if (path.startsWith("content://")) {
-                            player.setDataSource(applicationContext, Uri.parse(path))
-                        } else {
-                            player.setDataSource(path)
-                        }
-                        player.prepare()
-                        if (trackIndex != null && trackIndex >= 0) {
-                            try {
-                                val trackInfos = player.trackInfo
-                                for (i in trackInfos.indices) {
-                                    if (trackInfos[i].trackType == MediaPlayer.TrackInfo.MEDIA_TRACK_TYPE_AUDIO) {
-                                        if (i == trackIndex) {
-                                            player.selectTrack(i)
-                                            break
+                            val player = MediaPlayer()
+                            if (path.startsWith("content://")) {
+                                player.setDataSource(applicationContext, Uri.parse(path))
+                            } else {
+                                player.setDataSource(path)
+                            }
+                            player.setOnPreparedListener { mp ->
+                                try {
+                                    if (trackIndex != null && trackIndex >= 0) {
+                                        val trackInfos = mp.trackInfo
+                                        for (i in trackInfos.indices) {
+                                            if (trackInfos[i].trackType == MediaPlayer.TrackInfo.MEDIA_TRACK_TYPE_AUDIO) {
+                                                if (i == trackIndex) {
+                                                    mp.selectTrack(i)
+                                                    break
+                                                }
+                                            }
                                         }
                                     }
-                                }
-                            } catch (_: Throwable) {}
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                        mp.seekTo(positionMs, MediaPlayer.SEEK_CLOSEST_SYNC)
+                                    } else {
+                                        mp.seekTo(positionMs.toInt())
+                                    }
+                                    val vol = volume.toFloat().coerceIn(0f, 1f)
+                                    mp.setVolume(vol, vol)
+                                    mp.start()
+                                    syncAudioPlayer = mp
+                                } catch (_: Throwable) {}
+                            }
+                            player.setOnErrorListener { mp, _, _ ->
+                                try { mp.release() } catch (_: Throwable) {}
+                                true
+                            }
+                            player.prepareAsync()
+                            runOnUiThread { result.success(true) }
+                        } catch (e: Throwable) {
+                            runOnUiThread { result.error("AUDIO_SYNC_ERROR", e.localizedMessage, null) }
                         }
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                            player.seekTo(positionMs, MediaPlayer.SEEK_CLOSEST_SYNC)
-                        } else {
-                            player.seekTo(positionMs.toInt())
-                        }
-                        val vol = volume.toFloat().coerceIn(0f, 1f)
-                        player.setVolume(vol, vol)
-                        player.start()
-                        syncAudioPlayer = player
-                        result.success(true)
-                    } catch (e: Throwable) {
-                        result.error("AUDIO_SYNC_ERROR", e.localizedMessage, null)
-                    }
+                    }.start()
                 }
                 "seekSyncAudio" -> {
                     val positionMs = (call.argument<Number>("positionMs"))?.toLong() ?: 0L
