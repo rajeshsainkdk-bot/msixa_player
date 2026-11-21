@@ -1225,7 +1225,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               color: const Color(0xFF1E293B),
                               child: const Icon(Icons.person_rounded, color: Colors.white38),
                             ),
-                            errorBuilder: (_, __, ___) => Container(
+                            errorWidget: (_, __, ___) => Container(
                               color: const Color(0xFF1E293B),
                               child: const Icon(Icons.person_rounded, color: Colors.white38),
                             ),
