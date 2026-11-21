@@ -13,6 +13,7 @@ import 'package:msixa_player/widgets/mini_player.dart';
 import 'package:msixa_player/screens/now_playing_screen.dart';
 import 'package:msixa_player/screens/home_screen.dart';
 import 'package:msixa_player/screens/admin/admin_dashboard_screen.dart';
+import 'package:msixa_player/services/jiosaavn_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -558,6 +559,27 @@ void main() {
       expect(totalBucketBytes / (1024 * 1024 * 1024), 4.0);
       expect(remainingFreeBytes / (1024 * 1024 * 1024), 6.0);
       expect(usedPercentage, 40.0);
+    });
+
+    test('JioSaavnService Top Artists contains regional and Bollywood stars with 500x500 artwork', () {
+      final artists = JioSaavnService.getTopArtists();
+      expect(artists.isNotEmpty, true);
+      final names = artists.map((a) => a['name']).toList();
+
+      expect(names.contains('Arijit Singh'), true);
+      expect(names.contains('Sapna Choudhary'), true);
+      expect(names.contains('Mame Khan'), true);
+      expect(names.contains('Renuka Panwar'), true);
+      expect(names.contains('Gulzaar Chhaniwala'), true);
+      expect(names.contains('Pawan Singh'), true);
+      expect(names.contains('Sonu Nigam'), true);
+      expect(names.contains('Kumar Sanu'), true);
+      expect(names.contains('Alka Yagnik'), true);
+
+      for (final a in artists) {
+        expect(a['image'], isNotNull);
+        expect(a['image']!.contains('500x500'), true);
+      }
     });
   });
 }

@@ -41,6 +41,14 @@ class PlayerProvider extends ChangeNotifier {
   List<Song> _onlineRomanticSongs = [];
   List<Song> _onlinePunjabiSongs = [];
   List<Song> _onlineBhaktiSongs = [];
+  List<Song> _onlineDjSongs = [];
+  List<Song> _onlineHaryanviSongs = [];
+  List<Song> _onlineRajasthaniSongs = [];
+  List<Song> _onlineMarwadiSongs = [];
+  List<Song> _onlineBhojpuriSongs = [];
+  List<Song> _onlineRetroSongs = [];
+  List<Song> _onlineLofiSongs = [];
+  List<Song> _onlineSadSongs = [];
   bool _isLoadingOnlineTrending = false;
 
   bool _isLoadingTrending = false;
@@ -99,6 +107,14 @@ class PlayerProvider extends ChangeNotifier {
   List<Song> get onlineRomanticSongs => _onlineRomanticSongs;
   List<Song> get onlinePunjabiSongs => _onlinePunjabiSongs;
   List<Song> get onlineBhaktiSongs => _onlineBhaktiSongs;
+  List<Song> get onlineDjSongs => _onlineDjSongs;
+  List<Song> get onlineHaryanviSongs => _onlineHaryanviSongs;
+  List<Song> get onlineRajasthaniSongs => _onlineRajasthaniSongs;
+  List<Song> get onlineMarwadiSongs => _onlineMarwadiSongs;
+  List<Song> get onlineBhojpuriSongs => _onlineBhojpuriSongs;
+  List<Song> get onlineRetroSongs => _onlineRetroSongs;
+  List<Song> get onlineLofiSongs => _onlineLofiSongs;
+  List<Song> get onlineSadSongs => _onlineSadSongs;
   bool get isLoadingOnlineTrending => _isLoadingOnlineTrending;
 
   bool get isLoadingTrending => _isLoadingTrending;
@@ -538,13 +554,17 @@ class PlayerProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Load Today's Trending Hits, Global Top 50, Romantic, Punjabi & Bhakti
+  /// Load Today's Trending Hits, Global Top 50, Regional & Curated Sections
   Future<void> loadOnlineTrending({bool forceRefresh = false}) async {
     final hasData = _onlineTrendingSongs.isNotEmpty &&
         _onlineGlobalSongs.isNotEmpty &&
         _onlineRomanticSongs.isNotEmpty &&
         _onlinePunjabiSongs.isNotEmpty &&
-        _onlineBhaktiSongs.isNotEmpty;
+        _onlineBhaktiSongs.isNotEmpty &&
+        _onlineDjSongs.isNotEmpty &&
+        _onlineHaryanviSongs.isNotEmpty &&
+        _onlineRajasthaniSongs.isNotEmpty &&
+        _onlineMarwadiSongs.isNotEmpty;
 
     if (hasData && !forceRefresh) return;
 
@@ -560,18 +580,43 @@ class PlayerProvider extends ChangeNotifier {
         _saavnService.getRomanticTop50(),
         _saavnService.getPunjabiTop50(),
         _saavnService.getBhaktiTop50(),
+        _saavnService.getDjRemixTop50(),
+        _saavnService.getHaryanviTop50(),
+        _saavnService.getRajasthaniTop50(),
+        _saavnService.getMarwadiHits(),
+        _saavnService.getBhojpuriTop50(),
+        _saavnService.get90sRetroTop50(),
+        _saavnService.getLofiHits(),
+        _saavnService.getSadSongsTop50(),
       ]);
-      _onlineTrendingSongs = futures[0];
-      _onlineGlobalSongs = futures[1];
-      _onlineRomanticSongs = futures[2];
-      _onlinePunjabiSongs = futures[3];
-      _onlineBhaktiSongs = futures[4];
+
+      if (futures[0].isNotEmpty) _onlineTrendingSongs = futures[0];
+      if (futures[1].isNotEmpty) _onlineGlobalSongs = futures[1];
+      if (futures[2].isNotEmpty) _onlineRomanticSongs = futures[2];
+      if (futures[3].isNotEmpty) _onlinePunjabiSongs = futures[3];
+      if (futures[4].isNotEmpty) _onlineBhaktiSongs = futures[4];
+      if (futures[5].isNotEmpty) _onlineDjSongs = futures[5];
+      if (futures[6].isNotEmpty) _onlineHaryanviSongs = futures[6];
+      if (futures[7].isNotEmpty) _onlineRajasthaniSongs = futures[7];
+      if (futures[8].isNotEmpty) _onlineMarwadiSongs = futures[8];
+      if (futures[9].isNotEmpty) _onlineBhojpuriSongs = futures[9];
+      if (futures[10].isNotEmpty) _onlineRetroSongs = futures[10];
+      if (futures[11].isNotEmpty) _onlineLofiSongs = futures[11];
+      if (futures[12].isNotEmpty) _onlineSadSongs = futures[12];
 
       _syncFavoritesFlag(_onlineTrendingSongs);
       _syncFavoritesFlag(_onlineGlobalSongs);
       _syncFavoritesFlag(_onlineRomanticSongs);
       _syncFavoritesFlag(_onlinePunjabiSongs);
       _syncFavoritesFlag(_onlineBhaktiSongs);
+      _syncFavoritesFlag(_onlineDjSongs);
+      _syncFavoritesFlag(_onlineHaryanviSongs);
+      _syncFavoritesFlag(_onlineRajasthaniSongs);
+      _syncFavoritesFlag(_onlineMarwadiSongs);
+      _syncFavoritesFlag(_onlineBhojpuriSongs);
+      _syncFavoritesFlag(_onlineRetroSongs);
+      _syncFavoritesFlag(_onlineLofiSongs);
+      _syncFavoritesFlag(_onlineSadSongs);
 
       _saveCachedOnlineSections();
     } catch (e) {
@@ -590,19 +635,43 @@ class PlayerProvider extends ChangeNotifier {
       final roRaw = prefs.getString('cache_online_romantic');
       final puRaw = prefs.getString('cache_online_punjabi');
       final bhRaw = prefs.getString('cache_online_bhakti');
+      final djRaw = prefs.getString('cache_online_dj');
+      final hrRaw = prefs.getString('cache_online_haryanvi');
+      final rjRaw = prefs.getString('cache_online_rajasthani');
+      final mwRaw = prefs.getString('cache_online_marwadi');
+      final bpRaw = prefs.getString('cache_online_bhojpuri');
+      final rtRaw = prefs.getString('cache_online_retro');
+      final lfRaw = prefs.getString('cache_online_lofi');
+      final sdRaw = prefs.getString('cache_online_sad');
 
       if (trRaw != null) _onlineTrendingSongs = _restoreSongsFromCache(trRaw);
       if (glRaw != null) _onlineGlobalSongs = _restoreSongsFromCache(glRaw);
       if (roRaw != null) _onlineRomanticSongs = _restoreSongsFromCache(roRaw);
       if (puRaw != null) _onlinePunjabiSongs = _restoreSongsFromCache(puRaw);
       if (bhRaw != null) _onlineBhaktiSongs = _restoreSongsFromCache(bhRaw);
+      if (djRaw != null) _onlineDjSongs = _restoreSongsFromCache(djRaw);
+      if (hrRaw != null) _onlineHaryanviSongs = _restoreSongsFromCache(hrRaw);
+      if (rjRaw != null) _onlineRajasthaniSongs = _restoreSongsFromCache(rjRaw);
+      if (mwRaw != null) _onlineMarwadiSongs = _restoreSongsFromCache(mwRaw);
+      if (bpRaw != null) _onlineBhojpuriSongs = _restoreSongsFromCache(bpRaw);
+      if (rtRaw != null) _onlineRetroSongs = _restoreSongsFromCache(rtRaw);
+      if (lfRaw != null) _onlineLofiSongs = _restoreSongsFromCache(lfRaw);
+      if (sdRaw != null) _onlineSadSongs = _restoreSongsFromCache(sdRaw);
 
-      if (_onlineTrendingSongs.isNotEmpty) {
+      if (_onlineTrendingSongs.isNotEmpty || _onlineHaryanviSongs.isNotEmpty) {
         _syncFavoritesFlag(_onlineTrendingSongs);
         _syncFavoritesFlag(_onlineGlobalSongs);
         _syncFavoritesFlag(_onlineRomanticSongs);
         _syncFavoritesFlag(_onlinePunjabiSongs);
         _syncFavoritesFlag(_onlineBhaktiSongs);
+        _syncFavoritesFlag(_onlineDjSongs);
+        _syncFavoritesFlag(_onlineHaryanviSongs);
+        _syncFavoritesFlag(_onlineRajasthaniSongs);
+        _syncFavoritesFlag(_onlineMarwadiSongs);
+        _syncFavoritesFlag(_onlineBhojpuriSongs);
+        _syncFavoritesFlag(_onlineRetroSongs);
+        _syncFavoritesFlag(_onlineLofiSongs);
+        _syncFavoritesFlag(_onlineSadSongs);
         notifyListeners();
       }
     } catch (e) {
@@ -627,6 +696,30 @@ class PlayerProvider extends ChangeNotifier {
       }
       if (_onlineBhaktiSongs.isNotEmpty) {
         prefs.setString('cache_online_bhakti', jsonEncode(_onlineBhaktiSongs.map((s) => s.toJson()).toList()));
+      }
+      if (_onlineDjSongs.isNotEmpty) {
+        prefs.setString('cache_online_dj', jsonEncode(_onlineDjSongs.map((s) => s.toJson()).toList()));
+      }
+      if (_onlineHaryanviSongs.isNotEmpty) {
+        prefs.setString('cache_online_haryanvi', jsonEncode(_onlineHaryanviSongs.map((s) => s.toJson()).toList()));
+      }
+      if (_onlineRajasthaniSongs.isNotEmpty) {
+        prefs.setString('cache_online_rajasthani', jsonEncode(_onlineRajasthaniSongs.map((s) => s.toJson()).toList()));
+      }
+      if (_onlineMarwadiSongs.isNotEmpty) {
+        prefs.setString('cache_online_marwadi', jsonEncode(_onlineMarwadiSongs.map((s) => s.toJson()).toList()));
+      }
+      if (_onlineBhojpuriSongs.isNotEmpty) {
+        prefs.setString('cache_online_bhojpuri', jsonEncode(_onlineBhojpuriSongs.map((s) => s.toJson()).toList()));
+      }
+      if (_onlineRetroSongs.isNotEmpty) {
+        prefs.setString('cache_online_retro', jsonEncode(_onlineRetroSongs.map((s) => s.toJson()).toList()));
+      }
+      if (_onlineLofiSongs.isNotEmpty) {
+        prefs.setString('cache_online_lofi', jsonEncode(_onlineLofiSongs.map((s) => s.toJson()).toList()));
+      }
+      if (_onlineSadSongs.isNotEmpty) {
+        prefs.setString('cache_online_sad', jsonEncode(_onlineSadSongs.map((s) => s.toJson()).toList()));
       }
     } catch (e) {
       debugPrint('Error saving cached online sections: $e');

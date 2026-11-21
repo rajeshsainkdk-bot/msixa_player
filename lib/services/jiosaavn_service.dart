@@ -263,12 +263,52 @@ class JioSaavnService {
   Future<List<Song>> getBhaktiTop50({int limit = 50}) =>
       getPlaylistSongs('1296588511', genre: 'Bhakti', subCategory: 'Devotional Chants', defaultAlbum: 'Divine Bhakti', limit: limit);
 
+  /// Haryanvi Superhits Top 50
+  Future<List<Song>> getHaryanviTop50({int limit = 50}) =>
+      getPlaylistSongs('1134770917', genre: 'Haryanvi', subCategory: 'Haryanvi Hits', defaultAlbum: 'Haryanvi Top 50', limit: limit);
+
+  /// Rajasthani Superhits Top 50
+  Future<List<Song>> getRajasthaniTop50({int limit = 50}) =>
+      getPlaylistSongs('1134744088', genre: 'Rajasthani', subCategory: 'Rajasthani Hits', defaultAlbum: 'Rajasthani Top 50', limit: limit);
+
+  /// Bhojpuri Superhits Top 50
+  Future<List<Song>> getBhojpuriTop50({int limit = 50}) =>
+      getPlaylistSongs('1134768973', genre: 'Bhojpuri', subCategory: 'Bhojpuri Hits', defaultAlbum: 'Bhojpuri Top 50', limit: limit);
+
+  /// Bollywood & Dance DJ Remix Party Top Hits
+  Future<List<Song>> getDjRemixTop50({int limit = 50}) =>
+      getPlaylistSongs('1299841359', genre: 'DJ Remix', subCategory: 'DJ Dance Party', defaultAlbum: 'Bollywood DJ Remix', limit: limit);
+
+  /// 90s Golden Bollywood Retro Evergreen Melodies
+  Future<List<Song>> get90sRetroTop50({int limit = 50}) =>
+      getPlaylistSongs('1208889803', genre: '90s Retro', subCategory: 'Evergreen 90s', defaultAlbum: '90s Melodies', limit: limit);
+
+  /// Sad Songs & Broken Heart Melodies
+  Future<List<Song>> getSadSongsTop50({int limit = 50}) =>
+      getPlaylistSongs('802336660', genre: 'Sad Songs', subCategory: 'Broken Heart', defaultAlbum: 'Emotional Melodies', limit: limit);
+
+  /// Marwadi Desi & DJ Regional Hits
+  Future<List<Song>> getMarwadiHits({int limit = 30}) =>
+      searchSongs('Marwadi DJ Song', limit: limit);
+
+  /// Lo-Fi Chill & Relax Hits
+  Future<List<Song>> getLofiHits({int limit = 30}) =>
+      searchSongs('Hindi Lo-Fi Chill', limit: limit);
+
   /// Curated Top Artists with verified 500x500 HD official artwork
   static List<Map<String, String>> getTopArtists() {
     return const [
       {
         'name': 'Arijit Singh',
         'image': 'https://c.saavncdn.com/artists/Arijit_Singh_004_20241118063717_500x500.webp',
+      },
+      {
+        'name': 'Neha Kakkar',
+        'image': 'https://c.saavncdn.com/artists/Neha_Kakkar_007_20241212115832_500x500.jpg',
+      },
+      {
+        'name': 'Badshah',
+        'image': 'https://c.saavncdn.com/artists/Badshah_006_20241118064015_500x500.jpg',
       },
       {
         'name': 'Sidhu Moose Wala',
@@ -279,16 +319,48 @@ class JioSaavnService {
         'image': 'https://c.saavncdn.com/artists/Diljit_Dosanjh_006_20240327072412_500x500.webp',
       },
       {
+        'name': 'Sapna Choudhary',
+        'image': 'https://c.saavncdn.com/artists/Sapna_Choudhary_000_20220916102820_500x500.jpg',
+      },
+      {
+        'name': 'Mame Khan',
+        'image': 'https://c.saavncdn.com/artists/Mame_Khan_20191129073056_500x500.jpg',
+      },
+      {
+        'name': 'Renuka Panwar',
+        'image': 'https://c.saavncdn.com/artists/Renuka_Panwar_004_20240715112921_500x500.jpg',
+      },
+      {
+        'name': 'Gulzaar Chhaniwala',
+        'image': 'https://c.saavncdn.com/artists/Gulzaar_Chhaniwala_003_20200822041826_500x500.jpg',
+      },
+      {
+        'name': 'Masoom Sharma',
+        'image': 'https://c.saavncdn.com/artists/Masoom_Sharma_003_20250619064935_500x500.jpg',
+      },
+      {
+        'name': 'Pawan Singh',
+        'image': 'https://c.saavncdn.com/artists/Pawan_Singh_003_20241119074737_500x500.jpg',
+      },
+      {
+        'name': 'Khesari Lal Yadav',
+        'image': 'https://c.saavncdn.com/553/Jannat-Ke-Sukh-Bhojpuri-2026-20261118135005-500x500.webp',
+      },
+      {
+        'name': 'Sonu Nigam',
+        'image': 'https://c.saavncdn.com/artists/Sonu_Nigam_003_20260813182013_500x500.jpg',
+      },
+      {
+        'name': 'Kumar Sanu',
+        'image': 'https://c.saavncdn.com/artists/Kumar_Sanu_500x500.jpg',
+      },
+      {
+        'name': 'Alka Yagnik',
+        'image': 'https://c.saavncdn.com/artists/Alka_Yagnik_002_20220314192930_500x500.jpg',
+      },
+      {
         'name': 'Shreya Ghoshal',
         'image': 'https://c.saavncdn.com/artists/Shreya_Ghoshal_004_20241118064112_500x500.webp',
-      },
-      {
-        'name': 'Ed Sheeran',
-        'image': 'https://c.saavncdn.com/artists/Ed_Sheeran_500x500.jpg',
-      },
-      {
-        'name': 'Taylor Swift',
-        'image': 'https://c.saavncdn.com/artists/Taylor_Swift_500x500.jpg',
       },
       {
         'name': 'Karan Aujla',
@@ -309,6 +381,14 @@ class JioSaavnService {
       {
         'name': 'B Praak',
         'image': 'https://c.saavncdn.com/artists/B_Praak_003_20240327073845_500x500.webp',
+      },
+      {
+        'name': 'Ed Sheeran',
+        'image': 'https://c.saavncdn.com/artists/Ed_Sheeran_500x500.jpg',
+      },
+      {
+        'name': 'Taylor Swift',
+        'image': 'https://c.saavncdn.com/artists/Taylor_Swift_500x500.jpg',
       },
     ];
   }

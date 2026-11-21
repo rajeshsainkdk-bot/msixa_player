@@ -45,22 +45,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   static const List<Map<String, dynamic>> _genres = [
     {
-      'title': 'All Indian',
-      'icon': Icons.music_note_rounded,
-      'gradient': LinearGradient(colors: [Color(0xFFFF9933), Color(0xFF138808)]),
-      'image': 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&q=80',
-    },
-    {
-      'title': 'Rajasthani',
-      'icon': Icons.audiotrack_rounded,
-      'gradient': LinearGradient(colors: [Color(0xFFFF6F00), Color(0xFFFFD54F)]),
-      'image': 'https://images.unsplash.com/photo-1599827552599-eeddd59551c6?w=600&q=80',
-    },
-    {
-      'title': 'Bhakti',
-      'icon': Icons.temple_hindu_rounded,
-      'gradient': LinearGradient(colors: [Color(0xFFF59E0B), Color(0xFFD97706)]),
-      'image': 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=600&q=80',
+      'title': 'DJ Remix',
+      'icon': Icons.equalizer_rounded,
+      'gradient': LinearGradient(colors: [Color(0xFF00E5FF), Color(0xFF4F46E5)]),
+      'image': 'https://images.unsplash.com/photo-1571266028243-3716f02d2d2e?w=600&q=80',
     },
     {
       'title': 'Haryanvi',
@@ -69,13 +57,67 @@ class _HomeScreenState extends State<HomeScreen> {
       'image': 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=600&q=80',
     },
     {
+      'title': 'Rajasthani',
+      'icon': Icons.audiotrack_rounded,
+      'gradient': LinearGradient(colors: [Color(0xFFFF6F00), Color(0xFFFFD54F)]),
+      'image': 'https://images.unsplash.com/photo-1599827552599-eeddd59551c6?w=600&q=80',
+    },
+    {
+      'title': 'Marwadi',
+      'icon': Icons.celebration_rounded,
+      'gradient': LinearGradient(colors: [Color(0xFFFF3D00), Color(0xFFFF9100)]),
+      'image': 'https://images.unsplash.com/photo-1599827552599-eeddd59551c6?w=600&q=80',
+    },
+    {
+      'title': 'Bhojpuri',
+      'icon': Icons.music_video_rounded,
+      'gradient': LinearGradient(colors: [Color(0xFFF43F5E), Color(0xFFBE123C)]),
+      'image': 'https://images.unsplash.com/photo-1506157786151-b8491531f063?w=600&q=80',
+    },
+    {
+      'title': '90s Retro',
+      'icon': Icons.radio_rounded,
+      'gradient': LinearGradient(colors: [Color(0xFF7C3AED), Color(0xFFDB2777)]),
+      'image': 'https://images.unsplash.com/photo-1461360370896-922624d12aa1?w=600&q=80',
+    },
+    {
       'title': 'Punjabi',
-      'icon': Icons.speaker_group_rounded,
+      'icon': Icons.bolt_rounded,
       'gradient': LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFFEC4899)]),
       'image': 'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=600&q=80',
     },
     {
-      'title': 'Sufi',
+      'title': 'Romantic',
+      'icon': Icons.favorite_rounded,
+      'gradient': LinearGradient(colors: [Color(0xFFE11D48), Color(0xFFFF4081)]),
+      'image': 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?w=600&q=80',
+    },
+    {
+      'title': 'Bhakti',
+      'icon': Icons.temple_hindu_rounded,
+      'gradient': LinearGradient(colors: [Color(0xFFF59E0B), Color(0xFFD97706)]),
+      'image': 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=600&q=80',
+    },
+    {
+      'title': 'Sad Songs',
+      'icon': Icons.heart_broken_rounded,
+      'gradient': LinearGradient(colors: [Color(0xFF334155), Color(0xFF475569)]),
+      'image': 'https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?w=600&q=80',
+    },
+    {
+      'title': 'Desi Lo-Fi',
+      'icon': Icons.nightlife_rounded,
+      'gradient': LinearGradient(colors: [Color(0xFF3B82F6), Color(0xFF06B6D4)]),
+      'image': 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600&q=80',
+    },
+    {
+      'title': 'Gym & Workout',
+      'icon': Icons.fitness_center_rounded,
+      'gradient': LinearGradient(colors: [Color(0xFFEA580C), Color(0xFFEF4444)]),
+      'image': 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=600&q=80',
+    },
+    {
+      'title': 'Ghazal & Sufi',
       'icon': Icons.self_improvement_rounded,
       'gradient': LinearGradient(colors: [Color(0xFF10B981), Color(0xFF06B6D4)]),
       'image': 'https://images.unsplash.com/photo-1511192336575-5a79af67a629?w=600&q=80',
@@ -87,52 +129,10 @@ class _HomeScreenState extends State<HomeScreen> {
       'image': 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=600&q=80',
     },
     {
-      'title': 'Spiritual',
-      'icon': Icons.flare_rounded,
-      'gradient': LinearGradient(colors: [Color(0xFF6366F1), Color(0xFF3B82F6)]),
-      'image': 'https://images.unsplash.com/photo-1507676184212-d03ab07a01bf?w=600&q=80',
-    },
-    {
-      'title': 'Desi Lo-Fi',
-      'icon': Icons.nightlife_rounded,
-      'gradient': LinearGradient(colors: [Color(0xFF3B82F6), Color(0xFF06B6D4)]),
-      'image': 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600&q=80',
-    },
-    {
-      'title': 'Ghazal',
-      'icon': Icons.waves_rounded,
-      'gradient': LinearGradient(colors: [Color(0xFFEC4899), Color(0xFFF43F5E)]),
-      'image': 'https://images.unsplash.com/photo-1445985543470-41fdd5c31447?w=600&q=80',
-    },
-    {
-      'title': 'Folk Fusion',
-      'icon': Icons.album_rounded,
-      'gradient': LinearGradient(colors: [Color(0xFFD97706), Color(0xFFB45309)]),
-      'image': 'https://images.unsplash.com/photo-1524492412937-b28074a5d7da?w=600&q=80',
-    },
-    {
-      'title': 'Bhojpuri',
-      'icon': Icons.music_video_rounded,
-      'gradient': LinearGradient(colors: [Color(0xFFF43F5E), Color(0xFFBE123C)]),
-      'image': 'https://images.unsplash.com/photo-1506157786151-b8491531f063?w=600&q=80',
-    },
-    {
-      'title': 'DJ Remix',
-      'icon': Icons.equalizer_rounded,
-      'gradient': LinearGradient(colors: [Color(0xFF00E5FF), Color(0xFF4F46E5)]),
-      'image': 'https://images.unsplash.com/photo-1571266028243-3716f02d2d2e?w=600&q=80',
-    },
-    {
-      'title': 'Classical',
-      'icon': Icons.graphic_eq_rounded,
-      'gradient': LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFF4338CA)]),
-      'image': 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=600&q=80',
-    },
-    {
-      'title': 'Indie Pop',
-      'icon': Icons.radio_rounded,
-      'gradient': LinearGradient(colors: [Color(0xFF06B6D4), Color(0xFF0284C7)]),
-      'image': 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=600&q=80',
+      'title': 'All Indian',
+      'icon': Icons.music_note_rounded,
+      'gradient': LinearGradient(colors: [Color(0xFFFF9933), Color(0xFF138808)]),
+      'image': 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&q=80',
     },
   ];
 
@@ -645,89 +645,28 @@ class _HomeScreenState extends State<HomeScreen> {
                 _buildTopArtistsSection(context, lang),
 
                 // ==========================================
-                // 🌍 SECTION 3: GLOBAL TOP 50 HITS (International Charts)
+                // 🎨 SECTION 3: BROWSE ALL GENRES & MOODS (Category Cards)
                 // ==========================================
-                _buildOnlineSection(
-                  context: context,
-                  title: 'Global Top 50 Hits',
-                  hindiTitle: 'ग्लोबल टॉप 50 हिट्स',
-                  icon: Icons.public_rounded,
-                  iconColor: const Color(0xFF00E5FF),
-                  songs: provider.onlineGlobalSongs,
-                  provider: provider,
-                  lang: lang,
-                ),
-
-                // ==========================================
-                // ❤️ SECTION 4: ROMANTIC MELODIES (Most Streamed Love Songs)
-                // ==========================================
-                _buildOnlineSection(
-                  context: context,
-                  title: 'Romantic Melodies',
-                  hindiTitle: 'रोमांटिक मेलोडीज़ (लव सोंग्स)',
-                  icon: Icons.favorite_rounded,
-                  iconColor: const Color(0xFFFF4081),
-                  songs: provider.onlineRomanticSongs,
-                  provider: provider,
-                  lang: lang,
-                ),
-
-                // ==========================================
-                // ⚡ SECTION 5: PUNJABI SUPERHITS (High Energy Beats)
-                // ==========================================
-                _buildOnlineSection(
-                  context: context,
-                  title: 'Punjabi Superhits',
-                  hindiTitle: 'पंजाबी सुपरहिट्स (धमाकेदार बीट्स)',
-                  icon: Icons.bolt_rounded,
-                  iconColor: const Color(0xFFFFB300),
-                  songs: provider.onlinePunjabiSongs,
-                  provider: provider,
-                  lang: lang,
-                ),
-
-                // ==========================================
-                // 🙏 SECTION 6: BHAKTI & DEVOTION (Sacred Chants)
-                // ==========================================
-                _buildOnlineSection(
-                  context: context,
-                  title: 'Bhakti & Devotion',
-                  hindiTitle: 'दिव्य भक्ति व पावन भजन',
-                  icon: Icons.self_improvement_rounded,
-                  iconColor: const Color(0xFFFF9100),
-                  songs: provider.onlineBhaktiSongs,
-                  provider: provider,
-                  lang: lang,
-                ),
-
-                const SizedBox(height: 20),
-
-                // Genres / Moods Carousel
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        lang.t('browse_category'),
+                        lang.isHindi ? 'सभी श्रेणियां व मूड्स' : 'Browse All Genres & Moods',
                         style: const TextStyle(
                           color: AppColors.textPrimary,
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      if (provider.selectedGenre != 'All')
-                        GestureDetector(
-                          onTap: () => provider.selectGenre('All'),
-                          child: Text(
-                            lang.t('show_all'),
-                            style: const TextStyle(color: AppColors.accentCyan, fontSize: 13),
-                          ),
-                        ),
+                      Text(
+                        lang.isHindi ? 'सभी कार्ड्स' : 'All Cards',
+                        style: const TextStyle(color: AppColors.accentCyan, fontSize: 12, fontWeight: FontWeight.w600),
+                      ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 12),
                 SizedBox(
                   height: 75,
                   child: ListView.builder(
@@ -745,59 +684,199 @@ class _HomeScreenState extends State<HomeScreen> {
                         imageUrl: g['image'] as String?,
                         isSelected: isSelected,
                         onTap: () {
-                          provider.selectGenre(g['title'] as String);
+                          final genreName = g['title'] as String;
+                          provider.searchOnline('$genreName Songs');
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => Scaffold(
+                                appBar: AppBar(
+                                  backgroundColor: AppColors.surface,
+                                  elevation: 0,
+                                  title: Text(
+                                    lang.isHindi ? '$genreName स्पेशल' : '$genreName Hits',
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                                  ),
+                                ),
+                                body: const SearchScreen(),
+                              ),
+                            ),
+                          );
                         },
                       );
                     },
                   ),
                 ),
 
-                const SizedBox(height: 24),
-
-                // Trending Catalog Songs
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        provider.selectedGenre == 'All' || provider.selectedGenre == 'All Indian'
-                            ? 'All Free Indian Tracks'
-                            : '${provider.selectedGenre} Tracks',
-                        style: const TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const Text(
-                        '100% Free Forever',
-                        style: TextStyle(
-                          color: AppColors.accentGreen,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
+                // ==========================================
+                // 🎧 SECTION 4: DJ REMIX & DANCE PARTY (डीजे वाले गाने)
+                // ==========================================
+                _buildOnlineSection(
+                  context: context,
+                  title: 'DJ Remix & Dance Party',
+                  hindiTitle: 'डीजे वाले गाने (धमाकेदार रीमिक्स)',
+                  icon: Icons.equalizer_rounded,
+                  iconColor: const Color(0xFF00E5FF),
+                  songs: provider.onlineDjSongs,
+                  provider: provider,
+                  lang: lang,
                 ),
-                const SizedBox(height: 10),
 
-                ListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: trending.length,
-                  itemBuilder: (context, index) {
-                    final song = trending[index];
-                    final isCurrent = provider.currentSong?.id == song.id;
-
-                    return SongListTile(
-                      song: song,
-                      isCurrent: isCurrent,
-                      onTap: () => provider.playSong(song, queueContext: trending),
-                    );
-                  },
+                // ==========================================
+                // 🌾 SECTION 5: HARYANVI SUPERHITS (हरियाणवी सुपरहिट्स)
+                // ==========================================
+                _buildOnlineSection(
+                  context: context,
+                  title: 'Haryanvi Superhits',
+                  hindiTitle: 'हरियाणवी सुपरहिट्स (सपना, मासूम, रेणुका)',
+                  icon: Icons.speaker_group_rounded,
+                  iconColor: const Color(0xFF10B981),
+                  songs: provider.onlineHaryanviSongs,
+                  provider: provider,
+                  lang: lang,
                 ),
+
+                // ==========================================
+                // 🐪 SECTION 6: RAJASTHANI SUPERHITS (राजस्थानी सुपरहिट्स)
+                // ==========================================
+                _buildOnlineSection(
+                  context: context,
+                  title: 'Rajasthani Superhits',
+                  hindiTitle: 'राजस्थानी सुपरहिट्स (लोकगीत व परम्परा)',
+                  icon: Icons.audiotrack_rounded,
+                  iconColor: const Color(0xFFFF6F00),
+                  songs: provider.onlineRajasthaniSongs,
+                  provider: provider,
+                  lang: lang,
+                ),
+
+                // ==========================================
+                // 🪕 SECTION 7: MARWADI DESI & DJ (मारवाड़ी देसी व डीजे)
+                // ==========================================
+                _buildOnlineSection(
+                  context: context,
+                  title: 'Marwadi Desi & DJ Hits',
+                  hindiTitle: 'मारवाड़ी देसी व डीजे धमाका',
+                  icon: Icons.celebration_rounded,
+                  iconColor: const Color(0xFFFF3D00),
+                  songs: provider.onlineMarwadiSongs,
+                  provider: provider,
+                  lang: lang,
+                ),
+
+                // ==========================================
+                // 💥 SECTION 8: BHOJPURI DHAMAKA (भोजपुरी टॉप 50)
+                // ==========================================
+                _buildOnlineSection(
+                  context: context,
+                  title: 'Bhojpuri Dhamaka Top 50',
+                  hindiTitle: 'भोजपुरी धमाका (पवन सिंह, खेसारी, शिल्पी)',
+                  icon: Icons.music_video_rounded,
+                  iconColor: const Color(0xFFF43F5E),
+                  songs: provider.onlineBhojpuriSongs,
+                  provider: provider,
+                  lang: lang,
+                ),
+
+                // ==========================================
+                // 📻 SECTION 9: 90s EVERGREEN RETRO (90 के सदाबहार नगमे)
+                // ==========================================
+                _buildOnlineSection(
+                  context: context,
+                  title: '90s Bollywood Evergreen',
+                  hindiTitle: '90s के सदाबहार नगमे (सोनू, अलका, उदित)',
+                  icon: Icons.radio_rounded,
+                  iconColor: const Color(0xFF8B5CF6),
+                  songs: provider.onlineRetroSongs,
+                  provider: provider,
+                  lang: lang,
+                ),
+
+                // ==========================================
+                // ❤️ SECTION 10: ROMANTIC MELODIES (Most Streamed Love Songs)
+                // ==========================================
+                _buildOnlineSection(
+                  context: context,
+                  title: 'Romantic Melodies',
+                  hindiTitle: 'रोमांटिक मेलोडीज़ (लव सोंग्स)',
+                  icon: Icons.favorite_rounded,
+                  iconColor: const Color(0xFFFF4081),
+                  songs: provider.onlineRomanticSongs,
+                  provider: provider,
+                  lang: lang,
+                ),
+
+                // ==========================================
+                // ⚡ SECTION 11: PUNJABI SUPERHITS (High Energy Beats)
+                // ==========================================
+                _buildOnlineSection(
+                  context: context,
+                  title: 'Punjabi Superhits',
+                  hindiTitle: 'पंजाबी सुपरहिट्स (धमाकेदार बीट्स)',
+                  icon: Icons.bolt_rounded,
+                  iconColor: const Color(0xFFFFB300),
+                  songs: provider.onlinePunjabiSongs,
+                  provider: provider,
+                  lang: lang,
+                ),
+
+                // ==========================================
+                // 🙏 SECTION 12: BHAKTI & DEVOTION (Sacred Chants)
+                // ==========================================
+                _buildOnlineSection(
+                  context: context,
+                  title: 'Bhakti & Devotion',
+                  hindiTitle: 'दिव्य भक्ति व पावन भजन',
+                  icon: Icons.self_improvement_rounded,
+                  iconColor: const Color(0xFFFF9100),
+                  songs: provider.onlineBhaktiSongs,
+                  provider: provider,
+                  lang: lang,
+                ),
+
+                // ==========================================
+                // ☕ SECTION 13: LO-FI & CHILL VIBES (सुकून भरे लो-फाई)
+                // ==========================================
+                _buildOnlineSection(
+                  context: context,
+                  title: 'Lo-Fi Chill & Relax',
+                  hindiTitle: 'लो-फाई और सुकून (रिलैक्स बीट्स)',
+                  icon: Icons.nightlife_rounded,
+                  iconColor: const Color(0xFF06B6D4),
+                  songs: provider.onlineLofiSongs,
+                  provider: provider,
+                  lang: lang,
+                ),
+
+                // ==========================================
+                // 💔 SECTION 14: DARD BHARE NAGME (Sad Songs)
+                // ==========================================
+                _buildOnlineSection(
+                  context: context,
+                  title: 'Heartbroken & Sad Songs',
+                  hindiTitle: 'दर्द भरे नगमे (इमोशनल व उदास)',
+                  icon: Icons.heart_broken_rounded,
+                  iconColor: const Color(0xFF64748B),
+                  songs: provider.onlineSadSongs,
+                  provider: provider,
+                  lang: lang,
+                ),
+
+                // ==========================================
+                // 🌍 SECTION 15: GLOBAL TOP 50 HITS (International Charts)
+                // ==========================================
+                _buildOnlineSection(
+                  context: context,
+                  title: 'Global Top 50 Hits',
+                  hindiTitle: 'ग्लोबल टॉप 50 हिट्स',
+                  icon: Icons.public_rounded,
+                  iconColor: const Color(0xFF00E5FF),
+                  songs: provider.onlineGlobalSongs,
+                  provider: provider,
+                  lang: lang,
+                ),
+
+                const SizedBox(height: 30),
                 ], // end of else ...[ for all
               ],
             ),
