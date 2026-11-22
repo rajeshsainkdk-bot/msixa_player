@@ -5,6 +5,13 @@ import 'package:share_plus/share_plus.dart';
 class AppShareService {
   static const MethodChannel _channel = MethodChannel('com.msixa.player/app_share');
 
+  /// Controls Android wake-lock to prevent screen from automatically turning off or locking
+  static Future<void> keepScreenOn(bool enable) async {
+    try {
+      await _channel.invokeMethod('keepScreenOn', {'enable': enable});
+    } catch (_) {}
+  }
+
   /// Shares Msixa Player APK FILE directly via native Android sharesheet
   /// (WhatsApp, Bluetooth, Quick Share, Nearby Share, Telegram, etc.)
   /// Directly sends the .apk installer file, NOT a link.

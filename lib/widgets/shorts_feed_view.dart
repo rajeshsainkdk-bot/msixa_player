@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:video_player/video_player.dart';
 import '../models/short_video_item.dart';
+import '../services/app_share_service.dart';
 import '../services/language_service.dart';
 import '../services/shorts_service.dart';
 import '../theme/app_colors.dart';
@@ -42,11 +43,13 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
   @override
   void initState() {
     super.initState();
+    AppShareService.keepScreenOn(true);
     _loadShortsForCategory(_activeCategory);
   }
 
   @override
   void dispose() {
+    AppShareService.keepScreenOn(false);
     _disposeAllControllers();
     _pageController.dispose();
     _searchController.dispose();
@@ -129,15 +132,20 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
     }
     _shortsService.prewarmStreamUrls(idsToPrewarm);
 
-    // Initialize VideoPlayerControllers for current, next 1, and next 2
-    for (int i = center; i <= center + 2; i++) {
-      if (i >= 0 && i < _shorts.length) {
-        _initControllerForIndex(i);
+    // Priority 1: Current active video gets 100% bandwidth immediately
+    _initControllerForIndex(center);
+
+    // Priority 2: Preload next video smoothly after short delay so active video never stutters
+    Future.delayed(const Duration(milliseconds: 1200), () {
+      if (mounted && _currentIndex == center) {
+        if (center + 1 < _shorts.length) {
+          _initControllerForIndex(center + 1);
+        }
       }
-    }
+    });
 
     // Clean up distant controllers to avoid memory leaks
-    final staleKeys = _controllers.keys.where((k) => k < center - 2 || k > center + 3).toList();
+    final staleKeys = _controllers.keys.where((k) => k < center - 1 || k > center + 2).toList();
     for (final k in staleKeys) {
       try {
         _controllers[k]?.pause();
@@ -162,6 +170,9 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
       if (streamUrl != null && streamUrl.isNotEmpty && mounted) {
         final ctrl = VideoPlayerController.networkUrl(
           Uri.parse(streamUrl),
+          httpHeaders: const {
+            'User-Agent': 'Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+          },
           videoPlayerOptions: VideoPlayerOptions(mixWithOthers: false),
         );
         await ctrl.initialize();
@@ -190,6 +201,9 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
           final fallbackUrl = _shortsService.getFallbackStreamUrl(_shorts[index].category);
           final ctrl = VideoPlayerController.networkUrl(
             Uri.parse(fallbackUrl),
+            httpHeaders: const {
+              'User-Agent': 'Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+            },
             videoPlayerOptions: VideoPlayerOptions(mixWithOthers: false),
           );
           await ctrl.initialize();
@@ -470,6 +484,7 @@ class _ShortVideoPlayerCardState extends State<_ShortVideoPlayerCard> {
     if (widget.isActive && widget.controller != null && widget.controller!.value.isInitialized) {
       widget.controller!.play();
       _isPlaying = true;
+      AppShareService.keepScreenOn(true);
     }
   }
 
@@ -488,10 +503,12 @@ class _ShortVideoPlayerCardState extends State<_ShortVideoPlayerCard> {
           widget.controller!.seekTo(Duration.zero);
           widget.controller!.play();
           setState(() => _isPlaying = true);
+          AppShareService.keepScreenOn(true);
         }
       } else {
         widget.controller?.pause();
         setState(() => _isPlaying = false);
+        AppShareService.keepScreenOn(false);
       }
     }
   }
@@ -503,6 +520,7 @@ class _ShortVideoPlayerCardState extends State<_ShortVideoPlayerCard> {
   @override
   void dispose() {
     widget.controller?.removeListener(_onControllerUpdate);
+    AppShareService.keepScreenOn(false);
     super.dispose();
   }
 
@@ -527,9 +545,11 @@ class _ShortVideoPlayerCardState extends State<_ShortVideoPlayerCard> {
       if (ctrl.value.isPlaying) {
         ctrl.pause();
         _isPlaying = false; // Buttons & overlay become visible on pause!
+        AppShareService.keepScreenOn(false);
       } else {
         ctrl.play();
         _isPlaying = true; // Buttons & overlay hide when video plays!
+        AppShareService.keepScreenOn(true);
       }
     });
   }
@@ -641,16 +661,12 @@ class _ShortVideoPlayerCardState extends State<_ShortVideoPlayerCard> {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // 1. Pure Edge-to-Edge Fullscreen Video Player (FittedBox.cover)
+          // 1. True Fit-To-Screen Video Player (Zero over-zoom, 100% full frame visible)
           if (isReady)
-            SizedBox.expand(
-              child: FittedBox(
-                fit: BoxFit.cover,
-                child: SizedBox(
-                  width: ctrl.value.size.width > 0 ? ctrl.value.size.width : 1080,
-                  height: ctrl.value.size.height > 0 ? ctrl.value.size.height : 1920,
-                  child: VideoPlayer(ctrl),
-                ),
+            Center(
+              child: AspectRatio(
+                aspectRatio: ctrl.value.aspectRatio > 0 ? ctrl.value.aspectRatio : (9 / 16),
+                child: VideoPlayer(ctrl),
               ),
             )
           else
@@ -669,6 +685,19 @@ class _ShortVideoPlayerCardState extends State<_ShortVideoPlayerCard> {
                   child: CircularProgressIndicator(color: AppColors.accentCyan),
                 ),
               ],
+            ),
+
+          // Buffering Indicator (Non-blocking cyan spinner if network is rebuffering during active playback)
+          if (isReady && ctrl.value.isBuffering)
+            const Center(
+              child: SizedBox(
+                width: 44,
+                height: 44,
+                child: CircularProgressIndicator(
+                  color: AppColors.accentCyan,
+                  strokeWidth: 3,
+                ),
+              ),
             ),
 
           // 2. Center Animated Play/Pause Indicator (Shown when Paused)

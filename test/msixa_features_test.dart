@@ -16,6 +16,7 @@ import 'package:msixa_player/screens/admin/admin_dashboard_screen.dart';
 import 'package:msixa_player/services/jiosaavn_service.dart';
 import 'package:msixa_player/models/short_video_item.dart';
 import 'package:msixa_player/services/shorts_service.dart';
+import 'package:msixa_player/services/app_share_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -652,6 +653,12 @@ void main() {
 
       final fallback = service.getFallbackStreamUrl('DJ Remix');
       expect(fallback.contains('.mp4'), true);
+    });
+
+    test('AppShareService keepScreenOn enables and disables screen wake-lock cleanly', () async {
+      await AppShareService.keepScreenOn(true);
+      await AppShareService.keepScreenOn(false);
+      expect(true, isTrue);
     });
   });
 

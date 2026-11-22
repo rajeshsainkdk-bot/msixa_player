@@ -16,74 +16,74 @@ class ShortsService {
   // Curated initial catalog for zero-latency instant startup
   static final List<ShortVideoItem> _curatedShorts = [
     ShortVideoItem(
-      id: 'marwadi_sample_1',
+      id: 'kffacxfA7G4',
       title: 'Rajasthani Desi Dhol Thali Dance • मारवाड़ी विवाह डांस शॉर्ट्स',
       author: 'Marwadi Folk Beats',
       thumbnailUrl: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=600&fit=crop',
       category: 'Marwadi',
       likesCount: 24500,
       shareCount: 6800,
-      streamUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+      streamUrl: 'https://raw.githubusercontent.com/mediaelement/mediaelement-files/master/big_buck_bunny.mp4',
     ),
     ShortVideoItem(
-      id: 'marwadi_sample_2',
+      id: 'dQw4w9WgXcQ',
       title: 'Ghoomar Rajasthani Traditional Dance • मारवाड़ी घूमर न्यू स्टेटस',
       author: 'Rangeelo Rajasthan',
       thumbnailUrl: 'https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=600&fit=crop',
       category: 'Marwadi',
       likesCount: 31200,
       shareCount: 8400,
-      streamUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4',
+      streamUrl: 'https://raw.githubusercontent.com/mediaelement/mediaelement-files/master/big_buck_bunny.mp4',
     ),
     ShortVideoItem(
-      id: 'dj_remix_sample_2',
+      id: '3JZ_D3ELwOQ',
       title: 'Full Bass DJ Remix Status • न्यू डीजे रीमिक्स सॉन्ग स्टेटस',
       author: 'DJ Bass King',
       thumbnailUrl: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=600&fit=crop',
       category: 'DJ Remix',
       likesCount: 38900,
       shareCount: 12400,
-      streamUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
+      streamUrl: 'https://raw.githubusercontent.com/mediaelement/mediaelement-files/master/big_buck_bunny.mp4',
     ),
     ShortVideoItem(
-      id: 'dj_remix_sample_3',
+      id: '9bZkp7q19f0',
       title: 'EDM Hard Bass Club Mix • डीजे रीमिक्स वायरल शॉर्ट्स',
       author: 'Beat Dropper DJ',
       thumbnailUrl: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&fit=crop',
       category: 'DJ Remix',
       likesCount: 44200,
       shareCount: 15300,
-      streamUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4',
+      streamUrl: 'https://raw.githubusercontent.com/mediaelement/mediaelement-files/master/big_buck_bunny.mp4',
     ),
     ShortVideoItem(
-      id: 'haryanvi_sample_3',
+      id: 'kJQP7kiw5Fk',
       title: 'Haryanvi Ragni & Desi Beats Status • हरियाणवी वायरल शॉर्ट्स',
       author: 'Desi Haryanvi Swag',
       thumbnailUrl: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&fit=crop',
       category: 'Haryanvi',
       likesCount: 19200,
       shareCount: 4300,
-      streamUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4',
+      streamUrl: 'https://raw.githubusercontent.com/mediaelement/mediaelement-files/master/big_buck_bunny.mp4',
     ),
     ShortVideoItem(
-      id: 'bhakti_sample_4',
+      id: 'fJ9rUzIMcZQ',
       title: 'Har Har Mahadev Shiv Tandav Status • महाकाल व्हाट्सएप स्टेटस',
       author: 'Bhakti Sagar Music',
       thumbnailUrl: 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=600&fit=crop',
       category: 'Bhakti',
       likesCount: 52100,
       shareCount: 28900,
-      streamUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyBlazes.mp4',
+      streamUrl: 'https://raw.githubusercontent.com/mediaelement/mediaelement-files/master/big_buck_bunny.mp4',
     ),
     ShortVideoItem(
-      id: 'romantic_sample_5',
+      id: 'JGwWNGJdvx8',
       title: 'Slowed & Reverb Romantic Acoustic Status • दिल छू लेने वाला स्टेटस',
       author: 'Soulful Melody',
       thumbnailUrl: 'https://images.unsplash.com/photo-1518895949257-7621c3c786d7?w=600&fit=crop',
       category: 'Romantic',
       likesCount: 31400,
       shareCount: 8900,
-      streamUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4',
+      streamUrl: 'https://raw.githubusercontent.com/mediaelement/mediaelement-files/master/big_buck_bunny.mp4',
     ),
   ];
 
@@ -98,22 +98,7 @@ class ShortsService {
 
   /// High-reliability fallback stream URL so playback NEVER fails or goes blank
   String getFallbackStreamUrl([String? category]) {
-    switch (category?.toLowerCase()) {
-      case 'marwadi':
-      case 'rajasthani':
-        return 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4';
-      case 'dj remix':
-      case 'dj':
-        return 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4';
-      case 'haryanvi':
-        return 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4';
-      case 'bhakti':
-        return 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyBlazes.mp4';
-      case 'romantic':
-        return 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4';
-      default:
-        return 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4';
-    }
+    return 'https://raw.githubusercontent.com/mediaelement/mediaelement-files/master/big_buck_bunny.mp4';
   }
 
   /// Resolves direct .mp4 media stream URL on-the-fly without login
@@ -136,7 +121,15 @@ class ShortsService {
         const Duration(seconds: 8),
       );
 
-      // Priority 1: Highest Quality Muxed Progressive MP4 Stream (Plays natively with 100% reliability on ExoPlayer)
+      // Priority 1: HLS Adaptive Bitrate stream (.m3u8) for crisp 1080p/720p 60fps streaming
+      // ExoPlayer natively handles HLS with multiple quality tracks without stalls
+      if (manifest.hls.isNotEmpty) {
+        final hlsUrl = manifest.hls.first.url.toString();
+        _streamCache[videoId] = hlsUrl;
+        return hlsUrl;
+      }
+
+      // Priority 2: Highest Quality Muxed Progressive MP4 Stream
       final muxedStreams = manifest.muxed.toList();
       if (muxedStreams.isNotEmpty) {
         // Sort descending by video resolution and bitrate for highest HD quality (1080p/720p 60fps)
@@ -148,13 +141,6 @@ class ShortsService {
         final url = muxedStreams.first.url.toString();
         _streamCache[videoId] = url;
         return url;
-      }
-
-      // Priority 2: HLS Adaptive Bitrate stream (.m3u8) fallback
-      if (manifest.hls.isNotEmpty) {
-        final hlsUrl = manifest.hls.first.url.toString();
-        _streamCache[videoId] = hlsUrl;
-        return hlsUrl;
       }
     } catch (_) {
       // Extractor fallback
@@ -305,6 +291,7 @@ class ShortsService {
 
       // 3. Download bytes with progress reporting
       final request = http.Request('GET', Uri.parse(streamUrl));
+      request.headers['User-Agent'] = 'Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36';
       final response = await http.Client().send(request);
       final totalBytes = response.contentLength ?? 0;
       var receivedBytes = 0;
