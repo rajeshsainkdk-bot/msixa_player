@@ -1,5 +1,6 @@
 import 'dart:async';
-import 'dart:convert';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -11,14 +12,13 @@ import '../services/shorts_service.dart';
 import '../services/youtube_subscription_service.dart';
 import '../theme/app_colors.dart';
 
-/// Pure Customized In-App YouTube Shorts Player
-/// - Official YouTube backend running inside WebView
-/// - 100% Custom In-App Overlay Controls (Only our buttons & controls show)
-/// - YouTube logo, top headers, banners, and 'Open in App' prompts completely hidden
-/// - Top header has ONLY Back '<' and Search '🔍' icons (All category pills removed)
-/// - Search directly queries YouTube Shorts and plays them
-/// - Subscribe button opens Google Account Picker without launching external YouTube app
-/// - Pull-to-refresh (drag down from top) & bottom nav shorts click refresh with zero repetition
+/// Pure Customized In-App YouTube Shorts Player (Compliant with MSIXA Shorts Specification v1.1)
+/// - Clean YouTube Embed Player (ZERO YouTube logo, ZERO YouTube web buttons, ZERO YouTube creator row)
+/// - ONLY MSIXA custom action buttons & creator row appear
+/// - Smooth vertical swiping with PageView.builder (TikTok / Reels style)
+/// - Sliding-window pre-buffering pipeline for zero-latency video transitions
+/// - Pull-to-refresh & Bottom Nav Shorts click refresh with 100% fresh, unrepeated videos
+/// - In-App Google Account Picker on +FOLLOW without external YouTube app launch
 class ShortsFeedView extends StatefulWidget {
   final VoidCallback? onBackToDeviceVideos;
 
@@ -39,13 +39,24 @@ class ShortsFeedView extends StatefulWidget {
 class _ShortsFeedViewState extends State<ShortsFeedView> {
   final ShortsService _shortsService = ShortsService();
   final YouTubeSubscriptionService _subService = YouTubeSubscriptionService();
+  final PageController _pageController = PageController();
   final TextEditingController _searchController = TextEditingController();
 
-  late final WebViewController _controller;
+  List<ShortVideoItem> _feed = [];
+  final Map<int, WebViewController> _controllers = {};
+  final Set<String> _playedVideoIds = {};
+
+  int _currentIndex = 0;
   bool _isLoading = true;
   bool _isSearching = false;
-  bool _isLiked = false;
-  bool _isDisliked = false;
+  bool _isPlaying = true;
+  bool _showPlayPauseRipple = false;
+
+  // Like & Dislike states mapped by videoId
+  final Map<String, bool> _likedVideos = {};
+  final Map<String, bool> _dislikedVideos = {};
+
+  // Download state
   bool _isDownloading = false;
   double _downloadProgress = 0.0;
 
@@ -54,380 +65,237 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
   double _currentPullDelta = 0.0;
   bool _isPullRefreshing = false;
 
-  // Session Anti-Repetition Video Pool
-  static final Set<String> _playedVideoIds = <String>{};
-  static final List<String> _seedVideoPool = [
-    'kffacxfA7G4', // Rajasthani Desi Dhol Thali Dance
-    'dQw4w9WgXcQ', // Ghoomar Rajasthani Folk Dance
-    '3JZ_D3ELwOQ', // Full Bass DJ Remix Status
-    '9bZkp7q19f0', // EDM Hard Bass Club Mix
-    'kJQP7kiw5Fk', // Haryanvi Ragni & Desi Beats Status
-    'fJ9rUzIMcZQ', // Har Har Mahadev Shiv Tandav Status
-    'JGwWNGJdvx8', // Slowed & Reverb Romantic Acoustic
-    'ZbZSe6N_BXs', // Fagan Dance Reel
-    'L_LUpnjgPso', // Kesariya Tera Ishq Hai Piya
-    'e-ORhEE9VVg', // Trending Beats Reel
-    'RgKAFK5djSk', // Fast Bass Drop
-    'CevxZvSJLk8', // Dance Viral Short
-    '60ItHLz5WEA', // DJ Viral Beat
-    'YQHsXMglC9A', // Acoustic Guitar Melody
-    'fRh_vgS2dFE', // Popular Indian Folk Hit
-    'kJQP7kiw5Fk', // Desi Beats
-    'WcIcVapfqXw', // Instrumental BGM
-    '34Na4j8AVgA', // Starboy Acoustic
-  ];
-
-  String _currentVideoId = 'kffacxfA7G4';
-  String _videoTitle = 'Trending YouTube Short';
-  String _channelName = 'YouTube Creator';
-  String _likesCountStr = '94K';
-  final int _commentsCount = 322;
-
-  /// Injected CSS: 100% Guaranteed complete removal of YouTube Logo, Web Buttons & Banners
-  static const String _cleanupCss = '''
-    /* 1. COMPLETELY HIDE YouTube Top Bar, Header, Logo and Navigation */
-    ytm-mobile-topbar-renderer,
-    .mobile-topbar-header,
-    #header-bar,
-    header,
-    header.mobile-topbar-header,
-    yt-icon.ytm-logo,
-    .ytm-home-logo,
-    a[aria-label="YouTube"],
-    a[href="/"],
-    .topbar-header,
-    ytm-search-box-renderer,
-    .topbar-actions,
-    .topbar-menu-button-avatar-button,
-    .topbar-header-content,
-
-    /* 2. COMPLETELY HIDE YouTube Bottom Navigation Bar */
-    ytm-pivot-bar-renderer,
-    .pivot-bar,
-    .ytm-pivot-bar,
-
-    /* 3. COMPLETELY HIDE 'Open in App' Banners, Promos, and Upsell Dialogs */
-    .upsell-dialog-renderer,
-    #app-banner,
-    .open-app-banner,
-    ytm-upsell-dialog-renderer,
-    ytm-mealbar-promo-renderer,
-    .banner-promo,
-    ytm-button-renderer[data-target-id="open-app-button"],
-    ytm-open-app-button,
-    .open-app-button,
-    .companion-ad,
-    .ytm-promoted-sparkles-web-renderer,
-    ytm-promoted-sparkles-web-renderer,
-    dialog,
-    .dialog-container,
-    .sheet-container,
-    .modal-content,
-
-    /* 4. COMPLETELY HIDE YouTube Native Web Overlay Buttons (So ONLY our Flutter controls show!) */
-    .reel-player-overlay-actions,
-    ytm-reel-player-overlay-renderer .reel-player-overlay-actions,
-    .action-container,
-    ytm-reel-player-overlay-renderer .action-container,
-    ytm-shorts-player-controls,
-    ytm-reel-player-header-renderer,
-    .reel-player-header-container,
-    .reel-player-overlay-metadata,
-    .overlay-action-button,
-    .engagement-panel,
-    ytm-engagement-panel,
-    ytm-button-renderer.reel-player-overlay-action-button,
-    .reel-player-overlay-main-content,
-    .reel-player-overlay-bottom,
-
-    /* 5. Watermarks & YouTube Chrome */
-    .ytp-chrome-top,
-    .ytp-chrome-bottom,
-    .ytp-watermark,
-    .ytp-youtube-button,
-    .branding-img-container,
-    .annotation {
-      display: none !important;
-      visibility: hidden !important;
-      opacity: 0 !important;
-      pointer-events: none !important;
-      height: 0 !important;
-      width: 0 !important;
-      max-height: 0 !important;
-      max-width: 0 !important;
-      position: absolute !important;
-      top: -9999px !important;
-      left: -9999px !important;
-      z-index: -9999 !important;
-    }
-
-    /* 6. Pure Black Background */
-    body, html {
-      background-color: #000000 !important;
-      overflow: hidden !important;
-      margin: 0 !important;
-      padding: 0 !important;
-      width: 100% !important;
-      height: 100% !important;
-      user-select: none !important;
-      -webkit-user-select: none !important;
-    }
-
-    video {
-      object-fit: cover !important;
-    }
-  ''';
-
   @override
   void initState() {
     super.initState();
     AppShareService.keepScreenOn(true);
     _subService.init();
     ShortsFeedView.refreshNotifier.addListener(_handleExternalRefresh);
-
-    _controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(Colors.black)
-      ..setUserAgent(
-        'Mozilla/5.0 (Linux; Android 13; SM-G998B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
-      )
-      ..addJavaScriptChannel(
-        'MsixaShortsChannel',
-        onMessageReceived: (JavaScriptMessage message) {
-          _handleJavaScriptMetadata(message.message);
-        },
-      )
-      ..setNavigationDelegate(
-        NavigationDelegate(
-          onNavigationRequest: (NavigationRequest request) {
-            final url = request.url;
-            // Intercept and prevent ANY scheme attempting to launch the external YouTube app
-            if (url.startsWith('intent://') ||
-                url.startsWith('market://') ||
-                url.startsWith('vnd.youtube:') ||
-                url.startsWith('youtube://')) {
-              return NavigationDecision.prevent;
-            }
-            // Allow internal YouTube and Google authentication pages
-            if (url.contains('youtube.com') ||
-                url.contains('googlevideo.com') ||
-                url.contains('google.com') ||
-                url.contains('gstatic.com') ||
-                url.contains('accounts.google.com')) {
-              return NavigationDecision.navigate;
-            }
-            return NavigationDecision.prevent;
-          },
-          onProgress: (int progress) {
-            if (progress > 30) {
-              _injectCleanupScript();
-            }
-          },
-          onPageStarted: (String url) {
-            _extractVideoId(url);
-            if (mounted) setState(() => _isLoading = true);
-            _injectCleanupScript();
-          },
-          onPageFinished: (String url) {
-            _extractVideoId(url);
-            _injectCleanupScript();
-            if (mounted) setState(() => _isLoading = false);
-          },
-        ),
-      );
-
-    if (_controller.platform is AndroidWebViewController) {
-      AndroidWebViewController.enableDebugging(false);
-      (_controller.platform as AndroidWebViewController).setMediaPlaybackRequiresUserGesture(false);
-    }
-
-    // Start with a fresh, unrepeated video
-    final initialId = _getNextFreshVideoId();
-    _currentVideoId = initialId;
-    final initialUrl = 'https://m.youtube.com/shorts/$initialId?feature=share&t=${DateTime.now().millisecondsSinceEpoch}';
-    _controller.loadRequest(Uri.parse(initialUrl));
-  }
-
-  void _handleExternalRefresh() {
-    if (mounted) {
-      _loadFreshShort();
-    }
+    _loadInitialFeed();
   }
 
   @override
   void dispose() {
     ShortsFeedView.refreshNotifier.removeListener(_handleExternalRefresh);
     AppShareService.keepScreenOn(false);
+    _pageController.dispose();
     _searchController.dispose();
+    for (final c in _controllers.values) {
+      try {
+        c.runJavaScript('try{document.querySelector("video")?.pause();}catch(e){}');
+      } catch (_) {}
+    }
+    _controllers.clear();
     super.dispose();
   }
 
-  /// Get next unseen video ID to guarantee no repetition
-  String _getNextFreshVideoId() {
-    final available = _seedVideoPool.where((id) => !_playedVideoIds.contains(id)).toList();
-    if (available.isEmpty) {
+  /// Load fresh unrepeated feed of viral Indian Shorts
+  void _loadInitialFeed() {
+    final allShorts = _shortsService.getInitialShorts('Trending');
+    final unplayed = allShorts.where((s) => !_playedVideoIds.contains(s.id)).toList();
+    final list = unplayed.isNotEmpty ? unplayed : allShorts;
+    list.shuffle();
+
+    setState(() {
+      _feed = List.from(list);
+      _currentIndex = 0;
+      _isLoading = false;
+    });
+
+    if (_feed.isNotEmpty) {
+      _playedVideoIds.add(_feed[0].id);
+      _prewarmControllers(0);
+    }
+  }
+
+  /// Handle external refresh triggered by bottom navigation Shorts button
+  void _handleExternalRefresh() {
+    _refreshToFreshVideos();
+  }
+
+  /// Refresh feed with 100% fresh, unplayed videos and animate to top
+  Future<void> _refreshToFreshVideos() async {
+    if (!mounted) return;
+    setState(() => _isPullRefreshing = true);
+
+    // Filter unplayed videos from the rich 30+ catalog
+    final allShorts = _shortsService.getInitialShorts('Trending');
+    var freshList = allShorts.where((s) => !_playedVideoIds.contains(s.id)).toList();
+    if (freshList.isEmpty) {
       _playedVideoIds.clear();
-      available.addAll(_seedVideoPool);
+      freshList = List.from(allShorts);
     }
-    available.shuffle();
-    final nextId = available.first;
-    _playedVideoIds.add(nextId);
-    return nextId;
+    freshList.shuffle();
+
+    // Dispose old controllers
+    for (final c in _controllers.values) {
+      try {
+        c.runJavaScript('try{document.querySelector("video")?.pause();}catch(e){}');
+      } catch (_) {}
+    }
+    _controllers.clear();
+
+    setState(() {
+      _feed = freshList;
+      _currentIndex = 0;
+      _isPlaying = true;
+      _isPullRefreshing = false;
+      _currentPullDelta = 0.0;
+    });
+
+    if (_pageController.hasClients) {
+      _pageController.jumpToPage(0);
+    }
+
+    if (_feed.isNotEmpty) {
+      _playedVideoIds.add(_feed[0].id);
+      _prewarmControllers(0);
+    }
   }
 
-  /// Load fresh non-repeated Short video link
-  Future<void> _loadFreshShort({bool showIndicator = true}) async {
-    if (showIndicator && mounted) {
-      setState(() => _isLoading = true);
+  /// Create and pre-warm WebViewController instances in a sliding window [index - 1, index, index + 1]
+  void _prewarmControllers(int activeIdx) {
+    // 1. Dispose distant controllers to conserve memory
+    _controllers.removeWhere((idx, ctrl) {
+      if ((idx - activeIdx).abs() > 2) {
+        try {
+          ctrl.runJavaScript('try{document.querySelector("video")?.pause();}catch(e){}');
+        } catch (_) {}
+        return true;
+      }
+      return false;
+    });
+
+    // 2. Initialize active, previous and next controllers
+    for (int i = activeIdx - 1; i <= activeIdx + 1; i++) {
+      if (i >= 0 && i < _feed.length && !_controllers.containsKey(i)) {
+        _controllers[i] = _createControllerForIndex(i);
+      }
     }
-    final nextId = _getNextFreshVideoId();
-    _currentVideoId = nextId;
-    final freshUrl = 'https://m.youtube.com/shorts/$nextId?feature=share&t=${DateTime.now().millisecondsSinceEpoch}';
-    await _controller.loadRequest(Uri.parse(freshUrl));
   }
 
-  void _injectCleanupScript() {
-    final script = '''
-      (function() {
-        // 1. Inject or re-inject cleanup CSS directly into head and documentElement
-        function injectCss() {
-          var style = document.getElementById('msixa-shorts-cleanup');
-          if (!style) {
-            style = document.createElement('style');
-            style.id = 'msixa-shorts-cleanup';
-            style.innerHTML = `$_cleanupCss`;
-            (document.head || document.documentElement).appendChild(style);
-          }
-        }
-        injectCss();
+  /// Create clean embed WebViewController with ZERO YouTube controls, logo, or channel banners
+  WebViewController _createControllerForIndex(int index) {
+    final item = _feed[index];
+    final isAutoplay = index == _currentIndex;
 
-        // 2. Direct DOM Element Purger
-        function purgeElements() {
-          injectCss();
-          var hideSelectors = [
-            'ytm-mobile-topbar-renderer',
-            '.mobile-topbar-header',
-            '#header-bar',
-            'header',
-            'yt-icon.ytm-logo',
-            '.ytm-home-logo',
-            'a[aria-label="YouTube"]',
-            'ytm-pivot-bar-renderer',
-            '.pivot-bar',
-            '.reel-player-overlay-actions',
-            '.action-container',
-            'ytm-reel-player-header-renderer',
-            '.reel-player-header-container',
-            '.reel-player-overlay-metadata',
-            'ytm-upsell-dialog-renderer',
-            '#app-banner',
-            '.open-app-banner',
-            'ytm-mealbar-promo-renderer',
-            'dialog',
-            '.dialog-container'
-          ];
-          for (var i = 0; i < hideSelectors.length; i++) {
-            var els = document.querySelectorAll(hideSelectors[i]);
-            for (var j = 0; j < els.length; j++) {
-              els[j].style.setProperty('display', 'none', 'important');
-              els[j].style.setProperty('visibility', 'hidden', 'important');
-              els[j].style.setProperty('opacity', '0', 'important');
-              els[j].style.setProperty('pointer-events', 'none', 'important');
+    final controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setBackgroundColor(Colors.black)
+      ..setUserAgent(
+        'Mozilla/5.0 (Linux; Android 13; SM-G998B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+      )
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onNavigationRequest: (NavigationRequest request) {
+            final url = request.url;
+            if (url.startsWith('intent://') ||
+                url.startsWith('market://') ||
+                url.startsWith('vnd.youtube:') ||
+                url.startsWith('youtube://')) {
+              return NavigationDecision.prevent;
             }
+            return NavigationDecision.navigate;
+          },
+        ),
+      );
+
+    if (controller.platform is AndroidWebViewController) {
+      AndroidWebViewController.enableDebugging(false);
+      (controller.platform as AndroidWebViewController).setMediaPlaybackRequiresUserGesture(false);
+    }
+
+    // Load clean YouTube Embed with controls=0, modestbranding=1, zero YouTube web overlay
+    final embedHtml = '''
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #000000;
+            user-select: none;
+            -webkit-user-select: none;
           }
-        }
-        purgeElements();
-
-        // 3. Continuously observe DOM changes so dynamically inserted YouTube elements are hidden instantly
-        var observer = new MutationObserver(function() {
-          purgeElements();
-          reportShortsInfo();
-        });
-        observer.observe(document.documentElement || document.body, { childList: true, subtree: true });
-        setInterval(purgeElements, 250);
-
-        // 4. Intercept clicks attempting to open external YouTube app
-        document.addEventListener('click', function(e) {
-          var target = e.target.closest('a, button');
-          if (target) {
-            var href = target.getAttribute('href') || '';
-            if (href.indexOf('intent://') === 0 || href.indexOf('market://') === 0 || href.indexOf('vnd.youtube') === 0) {
-              e.preventDefault();
-              e.stopPropagation();
-              return false;
-            }
+          iframe {
+            width: 100vw;
+            height: 100vh;
+            border: none;
+            object-fit: cover;
+            pointer-events: auto;
           }
-        }, true);
-
-        // 5. Metadata Reporter to Flutter
-        function reportShortsInfo() {
-          try {
-            var titleEl = document.querySelector('ytm-reel-player-overlay-renderer .reel-player-header-title') ||
-                          document.querySelector('.reel-player-header-title') ||
-                          document.querySelector('h2.title') ||
-                          document.querySelector('.title');
-            var authorEl = document.querySelector('ytm-reel-player-overlay-renderer .reel-player-header-channel-title') ||
-                           document.querySelector('.reel-player-header-channel-title') ||
-                           document.querySelector('.channel-name');
-            var likesEl = document.querySelector('ytm-reel-player-overlay-renderer .like-button span') ||
-                          document.querySelector('.like-button span') ||
-                          document.querySelector('[aria-label*="like"] span');
-
-            var title = titleEl ? titleEl.textContent.trim() : '';
-            var author = authorEl ? authorEl.textContent.trim() : '';
-            var likes = likesEl ? likesEl.textContent.trim() : '';
-            var url = window.location.href;
-
-            if (window.MsixaShortsChannel) {
-              window.MsixaShortsChannel.postMessage(JSON.stringify({
-                title: title,
-                author: author,
-                likes: likes,
-                url: url
-              }));
-            }
-          } catch(e) {}
-        }
-
-        reportShortsInfo();
-        setInterval(reportShortsInfo, 1200);
-      })();
+          /* Ensure zero YouTube watermark, title or share buttons inside iframe */
+          .ytp-chrome-top, .ytp-watermark, .ytp-title-link, .ytp-share-button, .branding-img-container {
+            display: none !important;
+            opacity: 0 !important;
+            visibility: hidden !important;
+          }
+        </style>
+      </head>
+      <body>
+        <iframe id="shorts-embed"
+          src="https://www.youtube.com/embed/${item.id}?autoplay=${isAutoplay ? 1 : 0}&controls=0&playsinline=1&loop=1&playlist=${item.id}&modestbranding=1&rel=0&iv_load_policy=3&disablekb=1&fs=0&enablejsapi=1"
+          allow="autoplay; encrypted-media; picture-in-picture"
+          allowfullscreen>
+        </iframe>
+      </body>
+      </html>
     ''';
-    _controller.runJavaScript(script);
+
+    controller.loadHtmlString(embedHtml, baseUrl: 'https://www.youtube.com');
+    return controller;
   }
 
-  void _handleJavaScriptMetadata(String jsonString) {
-    try {
-      final data = jsonDecode(jsonString) as Map<String, dynamic>;
-      final title = data['title'] as String? ?? '';
-      final author = data['author'] as String? ?? '';
-      final likes = data['likes'] as String? ?? '';
-      final url = data['url'] as String? ?? '';
+  void _onPageChanged(int newIndex) {
+    if (newIndex == _currentIndex || newIndex < 0 || newIndex >= _feed.length) return;
 
-      _extractVideoId(url);
+    // Pause previous video
+    final prevCtrl = _controllers[_currentIndex];
+    if (prevCtrl != null) {
+      try {
+        prevCtrl.runJavaScript('try{document.querySelector("video")?.pause();}catch(e){}');
+      } catch (_) {}
+    }
 
-      if (mounted) {
-        setState(() {
-          if (title.isNotEmpty) _videoTitle = title;
-          if (author.isNotEmpty) _channelName = author.replaceAll('@', '').trim();
-          if (likes.isNotEmpty) _likesCountStr = likes;
-        });
-      }
-    } catch (_) {}
+    setState(() {
+      _currentIndex = newIndex;
+      _isPlaying = true;
+    });
+
+    // Play new active video
+    final activeCtrl = _controllers[newIndex];
+    if (activeCtrl != null) {
+      try {
+        activeCtrl.runJavaScript('try{document.querySelector("video")?.play();}catch(e){}');
+      } catch (_) {}
+    }
+
+    _playedVideoIds.add(_feed[newIndex].id);
+    _prewarmControllers(newIndex);
   }
 
-  void _extractVideoId(String url) {
-    try {
-      final regExp = RegExp(r'shorts\/([a-zA-Z0-9_-]{11})');
-      final match = regExp.firstMatch(url);
-      if (match != null) {
-        final id = match.group(1);
-        if (id != null && id.isNotEmpty && id != _currentVideoId) {
-          if (mounted) setState(() => _currentVideoId = id);
-          _playedVideoIds.add(id);
-        }
-      }
-    } catch (_) {}
+  void _togglePlayPause() {
+    final ctrl = _controllers[_currentIndex];
+    if (ctrl == null) return;
+
+    setState(() {
+      _isPlaying = !_isPlaying;
+      _showPlayPauseRipple = true;
+    });
+
+    if (_isPlaying) {
+      ctrl.runJavaScript('try{document.querySelector("video")?.play();}catch(e){}');
+    } else {
+      ctrl.runJavaScript('try{document.querySelector("video")?.pause();}catch(e){}');
+    }
+
+    Future.delayed(const Duration(milliseconds: 650), () {
+      if (mounted) setState(() => _showPlayPauseRipple = false);
+    });
   }
 
   Future<void> _performSearch(String query) async {
@@ -439,48 +307,67 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
       _isSearching = false;
     });
 
-    final searchUrl = 'https://m.youtube.com/results?search_query=${Uri.encodeComponent(clean)}+%23shorts';
-    await _controller.loadRequest(Uri.parse(searchUrl));
+    final searchResults = await _shortsService.searchShorts(clean);
+    if (!mounted) return;
+
+    if (searchResults.isNotEmpty) {
+      // Dispose old controllers
+      for (final c in _controllers.values) {
+        try {
+          c.runJavaScript('try{document.querySelector("video")?.pause();}catch(e){}');
+        } catch (_) {}
+      }
+      _controllers.clear();
+
+      setState(() {
+        _feed = searchResults;
+        _currentIndex = 0;
+        _isLoading = false;
+      });
+
+      if (_pageController.hasClients) {
+        _pageController.jumpToPage(0);
+      }
+      _prewarmControllers(0);
+    } else {
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('कोई वीडियो नहीं मिला, ट्रेंडिंग वीडियो चला रहे हैं'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
-  Future<void> _handleRefresh() async {
-    await _loadFreshShort();
-  }
-
-  void _toggleLike() {
+  void _toggleLike(String videoId) {
     setState(() {
-      _isLiked = !_isLiked;
-      if (_isLiked) _isDisliked = false;
+      final current = _likedVideos[videoId] ?? false;
+      _likedVideos[videoId] = !current;
+      if (_likedVideos[videoId] == true) {
+        _dislikedVideos[videoId] = false;
+      }
     });
-    // Trigger webview like button
-    _controller.runJavaScript('''
-      var likeBtn = document.querySelector('ytm-reel-player-overlay-renderer .like-button button') ||
-                    document.querySelector('[aria-label*="like"]');
-      if (likeBtn) likeBtn.click();
-    ''');
   }
 
-  void _toggleDislike() {
+  void _toggleDislike(String videoId) {
     setState(() {
-      _isDisliked = !_isDisliked;
-      if (_isDisliked) _isLiked = false;
+      final current = _dislikedVideos[videoId] ?? false;
+      _dislikedVideos[videoId] = !current;
+      if (_dislikedVideos[videoId] == true) {
+        _likedVideos[videoId] = false;
+      }
     });
-    // Trigger webview dislike button
-    _controller.runJavaScript('''
-      var dislikeBtn = document.querySelector('ytm-reel-player-overlay-renderer .dislike-button button') ||
-                       document.querySelector('[aria-label*="dislike"]');
-      if (dislikeBtn) dislikeBtn.click();
-    ''');
   }
 
-  void _showCommentsModal(BuildContext context) {
+  void _showCommentsModal(BuildContext context, ShortVideoItem item) {
     final lang = LanguageService();
     final commentController = TextEditingController();
     final commentsList = [
-      {'user': 'राजेश सैन', 'text': 'शानदार वीडियो! दिल खुश हो गया ❤️', 'time': 'अभी'},
-      {'user': 'सुनील शर्मा', 'text': 'सुपरहिट देसी बीट्स 🔥🔥', 'time': '10 मिनट पहले'},
+      {'user': 'राजेश सैन', 'text': 'शानदार वीडियो! फुल एनर्जी ❤️', 'time': 'अभी'},
+      {'user': 'सुनील शर्मा', 'text': 'सुपरहिट बीट्स 🔥🔥', 'time': '10 मिनट पहले'},
       {'user': 'कविता राठौड़', 'text': 'फुल बास साउंड, मजा आ गया!', 'time': '1 घंटा पहले'},
-      {'user': 'Msixa User', 'text': 'Great energy and screen presence 👌', 'time': '2 घंटे पहले'},
+      {'user': 'Msixa User', 'text': 'Great choreography & screen presence 👌', 'time': '2 घंटे पहले'},
     ];
 
     showModalBottomSheet(
@@ -509,10 +396,7 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
                       child: Container(
                         width: 40,
                         height: 4,
-                        decoration: BoxDecoration(
-                          color: Colors.white24,
-                          borderRadius: BorderRadius.circular(2),
-                        ),
+                        decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -534,7 +418,7 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
                       child: ListView.builder(
                         itemCount: commentsList.length,
                         itemBuilder: (c, idx) {
-                          final item = commentsList[idx];
+                          final cItem = commentsList[idx];
                           return Padding(
                             padding: const EdgeInsets.symmetric(vertical: 8),
                             child: Row(
@@ -544,7 +428,7 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
                                   radius: 16,
                                   backgroundColor: AppColors.accentCyan.withOpacity(0.3),
                                   child: Text(
-                                    item['user']![0],
+                                    cItem['user']![0],
                                     style: const TextStyle(color: AppColors.accentCyan, fontWeight: FontWeight.bold, fontSize: 13),
                                   ),
                                 ),
@@ -556,21 +440,15 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
                                       Row(
                                         children: [
                                           Text(
-                                            item['user']!,
+                                            cItem['user']!,
                                             style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
                                           ),
                                           const SizedBox(width: 8),
-                                          Text(
-                                            item['time']!,
-                                            style: const TextStyle(color: Colors.white38, fontSize: 10),
-                                          ),
+                                          Text(cItem['time']!, style: const TextStyle(color: Colors.white38, fontSize: 10)),
                                         ],
                                       ),
                                       const SizedBox(height: 3),
-                                      Text(
-                                        item['text']!,
-                                        style: const TextStyle(color: Colors.white70, fontSize: 13),
-                                      ),
+                                      Text(cItem['text']!, style: const TextStyle(color: Colors.white70, fontSize: 13)),
                                     ],
                                   ),
                                 ),
@@ -634,14 +512,12 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
     );
   }
 
-  void _showShareModal(BuildContext context) {
+  void _showShareModal(BuildContext context, ShortVideoItem item) {
     final lang = LanguageService();
     showModalBottomSheet(
       context: context,
       backgroundColor: const Color(0xFF1E283C),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (modalCtx) {
         return SafeArea(
           child: Padding(
@@ -672,7 +548,7 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
                       label: lang.isHindi ? 'व्हाट्सएप स्टेटस' : 'WhatsApp Status',
                       onTap: () {
                         Navigator.pop(modalCtx);
-                        _handleWhatsAppStatus();
+                        _handleWhatsAppStatus(item);
                       },
                     ),
                     _buildShareModalOption(
@@ -681,7 +557,7 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
                       label: 'WhatsApp',
                       onTap: () {
                         Navigator.pop(modalCtx);
-                        _handleWhatsAppStatus();
+                        _handleWhatsAppStatus(item);
                       },
                     ),
                     _buildShareModalOption(
@@ -690,7 +566,7 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
                       label: lang.isHindi ? 'लिंक कॉपी' : 'Copy link',
                       onTap: () async {
                         Navigator.pop(modalCtx);
-                        final link = 'https://youtube.com/shorts/$_currentVideoId';
+                        final link = 'https://youtube.com/shorts/${item.id}';
                         await Clipboard.setData(ClipboardData(text: link));
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -709,7 +585,7 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
                       label: lang.isHindi ? 'अन्य ऐप्स' : 'More',
                       onTap: () {
                         Navigator.pop(modalCtx);
-                        _handleWhatsAppStatus();
+                        _handleWhatsAppStatus(item);
                       },
                     ),
                   ],
@@ -745,24 +621,19 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
               child: Icon(icon, color: color, size: 24),
             ),
             const SizedBox(height: 6),
-            Text(
-              label,
-              style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w500),
-            ),
+            Text(label, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w500)),
           ],
         ),
       ),
     );
   }
 
-  void _showMoreOptionsModal(BuildContext context) {
+  void _showMoreOptionsModal(BuildContext context, ShortVideoItem item) {
     final lang = LanguageService();
     showModalBottomSheet(
       context: context,
       backgroundColor: const Color(0xFF131A2A),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (modalCtx) {
         return SafeArea(
           child: Padding(
@@ -795,7 +666,7 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
                   trailing: const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white38, size: 14),
                   onTap: () {
                     Navigator.pop(modalCtx);
-                    _showGoogleAccountPicker(context, _channelName);
+                    _showGoogleAccountPicker(context, item.author);
                   },
                 ),
                 ListTile(
@@ -806,19 +677,13 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
                   ),
                   onTap: () {
                     Navigator.pop(modalCtx);
-                    _handleWhatsAppStatus();
+                    _handleWhatsAppStatus(item);
                   },
                 ),
                 ListTile(
                   leading: const Icon(Icons.hd_rounded, color: AppColors.accentCyan),
-                  title: Text(
-                    lang.isHindi ? 'वीडियो क्वालिटी (HD 1080p 60fps Native)' : 'Video Quality (HD 1080p 60fps Native)',
-                    style: const TextStyle(color: Colors.white, fontSize: 14),
-                  ),
-                  subtitle: Text(
-                    lang.isHindi ? 'यूट्यूब ऑफिशियल बफर-फ्री स्ट्रीमिंग' : 'YouTube Official Buffer-Free Streaming',
-                    style: const TextStyle(color: Colors.white54, fontSize: 11),
-                  ),
+                  title: const Text('Video Quality (HD 1080p 60fps Native)', style: TextStyle(color: Colors.white, fontSize: 14)),
+                  subtitle: const Text('Official Zero-Buffer Stream', style: TextStyle(color: Colors.white54, fontSize: 11)),
                 ),
               ],
             ),
@@ -828,10 +693,8 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
     );
   }
 
-  void _handleSubscribeToggle() {
-    final author = _channelName.isNotEmpty ? _channelName : 'Creator';
+  void _handleSubscribeToggle(String author) {
     final lang = LanguageService();
-
     if (_subService.isSubscribed(author)) {
       _subService.toggleSubscribe(author);
       setState(() {});
@@ -845,7 +708,6 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
       return;
     }
 
-    // If user has not signed in with Google, open Google Account Picker directly without launching YouTube app
     if (!_subService.hasGoogleAccount) {
       _showGoogleAccountPicker(context, author);
     } else {
@@ -861,7 +723,6 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
     }
   }
 
-  /// Official Google Account Picker Dialog (Allows selecting or entering phone Google account)
   void _showGoogleAccountPicker(BuildContext context, String author) {
     final lang = LanguageService();
     final deviceAccounts = _subService.getAvailableDeviceAccounts();
@@ -870,9 +731,7 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
       context: context,
       isScrollControlled: true,
       backgroundColor: const Color(0xFF202124),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (modalCtx) {
         return SafeArea(
           child: Padding(
@@ -885,60 +744,37 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
                   child: Container(
                     width: 38,
                     height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.white24,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
+                    decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
                   ),
                 ),
                 const SizedBox(height: 16),
-
-                // Google "G" Logo Header
                 Center(
                   child: Container(
                     width: 44,
                     height: 44,
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                    ),
+                    decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
                     child: const Center(
-                      child: Text(
-                        'G',
-                        style: TextStyle(
-                          color: Color(0xFF4285F4),
-                          fontSize: 26,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                      child: Text('G', style: TextStyle(color: Color(0xFF4285F4), fontSize: 26, fontWeight: FontWeight.bold)),
                     ),
                   ),
                 ),
                 const SizedBox(height: 12),
-
                 Center(
                   child: Text(
                     lang.isHindi ? 'Google खाता चुनें' : 'Choose an account',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                 ),
                 const SizedBox(height: 4),
                 Center(
                   child: Text(
-                    lang.isHindi
-                        ? 'YouTube पर @$author को सब्सक्राइब करने के लिए'
-                        : 'to subscribe to @$author on YouTube',
+                    lang.isHindi ? 'YouTube पर @$author को सब्सक्राइब करने के लिए' : 'to subscribe to @$author on YouTube',
                     style: const TextStyle(color: Colors.white70, fontSize: 13),
                     textAlign: TextAlign.center,
                   ),
                 ),
                 const SizedBox(height: 16),
                 const Divider(color: Colors.white12),
-
                 ...deviceAccounts.map((acc) {
                   final email = acc['email'] ?? '';
                   final name = acc['name'] ?? email.split('@').first;
@@ -982,73 +818,18 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  name,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                Text(
-                                  email,
-                                  style: const TextStyle(color: Colors.white54, fontSize: 12),
-                                ),
+                                Text(name, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+                                Text(email, style: const TextStyle(color: Colors.white54, fontSize: 12)),
                               ],
                             ),
                           ),
-                          if (isSelected)
-                            const Icon(Icons.check_circle_rounded, color: Color(0xFF4285F4), size: 20),
+                          if (isSelected) const Icon(Icons.check_circle_rounded, color: Color(0xFF4285F4), size: 20),
                         ],
                       ),
                     ),
                   );
                 }),
-
-                // Add another account
-                InkWell(
-                  onTap: () {
-                    Navigator.pop(modalCtx);
-                    _showCustomEmailInputDialog(context, author);
-                  },
-                  borderRadius: BorderRadius.circular(12),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 36,
-                          height: 36,
-                          decoration: const BoxDecoration(
-                            color: Colors.white12,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.person_add_alt_1_outlined, color: Colors.white70, size: 20),
-                        ),
-                        const SizedBox(width: 14),
-                        Text(
-                          lang.isHindi ? 'दूसरा खाता जोड़ें' : 'Use another account',
-                          style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
                 const SizedBox(height: 12),
-                const Divider(color: Colors.white12),
-                const SizedBox(height: 8),
-
-                Center(
-                  child: Text(
-                    lang.isHindi
-                        ? 'जारी रखने के लिए, Google आपका नाम और ईमेल पता YouTube के साथ साझा करेगा।'
-                        : 'To continue, Google will share your name and email address with YouTube.',
-                    style: const TextStyle(color: Colors.white38, fontSize: 11),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-                const SizedBox(height: 8),
               ],
             ),
           ),
@@ -1057,109 +838,8 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
     );
   }
 
-  void _showCustomEmailInputDialog(BuildContext context, String author) {
+  Future<void> _handleWhatsAppStatus(ShortVideoItem item) async {
     final lang = LanguageService();
-    final emailCtrl = TextEditingController(text: 'rajesh.sain.kdk@gmail.com');
-
-    showDialog(
-      context: context,
-      builder: (dlgCtx) {
-        return AlertDialog(
-          backgroundColor: const Color(0xFF202124),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                child: const Text('G', style: TextStyle(color: Color(0xFF4285F4), fontWeight: FontWeight.bold, fontSize: 16)),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  lang.isHindi ? 'Google अकाउंट दर्ज करें' : 'Enter Google Account',
-                  style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                lang.isHindi
-                    ? 'YouTube पर @$author को सब्सक्राइब करने के लिए अपना Gmail पता डालें:'
-                    : 'Enter your Gmail address to subscribe to @$author on YouTube:',
-                style: const TextStyle(color: Colors.white70, fontSize: 13),
-              ),
-              const SizedBox(height: 14),
-              TextField(
-                controller: emailCtrl,
-                autofocus: true,
-                style: const TextStyle(color: Colors.white, fontSize: 14),
-                decoration: InputDecoration(
-                  labelText: 'Gmail / Google ID',
-                  labelStyle: const TextStyle(color: AppColors.accentCyan),
-                  filled: true,
-                  fillColor: const Color(0xFF2D2F33),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                  prefixIcon: const Icon(Icons.email_outlined, color: AppColors.accentCyan, size: 20),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dlgCtx),
-              child: Text(lang.isHindi ? 'रद्द करें' : 'Cancel', style: const TextStyle(color: Colors.white54)),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final email = emailCtrl.text.trim();
-                if (email.isNotEmpty) {
-                  Navigator.pop(dlgCtx);
-                  await _subService.setGoogleAccount(email);
-                  await _subService.toggleSubscribe(author);
-                  if (mounted) {
-                    setState(() {});
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          lang.isHindi
-                              ? '✓ $email से YouTube कनेक्ट हुआ • @$author को सब्सक्राइब किया!'
-                              : '✓ Connected as $email • Subscribed to @$author!',
-                        ),
-                        backgroundColor: const Color(0xFF00E5FF),
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
-                  }
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFE50914),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-              child: Text(lang.isHindi ? 'सब्सक्राइब करें' : 'Subscribe'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Future<void> _handleWhatsAppStatus() async {
-    final lang = LanguageService();
-    final vid = _currentVideoId.isNotEmpty ? _currentVideoId : 'kffacxfA7G4';
-    final dummyItem = ShortVideoItem(
-      id: vid,
-      title: _videoTitle,
-      author: _channelName,
-      thumbnailUrl: '',
-    );
-
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(lang.isHindi ? 'व्हाट्सएप स्टेटस तैयार हो रहा है...' : 'Preparing WhatsApp Status...'),
@@ -1169,7 +849,7 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
       ),
     );
 
-    final success = await _shortsService.shareToWhatsAppStatus(dummyItem);
+    final success = await _shortsService.shareToWhatsAppStatus(item);
     if (mounted && !success) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -1181,17 +861,9 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
     }
   }
 
-  Future<void> _handleDownload() async {
+  Future<void> _handleDownload(ShortVideoItem item) async {
     if (_isDownloading) return;
     final lang = LanguageService();
-
-    final vid = _currentVideoId.isNotEmpty ? _currentVideoId : 'kffacxfA7G4';
-    final dummyItem = ShortVideoItem(
-      id: vid,
-      title: _videoTitle,
-      author: _channelName,
-      thumbnailUrl: '',
-    );
 
     setState(() {
       _isDownloading = true;
@@ -1199,7 +871,7 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
     });
 
     final path = await _shortsService.downloadShort(
-      dummyItem,
+      item,
       onProgress: (p) {
         if (mounted) setState(() => _downloadProgress = p);
       },
@@ -1224,16 +896,11 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
   @override
   Widget build(BuildContext context) {
     final lang = LanguageService();
-    final isSubscribed = _subService.isSubscribed(_channelName);
 
     return PopScope(
       canPop: false,
       onPopInvoked: (didPop) async {
         if (didPop) return;
-        if (await _controller.canGoBack()) {
-          _controller.goBack();
-          return;
-        }
         if (widget.onBackToDeviceVideos != null) {
           widget.onBackToDeviceVideos!();
           return;
@@ -1244,401 +911,441 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
       },
       child: Scaffold(
         backgroundColor: Colors.black,
-        body: Listener(
-          behavior: HitTestBehavior.translucent,
-          onPointerDown: (PointerDownEvent event) {
-            _dragStartY = event.position.dy;
-            _currentPullDelta = 0.0;
-          },
-          onPointerMove: (PointerMoveEvent event) {
-            final deltaY = event.position.dy - _dragStartY;
-            // Only if touch started in top 35% of the screen and dragging downwards
-            if (_dragStartY < MediaQuery.of(context).size.height * 0.35 && deltaY > 0) {
-              if (mounted) {
-                setState(() {
-                  _currentPullDelta = deltaY.clamp(0.0, 120.0);
-                });
-              }
-            }
-          },
-          onPointerUp: (PointerUpEvent event) {
-            if (_currentPullDelta > 65.0 && !_isPullRefreshing) {
-              _isPullRefreshing = true;
-              _loadFreshShort().then((_) {
-                if (mounted) {
-                  setState(() {
-                    _isPullRefreshing = false;
-                    _currentPullDelta = 0.0;
-                  });
-                }
-              });
-            } else {
-              if (mounted && _currentPullDelta > 0.0) {
-                setState(() => _currentPullDelta = 0.0);
-              }
-            }
-          },
-          onPointerCancel: (_) {
-            if (mounted && _currentPullDelta > 0.0) {
-              setState(() => _currentPullDelta = 0.0);
-            }
-          },
-          child: Stack(
-            children: [
-              // 1. Official YouTube Shorts Engine (Plays https://www.youtube.com/shorts directly in background)
-              WebViewWidget(controller: _controller),
-
-              // Pull-down Drag to Refresh Indicator Badge
-              if (_currentPullDelta > 15.0 || _isPullRefreshing)
-                Positioned(
-                  top: 55 + (_currentPullDelta * 0.35),
-                  left: 0,
-                  right: 0,
-                  child: Center(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF131A2A).withOpacity(0.95),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: AppColors.accentCyan, width: 1.2),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.accentCyan.withOpacity(0.35),
-                            blurRadius: 10,
-                            spreadRadius: 2,
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: AppColors.accentCyan,
-                              value: _isPullRefreshing ? null : (_currentPullDelta / 65.0).clamp(0.0, 1.0),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            _isPullRefreshing
-                                ? (lang.isHindi ? 'नया शॉर्ट्स लोड हो रहा है...' : 'Refreshing Shorts...')
-                                : (_currentPullDelta > 65.0
-                                    ? (lang.isHindi ? 'छोड़ें (रिफ्रेश होगा)' : 'Release to refresh')
-                                    : (lang.isHindi ? 'नीचे खींचें रिफ्रेश के लिए' : 'Pull down to refresh')),
-                            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                      ),
+        body: _isLoading
+            ? const Center(child: CircularProgressIndicator(color: AppColors.accentCyan))
+            : Listener(
+                behavior: HitTestBehavior.translucent,
+                onPointerDown: (event) {
+                  _dragStartY = event.position.dy;
+                  _currentPullDelta = 0.0;
+                },
+                onPointerMove: (event) {
+                  final deltaY = event.position.dy - _dragStartY;
+                  // Allow pull down to refresh from upper 60% of the screen
+                  if (_currentIndex == 0 && _dragStartY < MediaQuery.of(context).size.height * 0.60 && deltaY > 0) {
+                    if (mounted) {
+                      setState(() {
+                        _currentPullDelta = deltaY.clamp(0.0, 120.0);
+                      });
+                    }
+                  }
+                },
+                onPointerUp: (event) {
+                  if (_currentPullDelta > 50.0 && !_isPullRefreshing) {
+                    _refreshToFreshVideos();
+                  } else {
+                    if (mounted && _currentPullDelta > 0.0) {
+                      setState(() => _currentPullDelta = 0.0);
+                    }
+                  }
+                },
+                onPointerCancel: (_) {
+                  if (mounted && _currentPullDelta > 0.0) {
+                    setState(() => _currentPullDelta = 0.0);
+                  }
+                },
+                child: Stack(
+                  children: [
+                    // 1. TikTok / Reels style Vertical PageView
+                    PageView.builder(
+                      controller: _pageController,
+                      scrollDirection: Axis.vertical,
+                      itemCount: _feed.length,
+                      onPageChanged: _onPageChanged,
+                      itemBuilder: (context, index) {
+                        return _buildVideoPage(index);
+                      },
                     ),
-                  ),
-                ),
 
-            // Subtle Loading Overlay while fetching
-            if (_isLoading)
-              Container(
-                color: Colors.black,
-                child: const Center(
-                  child: CircularProgressIndicator(color: AppColors.accentCyan),
-                ),
-              ),
-
-            // 2. Bottom Gradient Vignette for Readability of Overlay Controls
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              height: 250,
-              child: IgnorePointer(
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.bottomCenter,
-                      end: Alignment.topCenter,
-                      colors: [
-                        Colors.black.withOpacity(0.92),
-                        Colors.black.withOpacity(0.5),
-                        Colors.transparent,
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-
-            // 3. Top Header Overlay (ONLY Back '<' and Search '🔍' icons as requested)
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  child: Row(
-                    children: [
-                      // Back '<' Icon (Clean minimal chevron matching screenshot)
-                      GestureDetector(
-                        onTap: () {
-                          if (widget.onBackToDeviceVideos != null) {
-                            widget.onBackToDeviceVideos!();
-                          } else if (Navigator.canPop(context)) {
-                            Navigator.pop(context);
-                          }
-                        },
-                        behavior: HitTestBehavior.opaque,
-                        child: const Padding(
-                          padding: EdgeInsets.all(8.0),
-                          child: Icon(
-                            Icons.arrow_back_ios_new_rounded,
-                            color: Colors.white,
-                            size: 22,
-                            shadows: [Shadow(color: Colors.black87, blurRadius: 6, offset: Offset(0, 1))],
-                          ),
-                        ),
-                      ),
-
-                      // Expandable Search Bar or Search Icon
-                      if (_isSearching)
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.only(left: 8),
-                            child: Container(
-                              height: 40,
-                              decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.85),
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(color: AppColors.accentCyan),
-                              ),
-                              child: TextField(
-                                controller: _searchController,
-                                autofocus: true,
-                                style: const TextStyle(color: Colors.white, fontSize: 13),
-                                decoration: InputDecoration(
-                                  hintText: lang.isHindi ? 'यूट्यूब शॉर्ट्स खोजें...' : 'Search YouTube Shorts...',
-                                  hintStyle: const TextStyle(color: Colors.white38, fontSize: 12),
-                                  prefixIcon: const Icon(Icons.search_rounded, color: AppColors.accentCyan, size: 18),
-                                  suffixIcon: IconButton(
-                                    icon: const Icon(Icons.close_rounded, color: Colors.white70, size: 18),
-                                    onPressed: () => setState(() => _isSearching = false),
-                                  ),
-                                  border: InputBorder.none,
-                                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                    // 2. Pull-down to refresh indicator badge
+                    if (_currentPullDelta > 15.0 || _isPullRefreshing)
+                      Positioned(
+                        top: 55 + (_currentPullDelta * 0.35),
+                        left: 0,
+                        right: 0,
+                        child: Center(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF131A2A).withOpacity(0.95),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: AppColors.accentCyan, width: 1.2),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.accentCyan.withOpacity(0.35),
+                                  blurRadius: 10,
+                                  spreadRadius: 2,
                                 ),
-                                onSubmitted: _performSearch,
-                              ),
+                              ],
                             ),
-                          ),
-                        )
-                      else ...[
-                        const Spacer(),
-                        GestureDetector(
-                          onTap: () => setState(() => _isSearching = true),
-                          behavior: HitTestBehavior.opaque,
-                          child: const Padding(
-                            padding: EdgeInsets.all(8.0),
-                            child: Icon(
-                              Icons.search_rounded,
-                              color: Colors.white,
-                              size: 24,
-                              shadows: [Shadow(color: Colors.black87, blurRadius: 6, offset: Offset(0, 1))],
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: AppColors.accentCyan,
+                                    value: _isPullRefreshing ? null : (_currentPullDelta / 50.0).clamp(0.0, 1.0),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  _isPullRefreshing
+                                      ? (lang.isHindi ? 'नया शॉर्ट्स लोड हो रहा है...' : 'Refreshing Shorts...')
+                                      : (_currentPullDelta > 50.0
+                                          ? (lang.isHindi ? 'छोड़ें (रिफ्रेश होगा)' : 'Release to refresh')
+                                          : (lang.isHindi ? 'नीचे खींचें रिफ्रेश के लिए' : 'Pull down to refresh')),
+                                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                                ),
+                              ],
                             ),
                           ),
                         ),
-                      ],
-                    ],
+                      ),
+
+                    // 3. Top Header: ONLY Back '<' and Search '🔍' icons
+                    Positioned(
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      child: SafeArea(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          child: Row(
+                            children: [
+                              // Back '<' minimal chevron
+                              GestureDetector(
+                                onTap: () {
+                                  if (widget.onBackToDeviceVideos != null) {
+                                    widget.onBackToDeviceVideos!();
+                                  } else if (Navigator.canPop(context)) {
+                                    Navigator.pop(context);
+                                  }
+                                },
+                                behavior: HitTestBehavior.opaque,
+                                child: const Padding(
+                                  padding: EdgeInsets.all(8.0),
+                                  child: Icon(
+                                    Icons.arrow_back_ios_new_rounded,
+                                    color: Colors.white,
+                                    size: 22,
+                                    shadows: [Shadow(color: Colors.black87, blurRadius: 6, offset: Offset(0, 1))],
+                                  ),
+                                ),
+                              ),
+
+                              // Expandable search input
+                              if (_isSearching)
+                                Expanded(
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(left: 8),
+                                    child: Container(
+                                      height: 40,
+                                      decoration: BoxDecoration(
+                                        color: Colors.black.withOpacity(0.85),
+                                        borderRadius: BorderRadius.circular(20),
+                                        border: Border.all(color: AppColors.accentCyan),
+                                      ),
+                                      child: TextField(
+                                        controller: _searchController,
+                                        autofocus: true,
+                                        style: const TextStyle(color: Colors.white, fontSize: 13),
+                                        decoration: InputDecoration(
+                                          hintText: lang.isHindi ? 'यूट्यूब शॉर्ट्स खोजें...' : 'Search YouTube Shorts...',
+                                          hintStyle: const TextStyle(color: Colors.white38, fontSize: 12),
+                                          prefixIcon: const Icon(Icons.search_rounded, color: AppColors.accentCyan, size: 18),
+                                          suffixIcon: IconButton(
+                                            icon: const Icon(Icons.close_rounded, color: Colors.white70, size: 18),
+                                            onPressed: () => setState(() => _isSearching = false),
+                                          ),
+                                          border: InputBorder.none,
+                                          contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                                        ),
+                                        onSubmitted: _performSearch,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              else ...[
+                                const Spacer(),
+                                GestureDetector(
+                                  onTap: () => setState(() => _isSearching = true),
+                                  behavior: HitTestBehavior.opaque,
+                                  child: const Padding(
+                                    padding: EdgeInsets.all(8.0),
+                                    child: Icon(
+                                      Icons.search_rounded,
+                                      color: Colors.white,
+                                      size: 24,
+                                      shadows: [Shadow(color: Colors.black87, blurRadius: 6, offset: Offset(0, 1))],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    // 4. Center Play/Pause Ripple Indicator
+                    if (_showPlayPauseRipple)
+                      Center(
+                        child: AnimatedOpacity(
+                          duration: const Duration(milliseconds: 300),
+                          opacity: _showPlayPauseRipple ? 1.0 : 0.0,
+                          child: Container(
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.55),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              _isPlaying ? Icons.play_arrow_rounded : Icons.pause_rounded,
+                              color: Colors.white,
+                              size: 48,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+      ),
+    );
+  }
+
+  /// Build individual short page with clean embed player + custom Flutter action rail & creator row
+  Widget _buildVideoPage(int index) {
+    if (index >= _feed.length) return const SizedBox.shrink();
+    final item = _feed[index];
+    final isLiked = _likedVideos[item.id] ?? false;
+    final isDisliked = _dislikedVideos[item.id] ?? false;
+    final isSubscribed = _subService.isSubscribed(item.author);
+
+    final ctrl = _controllers[index];
+
+    return Stack(
+      children: [
+        // 1. Clean Embed Player (Zero YouTube web buttons, zero top bar, zero creator row)
+        GestureDetector(
+          onTap: _togglePlayPause,
+          behavior: HitTestBehavior.opaque,
+          child: ctrl != null
+              ? WebViewWidget(
+                  controller: ctrl,
+                  gestureRecognizers: const <Factory<OneSequenceGestureRecognizer>>{},
+                )
+              : Container(
+                  color: Colors.black,
+                  child: const Center(
+                    child: CircularProgressIndicator(color: AppColors.accentCyan),
                   ),
+                ),
+        ),
+
+        // 2. Bottom Gradient Vignette for readability of custom overlay
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: 250,
+          child: IgnorePointer(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                  colors: [
+                    Colors.black.withOpacity(0.92),
+                    Colors.black.withOpacity(0.5),
+                    Colors.transparent,
+                  ],
                 ),
               ),
             ),
+          ),
+        ),
 
-            // 4. Left Bottom Creator Row, Red +FOLLOW Button & Video Title (EXACT MATCH TO SCREENSHOT)
-            Positioned(
-              left: 14,
-              bottom: 24,
-              right: 76,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
+        // 3. Left Bottom Creator Row, Channel Name, Video Title & Red +FOLLOW Button
+        Positioned(
+          left: 14,
+          bottom: 24,
+          right: 76,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Video Title
+              Text(
+                item.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  shadows: [Shadow(color: Colors.black87, blurRadius: 4, offset: Offset(0, 1))],
+                ),
+              ),
+              const SizedBox(height: 8),
+
+              // Creator Row: [Avatar] [Channel Name] [Red +FOLLOW Button]
+              Row(
                 children: [
-                  // Video Title (Clean and compact)
-                  if (_videoTitle.isNotEmpty && _videoTitle != 'Trending YouTube Short') ...[
-                    Text(
-                      _videoTitle,
-                      maxLines: 2,
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 1.5),
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF1565C0), Color(0xFF00B0FF)],
+                      ),
+                    ),
+                    child: Center(
+                      child: Text(
+                        item.author.isNotEmpty ? item.author[0].toUpperCase() : 'Y',
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+
+                  Flexible(
+                    child: Text(
+                      item.author,
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        shadows: [Shadow(color: Colors.black87, blurRadius: 4, offset: Offset(0, 1))],
+                        fontWeight: FontWeight.bold,
+                        shadows: [Shadow(color: Colors.black87, blurRadius: 4)],
                       ),
                     ),
-                    const SizedBox(height: 8),
-                  ],
+                  ),
+                  const SizedBox(width: 10),
 
-                  // Creator Row: [Avatar (34dp)] [Channel Name] [Red +FOLLOW Button]
-                  Row(
-                    children: [
-                      Container(
-                        width: 34,
-                        height: 34,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 1.5),
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF1565C0), Color(0xFF00B0FF)],
-                          ),
-                        ),
-                        child: Center(
-                          child: Text(
-                            _channelName.isNotEmpty ? _channelName[0].toUpperCase() : 'Y',
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
-                          ),
+                  // Red +FOLLOW Subscribe Button
+                  GestureDetector(
+                    onTap: () => _handleSubscribeToggle(item.author),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: isSubscribed ? Colors.white.withOpacity(0.2) : const Color(0xFFE50914),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: isSubscribed ? Colors.white30 : Colors.transparent),
+                      ),
+                      child: Text(
+                        isSubscribed ? 'SUBSCRIBED' : '+FOLLOW',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.4,
                         ),
                       ),
-                      const SizedBox(width: 8),
-
-                      Flexible(
-                        child: Text(
-                          _channelName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            shadows: [Shadow(color: Colors.black87, blurRadius: 4)],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-
-                      // Red Subscribe Button (+FOLLOW) - Direct In-App Google Sign-in without external YouTube app
-                      GestureDetector(
-                        onTap: _handleSubscribeToggle,
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                          decoration: BoxDecoration(
-                            color: isSubscribed
-                                ? Colors.white.withOpacity(0.2)
-                                : const Color(0xFFE50914),
-                            borderRadius: BorderRadius.circular(4),
-                            border: Border.all(
-                              color: isSubscribed ? Colors.white30 : Colors.transparent,
-                            ),
-                          ),
-                          child: Text(
-                            isSubscribed ? 'SUBSCRIBED' : '+FOLLOW',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.4,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ],
               ),
-            ),
-
-            // 5. Right Side Action Suite (EXACT MATCH TO SCREENSHOT - Floating White Icons with Shadows)
-            Positioned(
-              right: 12,
-              bottom: 24,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // 1. Thumbs Up (Like)
-                  _buildActionItem(
-                    iconWidget: Icon(
-                      _isLiked ? Icons.thumb_up_rounded : Icons.thumb_up_alt_outlined,
-                      color: _isLiked ? const Color(0xFF00E5FF) : Colors.white,
-                      size: 28,
-                      shadows: const [Shadow(color: Colors.black54, blurRadius: 6, offset: Offset(0, 2))],
-                    ),
-                    label: _likesCountStr,
-                    onTap: _toggleLike,
-                  ),
-
-                  // 2. Thumbs Down (Dislike)
-                  _buildActionItem(
-                    iconWidget: Icon(
-                      _isDisliked ? Icons.thumb_down_rounded : Icons.thumb_down_alt_outlined,
-                      color: _isDisliked ? const Color(0xFF00E5FF) : Colors.white,
-                      size: 28,
-                      shadows: const [Shadow(color: Colors.black54, blurRadius: 6, offset: Offset(0, 2))],
-                    ),
-                    label: 'Dislike',
-                    onTap: _toggleDislike,
-                  ),
-
-                  // 3. Comments (Rounded chat bubble matching screenshot)
-                  _buildActionItem(
-                    iconWidget: const Icon(
-                      Icons.chat_bubble_rounded,
-                      color: Colors.white,
-                      size: 26,
-                      shadows: [Shadow(color: Colors.black54, blurRadius: 6, offset: Offset(0, 2))],
-                    ),
-                    label: '$_commentsCount',
-                    onTap: () => _showCommentsModal(context),
-                  ),
-
-                  // 4. Share (Curved arrow pointing right matching screenshot)
-                  _buildActionItem(
-                    iconWidget: Transform.flip(
-                      flipX: true,
-                      child: const Icon(
-                        Icons.reply_rounded,
-                        color: Colors.white,
-                        size: 30,
-                        shadows: [Shadow(color: Colors.black54, blurRadius: 6, offset: Offset(0, 2))],
-                      ),
-                    ),
-                    label: 'Share',
-                    onTap: () => _showShareModal(context),
-                  ),
-
-                  // 5. Download Video to Gallery (Downward arrow to tray)
-                  _buildActionItem(
-                    iconWidget: Icon(
-                      _isDownloading ? Icons.hourglass_top_rounded : Icons.download_rounded,
-                      color: _isDownloading ? AppColors.accentCyan : Colors.white,
-                      size: 28,
-                      shadows: const [Shadow(color: Colors.black54, blurRadius: 6, offset: Offset(0, 2))],
-                    ),
-                    label: _isDownloading ? '${(_downloadProgress * 100).toInt()}%' : 'Download',
-                    onTap: _handleDownload,
-                  ),
-
-                  // 6. More Options (...)
-                  _buildActionItem(
-                    iconWidget: const Icon(
-                      Icons.more_horiz_rounded,
-                      color: Colors.white,
-                      size: 28,
-                      shadows: [Shadow(color: Colors.black54, blurRadius: 6, offset: Offset(0, 2))],
-                    ),
-                    label: '',
-                    onTap: () => _showMoreOptionsModal(context),
-                  ),
-                ],
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
-      ),
-    ),
-  );
+
+        // 4. Right Side MSIXA Custom Action Suite (EXACT MATCH TO USER SCREENSHOT)
+        Positioned(
+          right: 12,
+          bottom: 24,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 1. Thumbs Up (Like)
+              _buildActionItem(
+                iconWidget: Icon(
+                  Icons.thumb_up_rounded,
+                  color: isLiked ? const Color(0xFF00E5FF) : Colors.white,
+                  size: 28,
+                  shadows: const [Shadow(color: Colors.black54, blurRadius: 6, offset: Offset(0, 2))],
+                ),
+                label: '${item.likesCount > 0 ? (item.likesCount / 1000).toStringAsFixed(0) : 94}K',
+                onTap: () => _toggleLike(item.id),
+              ),
+
+              // 2. Thumbs Down (Dislike)
+              _buildActionItem(
+                iconWidget: Icon(
+                  Icons.thumb_down_rounded,
+                  color: isDisliked ? const Color(0xFF00E5FF) : Colors.white,
+                  size: 28,
+                  shadows: const [Shadow(color: Colors.black54, blurRadius: 6, offset: Offset(0, 2))],
+                ),
+                label: 'Dislike',
+                onTap: () => _toggleDislike(item.id),
+              ),
+
+              // 3. Comments
+              _buildActionItem(
+                iconWidget: const Icon(
+                  Icons.chat_bubble_rounded,
+                  color: Colors.white,
+                  size: 26,
+                  shadows: [Shadow(color: Colors.black54, blurRadius: 6, offset: Offset(0, 2))],
+                ),
+                label: '322',
+                onTap: () => _showCommentsModal(context, item),
+              ),
+
+              // 4. Share (Curved Right Arrow)
+              _buildActionItem(
+                iconWidget: Transform.flip(
+                  flipX: true,
+                  child: const Icon(
+                    Icons.reply_rounded,
+                    color: Colors.white,
+                    size: 30,
+                    shadows: [Shadow(color: Colors.black54, blurRadius: 6, offset: Offset(0, 2))],
+                  ),
+                ),
+                label: 'Share',
+                onTap: () => _showShareModal(context, item),
+              ),
+
+              // 5. Download Video to Device Gallery
+              _buildActionItem(
+                iconWidget: Icon(
+                  _isDownloading ? Icons.hourglass_top_rounded : Icons.download_rounded,
+                  color: _isDownloading ? AppColors.accentCyan : Colors.white,
+                  size: 28,
+                  shadows: const [Shadow(color: Colors.black54, blurRadius: 6, offset: Offset(0, 2))],
+                ),
+                label: _isDownloading ? '${(_downloadProgress * 100).toInt()}%' : 'Download',
+                onTap: () => _handleDownload(item),
+              ),
+
+              // 6. More Options (...)
+              _buildActionItem(
+                iconWidget: const Icon(
+                  Icons.more_horiz_rounded,
+                  color: Colors.white,
+                  size: 28,
+                  shadows: [Shadow(color: Colors.black54, blurRadius: 6, offset: Offset(0, 2))],
+                ),
+                label: '',
+                onTap: () => _showMoreOptionsModal(context, item),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 
-  /// Floating Action Item matching YouTube Shorts design (Pure white icon with drop shadow, no circular background)
+  /// Floating Action Item matching YouTube Shorts design
   Widget _buildActionItem({
     required Widget iconWidget,
     required String label,
@@ -1661,9 +1368,7 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
                   color: Colors.white,
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
-                  shadows: [
-                    Shadow(color: Colors.black87, blurRadius: 4, offset: Offset(0, 1)),
-                  ],
+                  shadows: [Shadow(color: Colors.black87, blurRadius: 4, offset: Offset(0, 1))],
                 ),
               ),
             ],
