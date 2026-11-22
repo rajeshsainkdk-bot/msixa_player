@@ -1,0 +1,671 @@
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:video_player/video_player.dart';
+import '../models/short_video_item.dart';
+import '../services/language_service.dart';
+import '../services/shorts_service.dart';
+import '../theme/app_colors.dart';
+
+class ShortsFeedView extends StatefulWidget {
+  final VoidCallback? onBackToDeviceVideos;
+  const ShortsFeedView({Key? key, this.onBackToDeviceVideos}) : super(key: key);
+
+  @override
+  State<ShortsFeedView> createState() => _ShortsFeedViewState();
+}
+
+class _ShortsFeedViewState extends State<ShortsFeedView> {
+  final ShortsService _shortsService = ShortsService();
+  final PageController _pageController = PageController();
+  final TextEditingController _searchController = TextEditingController();
+
+  List<ShortVideoItem> _shorts = [];
+  bool _isLoading = true;
+  String _activeCategory = 'Trending';
+  bool _isSearching = false;
+  int _currentIndex = 0;
+
+  final List<Map<String, String>> _categories = [
+    {'id': 'Trending', 'hi': '🔥 ट्रेंडिंग', 'en': '🔥 Trending'},
+    {'id': 'Marwadi', 'hi': '🐪 मारवाड़ी व राजस्थानी', 'en': '🐪 Rajasthani'},
+    {'id': 'DJ Remix', 'hi': '🎧 डीजे रीमिक्स', 'en': '🎧 DJ Remix'},
+    {'id': 'Haryanvi', 'hi': '🚜 हरियाणवी', 'en': '🚜 Haryanvi'},
+    {'id': 'Bhakti', 'hi': '🕉️ भक्ति व महाकाल', 'en': '🕉️ Bhakti'},
+    {'id': 'Romantic', 'hi': '❤️ रोमांटिक लव', 'en': '❤️ Romantic'},
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadShortsForCategory(_activeCategory);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadShortsForCategory(String category) async {
+    setState(() => _isLoading = true);
+    final list = await _shortsService.getShortsByCategory(category);
+    if (mounted) {
+      setState(() {
+        _shorts = list;
+        _isLoading = false;
+        _currentIndex = 0;
+      });
+    }
+  }
+
+  Future<void> _performSearch(String query) async {
+    if (query.trim().isEmpty) return;
+    setState(() => _isLoading = true);
+    final results = await _shortsService.searchShorts(query.trim());
+    if (mounted) {
+      setState(() {
+        _shorts = results;
+        _isLoading = false;
+        _currentIndex = 0;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final lang = LanguageService();
+
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        children: [
+          // 1. Vertical Swipeable PageView Feed
+          if (_isLoading)
+            const Center(
+              child: CircularProgressIndicator(color: AppColors.accentCyan),
+            )
+          else if (_shorts.isEmpty)
+            Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.videocam_off_rounded, color: Colors.white38, size: 48),
+                  const SizedBox(height: 12),
+                  Text(
+                    lang.isHindi ? 'कोई शॉर्ट्स वीडियो नहीं मिला' : 'No short videos found',
+                    style: const TextStyle(color: Colors.white70, fontSize: 14),
+                  ),
+                  const SizedBox(height: 12),
+                  ElevatedButton(
+                    onPressed: () => _loadShortsForCategory('Trending'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.accentCyan,
+                      foregroundColor: Colors.black,
+                    ),
+                    child: Text(lang.isHindi ? 'ताज़ा करें' : 'Refresh'),
+                  ),
+                ],
+              ),
+            )
+          else
+            PageView.builder(
+              controller: _pageController,
+              scrollDirection: Axis.vertical,
+              itemCount: _shorts.length,
+              onPageChanged: (index) {
+                setState(() => _currentIndex = index);
+              },
+              itemBuilder: (context, index) {
+                final isCurrent = index == _currentIndex;
+                return _ShortVideoPlayerCard(
+                  key: ValueKey(_shorts[index].id),
+                  short: _shorts[index],
+                  isActive: isCurrent,
+                  onLikeToggle: () {
+                    setState(() {
+                      final item = _shorts[index];
+                      item.isLiked = !item.isLiked;
+                      item.likesCount += item.isLiked ? 1 : -1;
+                    });
+                  },
+                );
+              },
+            ),
+
+          // 2. Top Header Overlay (Category Chips & Search)
+          SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Top Action Bar
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Row(
+                    children: [
+                      if (widget.onBackToDeviceVideos != null)
+                        InkWell(
+                          onTap: widget.onBackToDeviceVideos,
+                          borderRadius: BorderRadius.circular(20),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.5),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: Colors.white24),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.arrow_back_ios_rounded, color: Colors.white, size: 12),
+                                const SizedBox(width: 4),
+                                Text(
+                                  lang.isHindi ? 'डिवाइस' : 'Device',
+                                  style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _isSearching
+                            ? Container(
+                                height: 38,
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.7),
+                                  borderRadius: BorderRadius.circular(18),
+                                  border: Border.all(color: AppColors.accentCyan),
+                                ),
+                                child: TextField(
+                                  controller: _searchController,
+                                  autofocus: true,
+                                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                                  decoration: InputDecoration(
+                                    hintText: lang.isHindi ? 'शॉर्ट्स खोजें (मारवाड़ी, डीजे, भक्ति)...' : 'Search any shorts...',
+                                    hintStyle: const TextStyle(color: Colors.white38, fontSize: 12),
+                                    prefixIcon: const Icon(Icons.search_rounded, color: AppColors.accentCyan, size: 18),
+                                    suffixIcon: IconButton(
+                                      icon: const Icon(Icons.close_rounded, color: Colors.white70, size: 16),
+                                      onPressed: () {
+                                        setState(() => _isSearching = false);
+                                        _loadShortsForCategory(_activeCategory);
+                                      },
+                                    ),
+                                    border: InputBorder.none,
+                                    contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                                  ),
+                                  onSubmitted: _performSearch,
+                                ),
+                              )
+                            : SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: Row(
+                                  children: _categories.map((cat) {
+                                    final isSelected = _activeCategory == cat['id'];
+                                    return Padding(
+                                      padding: const EdgeInsets.only(right: 6),
+                                      child: GestureDetector(
+                                        onTap: () {
+                                          setState(() => _activeCategory = cat['id']!);
+                                          _loadShortsForCategory(cat['id']!);
+                                        },
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                          decoration: BoxDecoration(
+                                            color: isSelected ? AppColors.accentCyan : Colors.black.withOpacity(0.55),
+                                            borderRadius: BorderRadius.circular(16),
+                                            border: Border.all(
+                                              color: isSelected ? AppColors.accentCyan : Colors.white24,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            lang.isHindi ? cat['hi']! : cat['en']!,
+                                            style: TextStyle(
+                                              color: isSelected ? Colors.black : Colors.white,
+                                              fontSize: 11,
+                                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                              ),
+                      ),
+                      if (!_isSearching)
+                        IconButton(
+                          icon: const Icon(Icons.search_rounded, color: Colors.white, size: 22),
+                          onPressed: () => setState(() => _isSearching = true),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ShortVideoPlayerCard extends StatefulWidget {
+  final ShortVideoItem short;
+  final bool isActive;
+  final VoidCallback onLikeToggle;
+
+  const _ShortVideoPlayerCard({
+    Key? key,
+    required this.short,
+    required this.isActive,
+    required this.onLikeToggle,
+  }) : super(key: key);
+
+  @override
+  State<_ShortVideoPlayerCard> createState() => _ShortVideoPlayerCardState();
+}
+
+class _ShortVideoPlayerCardState extends State<_ShortVideoPlayerCard> {
+  final ShortsService _shortsService = ShortsService();
+  VideoPlayerController? _controller;
+  bool _isInit = false;
+  bool _isPlaying = true;
+  bool _isDownloading = false;
+  double _downloadProgress = 0.0;
+  bool _isWhatsAppStatusPending = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.isActive) {
+      _initVideo();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _ShortVideoPlayerCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isActive != oldWidget.isActive) {
+      if (widget.isActive) {
+        if (_controller == null) {
+          _initVideo();
+        } else {
+          _controller?.play();
+          setState(() => _isPlaying = true);
+        }
+      } else {
+        _controller?.pause();
+        setState(() => _isPlaying = false);
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  Future<void> _initVideo() async {
+    try {
+      String? streamUrl = widget.short.streamUrl;
+      if (streamUrl == null || streamUrl.isEmpty) {
+        streamUrl = await _shortsService.resolveStreamUrl(widget.short.id);
+      }
+
+      if (streamUrl != null && streamUrl.isNotEmpty && mounted) {
+        final ctrl = VideoPlayerController.networkUrl(Uri.parse(streamUrl));
+        await ctrl.initialize();
+        ctrl.setLooping(true);
+        if (widget.isActive) {
+          ctrl.play();
+        }
+        if (mounted) {
+          setState(() {
+            _controller = ctrl;
+            _isInit = true;
+            _isPlaying = widget.isActive;
+          });
+        }
+      }
+    } catch (_) {}
+  }
+
+  void _togglePlayPause() {
+    if (_controller == null || !_isInit) return;
+    setState(() {
+      if (_controller!.value.isPlaying) {
+        _controller!.pause();
+        _isPlaying = false;
+      } else {
+        _controller!.play();
+        _isPlaying = true;
+      }
+    });
+  }
+
+  Future<void> _handleDownload(BuildContext context) async {
+    if (_isDownloading) return;
+    final lang = LanguageService();
+    setState(() {
+      _isDownloading = true;
+      _downloadProgress = 0.0;
+    });
+
+    final path = await _shortsService.downloadShort(
+      widget.short,
+      onProgress: (p) {
+        if (mounted) setState(() => _downloadProgress = p);
+      },
+    );
+
+    if (mounted) {
+      setState(() => _isDownloading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            path != null
+                ? (lang.isHindi ? 'वीडियो डाउनलोड हो गया! (गैलरी में सेव्ड)' : 'Video downloaded to storage!')
+                : (lang.isHindi ? 'डाउनलोड विफल रहा' : 'Download failed'),
+          ),
+          backgroundColor: path != null ? const Color(0xFF00E5FF) : Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  Future<void> _handleWhatsAppStatus(BuildContext context) async {
+    if (_isWhatsAppStatusPending) return;
+    final lang = LanguageService();
+
+    setState(() {
+      _isWhatsAppStatusPending = true;
+      _downloadProgress = 0.0;
+    });
+
+    // Show indicator
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+            ),
+            const SizedBox(width: 12),
+            Text(lang.isHindi ? 'व्हाट्सएप स्टेटस तैयार हो रहा है...' : 'Preparing WhatsApp Status...'),
+          ],
+        ),
+        backgroundColor: const Color(0xFF25D366),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+
+    final success = await _shortsService.shareToWhatsAppStatus(
+      widget.short,
+      onProgress: (p) {
+        if (mounted) setState(() => _downloadProgress = p);
+      },
+    );
+
+    if (mounted) {
+      setState(() => _isWhatsAppStatusPending = false);
+      if (!success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(lang.isHindi ? 'व्हाट्सएप नहीं मिला या स्टेटस नहीं लग सका' : 'Could not launch WhatsApp status'),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _handleGeneralShare() async {
+    final path = widget.short.localPath;
+    if (path != null && File(path).existsSync()) {
+      await Share.shareXFiles([XFile(path)], text: widget.short.title);
+    } else {
+      final cached = await _shortsService.downloadShort(widget.short);
+      if (cached != null) {
+        await Share.shareXFiles([XFile(cached)], text: widget.short.title);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: _togglePlayPause,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Background Video / Thumbnail
+          if (_controller != null && _isInit)
+            Center(
+              child: AspectRatio(
+                aspectRatio: _controller!.value.aspectRatio > 0 ? _controller!.value.aspectRatio : 9 / 16,
+                child: VideoPlayer(_controller!),
+              ),
+            )
+          else
+            Stack(
+              fit: StackFit.expand,
+              children: [
+                if (widget.short.thumbnailUrl.isNotEmpty)
+                  Image.network(
+                    widget.short.thumbnailUrl,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(color: const Color(0xFF131A2A)),
+                  )
+                else
+                  Container(color: const Color(0xFF131A2A)),
+                const Center(
+                  child: CircularProgressIndicator(color: AppColors.accentCyan),
+                ),
+              ],
+            ),
+
+          // Play / Pause Indicator on Tap
+          if (!_isPlaying && _isInit)
+            Center(
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.55),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 54),
+              ),
+            ),
+
+          // Gradient Vignette for bottom readable text
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: 220,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                  colors: [
+                    Colors.black.withOpacity(0.9),
+                    Colors.black.withOpacity(0.4),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // Left Bottom Title & Creator
+          Positioned(
+            left: 16,
+            bottom: 30,
+            right: 80,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppColors.accentCyan.withOpacity(0.25),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.accentCyan.withOpacity(0.5)),
+                  ),
+                  child: Text(
+                    widget.short.category,
+                    style: const TextStyle(color: AppColors.accentCyan, fontSize: 10, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  widget.short.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    shadows: [Shadow(color: Colors.black, blurRadius: 4)],
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    const Icon(Icons.music_note_rounded, color: AppColors.accentCyan, size: 14),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        widget.short.author,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Colors.white70, fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          // Right Floating Actions Column (Reels / Shorts Style)
+          Positioned(
+            right: 12,
+            bottom: 30,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // 1. Like Button
+                _buildActionItem(
+                  icon: widget.short.isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                  color: widget.short.isLiked ? Colors.redAccent : Colors.white,
+                  label: '${widget.short.likesCount}',
+                  onTap: widget.onLikeToggle,
+                ),
+                const SizedBox(height: 16),
+
+                // 2. Download Button
+                _buildActionItem(
+                  icon: _isDownloading
+                      ? Icons.downloading_rounded
+                      : (widget.short.isDownloaded ? Icons.check_circle_rounded : Icons.download_rounded),
+                  color: widget.short.isDownloaded ? AppColors.accentCyan : Colors.white,
+                  label: _isDownloading
+                      ? '${(_downloadProgress * 100).toInt()}%'
+                      : (widget.short.isDownloaded ? 'सेव्ड' : 'डाउनलोड'),
+                  onTap: () => _handleDownload(context),
+                ),
+                const SizedBox(height: 16),
+
+                // 3. WhatsApp Status Direct Button
+                _buildActionItem(
+                  icon: Icons.chat_bubble_rounded,
+                  color: const Color(0xFF25D366), // WhatsApp brand green
+                  label: 'स्टेटस',
+                  onTap: () => _handleWhatsAppStatus(context),
+                  badge: 'WA',
+                ),
+                const SizedBox(height: 16),
+
+                // 4. Share Button
+                _buildActionItem(
+                  icon: Icons.share_rounded,
+                  color: Colors.white,
+                  label: 'शेयर',
+                  onTap: _handleGeneralShare,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionItem({
+    required IconData icon,
+    required Color color,
+    required String label,
+    required VoidCallback onTap,
+    String? badge,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.4),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white12),
+                ),
+                child: Icon(icon, color: color, size: 26),
+              ),
+              if (badge != null)
+                Positioned(
+                  right: -2,
+                  top: -2,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF25D366),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      badge,
+                      style: const TextStyle(color: Colors.black, fontSize: 8, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              shadows: [Shadow(color: Colors.black, blurRadius: 4)],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

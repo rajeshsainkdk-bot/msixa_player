@@ -6,6 +6,7 @@ import '../models/video_item.dart';
 import '../services/device_video_service.dart';
 import '../services/language_service.dart';
 import '../theme/app_colors.dart';
+import '../widgets/shorts_feed_view.dart';
 import '../widgets/video_thumbnail_widget.dart';
 import 'video_player_screen.dart';
 
@@ -27,6 +28,7 @@ class _VideosScreenState extends State<VideosScreen> {
   String _sortOption = 'date_desc';
   List<String> _recentVideoIds = [];
   bool _isSelectionMode = false;
+  int _selectedVideoTab = 0; // 0: Device Videos, 1: Trending Shorts / WhatsApp Status
   final Set<String> _selectedVideoIds = {};
   final TextEditingController _searchController = TextEditingController();
 
@@ -462,6 +464,17 @@ class _VideosScreenState extends State<VideosScreen> {
                     ),
             ),
 
+            // Top Segment Switcher: Device Videos vs Trending Shorts
+            if (!_isSelectionMode)
+              _buildSegmentSwitcher(lang),
+
+            if (_selectedVideoTab == 1)
+              Expanded(
+                child: ShortsFeedView(
+                  onBackToDeviceVideos: () => setState(() => _selectedVideoTab = 0),
+                ),
+              )
+            else ...[
             // Horizontal Folder Filter Chips
             if (folders.length > 1)
               SizedBox(
@@ -563,10 +576,11 @@ class _VideosScreenState extends State<VideosScreen> {
                           },
                         ),
             ),
+            ],
           ],
         ),
       ),
-      floatingActionButton: (!_isSelectionMode && displayList.isNotEmpty)
+      floatingActionButton: (!_isSelectionMode && _selectedVideoTab == 0 && displayList.isNotEmpty)
           ? FloatingActionButton(
               backgroundColor: const Color(0xFF2563EB),
               elevation: 6,
@@ -619,6 +633,111 @@ class _VideosScreenState extends State<VideosScreen> {
               ),
             )
           : null,
+    );
+  }
+
+  Widget _buildSegmentSwitcher(LanguageService lang) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 2, 16, 8),
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: const Color(0xFF131A2A),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white12),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: GestureDetector(
+              onTap: () {
+                if (_selectedVideoTab != 0) {
+                  setState(() => _selectedVideoTab = 0);
+                }
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(
+                  color: _selectedVideoTab == 0 ? AppColors.accentCyan : Colors.transparent,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                alignment: Alignment.center,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.folder_special_rounded,
+                      size: 16,
+                      color: _selectedVideoTab == 0 ? Colors.black : Colors.white70,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      lang.isHindi ? 'डिवाइस वीडियो' : 'Device Videos',
+                      style: TextStyle(
+                        color: _selectedVideoTab == 0 ? Colors.black : Colors.white70,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: GestureDetector(
+              onTap: () {
+                if (_selectedVideoTab != 1) {
+                  setState(() => _selectedVideoTab = 1);
+                }
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(
+                  color: _selectedVideoTab == 1 ? const Color(0xFFFFB300) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                alignment: Alignment.center,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.bolt_rounded,
+                      size: 18,
+                      color: _selectedVideoTab == 1 ? Colors.black : const Color(0xFFFFB300),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      lang.isHindi ? 'ट्रेंडिंग शॉर्ट्स' : 'Trending Shorts',
+                      style: TextStyle(
+                        color: _selectedVideoTab == 1 ? Colors.black : Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: _selectedVideoTab == 1 ? Colors.black : const Color(0xFF25D366),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        'STATUS',
+                        style: TextStyle(
+                          color: _selectedVideoTab == 1 ? const Color(0xFFFFB300) : Colors.white,
+                          fontSize: 8,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

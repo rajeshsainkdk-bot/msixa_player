@@ -14,6 +14,7 @@ import 'package:msixa_player/screens/now_playing_screen.dart';
 import 'package:msixa_player/screens/home_screen.dart';
 import 'package:msixa_player/screens/admin/admin_dashboard_screen.dart';
 import 'package:msixa_player/services/jiosaavn_service.dart';
+import 'package:msixa_player/models/short_video_item.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -608,6 +609,34 @@ void main() {
 
       expect(isPlaying, false);
       expect(isBuffering, false);
+    });
+  });
+
+  group('16. ShortVideoItem & Shorts Service Tests', () {
+    test('ShortVideoItem model supports serialization and copyWith', () {
+      final item = ShortVideoItem(
+        id: 'test_short_01',
+        title: 'Marwadi Dance',
+        author: 'Folk Creator',
+        thumbnailUrl: 'https://example.com/thumb.jpg',
+        category: 'Marwadi',
+        likesCount: 1500,
+        shareCount: 400,
+      );
+
+      expect(item.id, 'test_short_01');
+      expect(item.category, 'Marwadi');
+
+      final json = item.toJson();
+      final restored = ShortVideoItem.fromJson(json);
+
+      expect(restored.id, item.id);
+      expect(restored.title, item.title);
+      expect(restored.author, item.author);
+
+      final updated = item.copyWith(isLiked: true, likesCount: 1501);
+      expect(updated.isLiked, true);
+      expect(updated.likesCount, 1501);
     });
   });
 }

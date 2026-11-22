@@ -340,6 +340,76 @@ class MainActivity: AudioServiceActivity() {
                         result.error("SHARE_ERROR", e.localizedMessage, null)
                     }
                 }
+                "shareToWhatsAppStatus" -> {
+                    try {
+                        val videoPath = call.argument<String>("videoPath") ?: ""
+                        val videoFile = File(videoPath)
+                        if (!videoFile.exists()) {
+                            result.error("FILE_NOT_FOUND", "Video file not found at $videoPath", null)
+                            return@setMethodCallHandler
+                        }
+                        val videoUri = FileProvider.getUriForFile(
+                            this,
+                            "${applicationContext.packageName}.fileprovider",
+                            videoFile
+                        )
+                        val pm = packageManager
+                        var targetPkg = "com.whatsapp"
+                        var isInstalled = try {
+                            pm.getPackageInfo("com.whatsapp", 0)
+                            true
+                        } catch (_: Exception) {
+                            false
+                        }
+                        if (!isInstalled) {
+                            isInstalled = try {
+                                pm.getPackageInfo("com.whatsapp.w4b", 0)
+                                targetPkg = "com.whatsapp.w4b"
+                                true
+                            } catch (_: Exception) {
+                                false
+                            }
+                        }
+
+                        if (isInstalled) {
+                            val waIntent = Intent(Intent.ACTION_SEND).apply {
+                                type = "video/*"
+                                setPackage(targetPkg)
+                                putExtra(Intent.EXTRA_STREAM, videoUri)
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            startActivity(waIntent)
+                            result.success(true)
+                        } else {
+                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                type = "video/*"
+                                putExtra(Intent.EXTRA_STREAM, videoUri)
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            }
+                            startActivity(Intent.createChooser(shareIntent, "Share Video Status"))
+                            result.success(true)
+                        }
+                    } catch (e: Exception) {
+                        result.error("STATUS_SHARE_ERR", e.localizedMessage, null)
+                    }
+                }
+                "scanMediaFile" -> {
+                    try {
+                        val path = call.argument<String>("path") ?: ""
+                        if (path.isNotEmpty()) {
+                            android.media.MediaScannerConnection.scanFile(
+                                applicationContext,
+                                arrayOf(path),
+                                arrayOf("video/mp4"),
+                                null
+                            )
+                        }
+                        result.success(true)
+                    } catch (_: Exception) {
+                        result.success(false)
+                    }
+                }
                 "captureVideoScreenshot" -> {
                     try {
                         val path = call.argument<String>("path") ?: ""

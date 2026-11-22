@@ -56,6 +56,8 @@ jobs:
 
               <!-- Package Visibility Queries for Android 11+ Package Installer Resolution -->
               <queries>
+                  <package android:name="com.whatsapp" />
+                  <package android:name="com.whatsapp.w4b" />
                   <intent>
                       <action android:name="android.intent.action.VIEW" />
                       <data android:mimeType="application/vnd.android.package-archive" />
@@ -63,6 +65,10 @@ jobs:
                   <intent>
                       <action android:name="android.intent.action.INSTALL_PACKAGE" />
                       <data android:mimeType="application/vnd.android.package-archive" />
+                  </intent>
+                  <intent>
+                      <action android:name="android.intent.action.SEND" />
+                      <data android:mimeType="video/*" />
                   </intent>
               </queries>
 
@@ -475,6 +481,74 @@ jobs:
                               result.success(true)
                           } catch (e: Exception) {
                               result.error("SHARE_ERROR", e.localizedMessage, null)
+                          }
+                      } else if (call.method == "shareToWhatsAppStatus") {
+                          try {
+                              val videoPath = call.argument<String>("videoPath") ?: ""
+                              val videoFile = File(videoPath)
+                              if (!videoFile.exists()) {
+                                  result.error("FILE_NOT_FOUND", "Video file not found at $videoPath", null)
+                                  return@setMethodCallHandler
+                              }
+                              val videoUri = FileProvider.getUriForFile(
+                                  this,
+                                  "${applicationContext.packageName}.fileprovider",
+                                  videoFile
+                              )
+                              val pm = packageManager
+                              var targetPkg = "com.whatsapp"
+                              var isInstalled = try {
+                                  pm.getPackageInfo("com.whatsapp", 0)
+                                  true
+                              } catch (_: Exception) {
+                                  false
+                              }
+                              if (!isInstalled) {
+                                  isInstalled = try {
+                                      pm.getPackageInfo("com.whatsapp.w4b", 0)
+                                      targetPkg = "com.whatsapp.w4b"
+                                      true
+                                  } catch (_: Exception) {
+                                      false
+                                  }
+                              }
+
+                              if (isInstalled) {
+                                  val waIntent = Intent(Intent.ACTION_SEND).apply {
+                                      type = "video/*"
+                                      setPackage(targetPkg)
+                                      putExtra(Intent.EXTRA_STREAM, videoUri)
+                                      addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                      addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                  }
+                                  startActivity(waIntent)
+                                  result.success(true)
+                              } else {
+                                  val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                      type = "video/*"
+                                      putExtra(Intent.EXTRA_STREAM, videoUri)
+                                      addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                  }
+                                  startActivity(Intent.createChooser(shareIntent, "Share Video Status"))
+                                  result.success(true)
+                              }
+                          } catch (e: Exception) {
+                              result.error("STATUS_SHARE_ERR", e.localizedMessage, null)
+                          }
+                      } else if (call.method == "scanMediaFile") {
+                          try {
+                              val path = call.argument<String>("path") ?: ""
+                              if (path.isNotEmpty()) {
+                                  android.media.MediaScannerConnection.scanFile(
+                                      applicationContext,
+                                      arrayOf(path),
+                                      arrayOf("video/mp4"),
+                                      null
+                                  )
+                              }
+                              result.success(true)
+                          } catch (_: Exception) {
+                              result.success(false)
                           }
                       } else if (call.method == "canInstallPackages") {
                           if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
