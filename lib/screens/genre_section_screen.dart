@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/song.dart';
@@ -6,6 +7,7 @@ import '../services/jiosaavn_service.dart';
 import '../services/language_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/mini_player.dart';
+import '../widgets/song_list_tile.dart';
 import '../widgets/song_thumbnail_widget.dart';
 
 class GenreSectionScreen extends StatefulWidget {
@@ -665,6 +667,7 @@ class _GenreSectionScreenState extends State<GenreSectionScreen> {
                 ),
               ),
             ),
+          ],
         ],
       ),
     );

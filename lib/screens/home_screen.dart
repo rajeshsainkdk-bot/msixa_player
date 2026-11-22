@@ -1064,7 +1064,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildLiveSearchResultsView(BuildContext context, PlayerProvider provider, LanguageService lang) {
     final isOnline = _searchScope == 0;
     final results = isOnline ? provider.onlineSearchResults : provider.searchResults;
-    final isLoading = isOnline && provider.isLoadingOnlineSearch;
+    final isLoading = isOnline && provider.isSearchingOnline;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
