@@ -27,6 +27,11 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
   bool _isSearching = false;
   int _currentIndex = 0;
 
+  // Session-wide seen video IDs tracking: NEVER repeat a video during the session
+  final Set<String> _seenVideoIds = {};
+  int _currentPage = 0;
+  bool _isLoadingMore = false;
+
   // Multi-Controller Preloading Pool for 0-Second Instant Playback
   final Map<int, VideoPlayerController> _controllers = {};
   final Set<int> _loadingIndices = {};
@@ -69,30 +74,80 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
 
   Future<void> _loadShortsForCategory(String category) async {
     _disposeAllControllers();
-    final initialList = _shortsService.getInitialShorts(category);
+    _currentPage = 0;
+
+    // Filter initial list through session-wide seen IDs so videos never repeat
+    final initialList = _shortsService.getInitialShorts(category, _seenVideoIds);
     setState(() {
       _shorts = initialList;
       _isLoading = initialList.isEmpty;
       _currentIndex = 0;
     });
 
+    for (final s in initialList) {
+      _seenVideoIds.add(s.id);
+    }
+
     if (initialList.isNotEmpty) {
       _preloadAroundIndex(0);
     }
 
     try {
-      final onlineList = await _shortsService.getShortsByCategory(category);
+      final onlineList = await _shortsService.getNextShortsBatch(
+        category: category,
+        page: _currentPage,
+        excludeIds: _seenVideoIds,
+      );
       if (mounted && onlineList.isNotEmpty) {
         setState(() {
-          final existingIds = _shorts.map((e) => e.id).toSet();
-          final newItems = onlineList.where((e) => !existingIds.contains(e.id)).toList();
-          _shorts.addAll(newItems);
+          for (final item in onlineList) {
+            if (!_seenVideoIds.contains(item.id)) {
+              _seenVideoIds.add(item.id);
+              _shorts.add(item);
+            }
+          }
           _isLoading = false;
         });
         _preloadAroundIndex(_currentIndex);
       }
     } catch (_) {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  /// Infinite pagination: Automatically called before the user reaches the end of the feed
+  Future<void> _fetchNextBatch() async {
+    if (_isLoadingMore) return;
+    _isLoadingMore = true;
+    _currentPage++;
+
+    try {
+      final newBatch = await _shortsService.getNextShortsBatch(
+        category: _activeCategory,
+        page: _currentPage,
+        excludeIds: _seenVideoIds,
+      );
+
+      if (mounted && newBatch.isNotEmpty) {
+        final uniqueItems = <ShortVideoItem>[];
+        for (final item in newBatch) {
+          if (!_seenVideoIds.contains(item.id)) {
+            _seenVideoIds.add(item.id);
+            uniqueItems.add(item);
+          }
+        }
+        if (uniqueItems.isNotEmpty) {
+          setState(() {
+            _shorts.addAll(uniqueItems);
+          });
+          _preloadAroundIndex(_currentIndex);
+        }
+      }
+    } catch (_) {
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingMore = false);
+      }
     }
   }
 
@@ -108,6 +163,9 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
           _isLoading = false;
           _currentIndex = 0;
         });
+        for (final s in _shorts) {
+          _seenVideoIds.add(s.id);
+        }
         _preloadAroundIndex(0);
       }
     } catch (_) {
@@ -144,8 +202,8 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
       }
     });
 
-    // Clean up distant controllers to avoid memory leaks
-    final staleKeys = _controllers.keys.where((k) => k < center - 1 || k > center + 2).toList();
+    // Clean up distant controllers: keep strictly [center - 1, center, center + 1] in memory
+    final staleKeys = _controllers.keys.where((k) => (k - center).abs() > 1).toList();
     for (final k in staleKeys) {
       try {
         _controllers[k]?.pause();
@@ -227,7 +285,7 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
     final oldIndex = _currentIndex;
     _currentIndex = newIndex;
 
-    // Pause old video
+    // Pause old video immediately - single player active rule
     if (_controllers.containsKey(oldIndex)) {
       _controllers[oldIndex]?.pause();
     }
@@ -244,6 +302,12 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
 
     // Preload next videos ahead
     _preloadAroundIndex(newIndex);
+
+    // Infinite Pagination: Trigger next batch prefetch when 3 videos from the end!
+    if (newIndex >= _shorts.length - 3 && !_isLoadingMore) {
+      _fetchNextBatch();
+    }
+
     setState(() {});
   }
 
@@ -256,12 +320,18 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
         curve: Curves.easeInOutCubic,
       );
     } else {
-      // Loop back to the first video smoothly
-      _pageController.animateToPage(
-        0,
-        duration: const Duration(milliseconds: 450),
-        curve: Curves.easeInOutCubic,
-      );
+      // Reached the end of loaded videos: DO NOT loop back to index 0!
+      // Fetch fresh new batch immediately and scroll forward to the brand new video
+      if (!_isLoadingMore) {
+        _fetchNextBatch().then((_) {
+          if (mounted && _shorts.length > index + 1) {
+            _pageController.nextPage(
+              duration: const Duration(milliseconds: 350),
+              curve: Curves.easeInOutCubic,
+            );
+          }
+        });
+      }
     }
   }
 
@@ -302,30 +372,37 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
               ),
             )
           else
-            PageView.builder(
-              controller: _pageController,
-              scrollDirection: Axis.vertical,
-              itemCount: _shorts.length,
-              onPageChanged: _onPageChanged,
-              itemBuilder: (context, index) {
-                final isCurrent = index == _currentIndex;
-                final controller = _controllers[index];
-
-                return _ShortVideoPlayerCard(
-                  key: ValueKey(_shorts[index].id),
-                  short: _shorts[index],
-                  isActive: isCurrent,
-                  controller: controller,
-                  onVideoCompleted: () => _onVideoCompleted(index),
-                  onLikeToggle: () {
-                    setState(() {
-                      final item = _shorts[index];
-                      item.isLiked = !item.isLiked;
-                      item.likesCount += item.isLiked ? 1 : -1;
-                    });
-                  },
-                );
+            RefreshIndicator(
+              color: AppColors.accentCyan,
+              backgroundColor: const Color(0xFF131A2A),
+              onRefresh: () async {
+                await _loadShortsForCategory(_activeCategory);
               },
+              child: PageView.builder(
+                controller: _pageController,
+                scrollDirection: Axis.vertical,
+                itemCount: _shorts.length,
+                onPageChanged: _onPageChanged,
+                itemBuilder: (context, index) {
+                  final isCurrent = index == _currentIndex;
+                  final controller = _controllers[index];
+
+                  return _ShortVideoPlayerCard(
+                    key: ValueKey(_shorts[index].id),
+                    short: _shorts[index],
+                    isActive: isCurrent,
+                    controller: controller,
+                    onVideoCompleted: () => _onVideoCompleted(index),
+                    onLikeToggle: () {
+                      setState(() {
+                        final item = _shorts[index];
+                        item.isLiked = !item.isLiked;
+                        item.likesCount += item.isLiked ? 1 : -1;
+                      });
+                    },
+                  );
+                },
+              ),
             ),
 
           // 2. Top Header Overlay (Category Chips & Search)

@@ -655,6 +655,16 @@ void main() {
       expect(fallback.contains('.mp4'), true);
     });
 
+    test('ShortsService anti-repetition filters excludeIds and provides infinite batches', () async {
+      final service = ShortsService();
+      final seen = {'kffacxfA7G4', 'dQw4w9WgXcQ'};
+      final freshInitial = service.getInitialShorts('Marwadi', seen);
+      expect(freshInitial.any((s) => seen.contains(s.id)), false);
+
+      final batch0 = await service.getNextShortsBatch(category: 'Trending', page: 0, excludeIds: seen);
+      expect(batch0.any((s) => seen.contains(s.id)), false);
+    });
+
     test('AppShareService keepScreenOn enables and disables screen wake-lock cleanly', () async {
       await AppShareService.keepScreenOn(true);
       await AppShareService.keepScreenOn(false);

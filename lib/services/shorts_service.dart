@@ -87,13 +87,76 @@ class ShortsService {
     ),
   ];
 
+  /// Dynamic category search queries to guarantee 100% fresh, non-repeating recommendations like YouTube
+  static final Map<String, List<String>> _categoryQueries = {
+    'trending': [
+      'trending shorts india viral',
+      'top viral youtube shorts 2026',
+      'trending desi dance reels status',
+      'most viewed indian shorts new',
+      'viral comedy shorts india',
+      'popular bollywood song shorts',
+    ],
+    'marwadi': [
+      'marwadi rajasthani shorts status',
+      'marwadi new vivah geet dance shorts',
+      'rajasthani desi dhol thali dance shorts',
+      'marwadi dj song viral shorts 2026',
+      'rajasthani folk song status shorts',
+      'veena music rajasthani dance status',
+      'marwadi desi bhajan shorts status',
+    ],
+    'rajasthani': [
+      'rajasthani folk song status shorts',
+      'marwadi new vivah geet dance shorts',
+      'rajasthani desi dhol thali dance shorts',
+      'marwadi dj song viral shorts 2026',
+    ],
+    'dj remix': [
+      'dj remix bass boosted status shorts',
+      'hard bass edm remix dance shorts',
+      'punjabi dj remix shorts reels',
+      'bollywood club dj remix status shorts',
+      'non stop dj dholki mix shorts',
+      'trending bass boosted dj shorts 2026',
+    ],
+    'haryanvi': [
+      'haryanvi trending status shorts',
+      'haryanvi new dance ragni shorts',
+      'desi haryanvi viral reels 2026',
+      'haryanvi sapna dhol dance shorts',
+      'latest haryanvi mashup shorts',
+      'haryanvi folk dj status shorts',
+    ],
+    'bhakti': [
+      'mahadev bhakti shorts status',
+      'har har shambhu shiv tandav shorts',
+      'krishna bhajan status shorts',
+      'hanuman chalisa status reels shorts',
+      'ram ji mandir bhakti shorts status',
+      'khatu shyam ji bhajan status shorts',
+    ],
+    'romantic': [
+      'romantic love status shorts slowed',
+      'slowed and reverb love song status shorts',
+      'heart touching romantic lyrics shorts',
+      'bollywood romantic couple status shorts',
+      'acoustic sad love status shorts',
+      'new hindi love song reels shorts',
+    ],
+  };
+
   /// Returns initial curated shorts immediately (0ms latency, zero spinner)
-  List<ShortVideoItem> getInitialShorts(String category) {
-    if (category == 'Trending' || category == 'All') {
-      return List<ShortVideoItem>.from(_curatedShorts);
+  List<ShortVideoItem> getInitialShorts(String category, [Set<String>? excludeIds]) {
+    final list = (category == 'Trending' || category == 'All')
+        ? _curatedShorts
+        : _curatedShorts.where((s) => s.category.toLowerCase() == category.toLowerCase()).toList();
+    final candidate = list.isNotEmpty ? list : _curatedShorts;
+    if (excludeIds != null && excludeIds.isNotEmpty) {
+      final unviewed = candidate.where((s) => !excludeIds.contains(s.id)).toList();
+      if (unviewed.isNotEmpty) return unviewed;
     }
-    final filtered = _curatedShorts.where((s) => s.category.toLowerCase() == category.toLowerCase()).toList();
-    return filtered.isNotEmpty ? filtered : List<ShortVideoItem>.from(_curatedShorts);
+    return List<ShortVideoItem>.from(candidate);
   }
 
   /// High-reliability fallback stream URL so playback NEVER fails or goes blank
@@ -201,44 +264,42 @@ class ShortsService {
     }
   }
 
-  /// Gets Shorts by Category
-  Future<List<ShortVideoItem>> getShortsByCategory(String category) async {
-    final List<ShortVideoItem> baseList = _curatedShorts.where((s) {
-      if (category == 'Trending' || category == 'All') return true;
-      return s.category.toLowerCase() == category.toLowerCase();
-    }).toList();
-
-    // Query query string based on category
-    String querySearch = 'trending shorts hindi';
-    switch (category.toLowerCase()) {
-      case 'marwadi':
-      case 'rajasthani':
-        querySearch = 'marwadi rajasthani shorts status';
-        break;
-      case 'dj remix':
-      case 'dj':
-        querySearch = 'dj remix bass boosted status shorts';
-        break;
-      case 'haryanvi':
-        querySearch = 'haryanvi trending status shorts';
-        break;
-      case 'bhakti':
-        querySearch = 'mahadev bhakti shorts status';
-        break;
-      case 'romantic':
-        querySearch = 'romantic love status shorts slowed';
-        break;
-      default:
-        querySearch = 'trending indian shorts status';
-        break;
-    }
+  /// Fetches a new, never-before-seen page of shorts for infinite continuous scrolling
+  Future<List<ShortVideoItem>> getNextShortsBatch({
+    required String category,
+    required int page,
+    Set<String>? excludeIds,
+  }) async {
+    final catKey = category.toLowerCase();
+    final queries = _categoryQueries[catKey] ?? _categoryQueries['trending']!;
+    final query = queries[page % queries.length];
 
     try {
-      final onlineResults = await searchShorts(querySearch);
-      if (onlineResults.isNotEmpty) {
-        return [...baseList, ...onlineResults];
+      final results = await searchShorts(query);
+      if (excludeIds != null && excludeIds.isNotEmpty) {
+        return results.where((item) => !excludeIds.contains(item.id)).toList();
       }
-    } catch (_) {}
+      return results;
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// Gets Shorts by Category with deduplication support
+  Future<List<ShortVideoItem>> getShortsByCategory(String category, {Set<String>? excludeIds}) async {
+    final baseList = getInitialShorts(category, excludeIds);
+
+    final onlineResults = await getNextShortsBatch(
+      category: category,
+      page: 0,
+      excludeIds: excludeIds,
+    );
+
+    if (onlineResults.isNotEmpty) {
+      final existingIds = baseList.map((e) => e.id).toSet();
+      final fresh = onlineResults.where((e) => !existingIds.contains(e.id)).toList();
+      return [...baseList, ...fresh];
+    }
 
     return baseList.isNotEmpty ? baseList : _curatedShorts;
   }
