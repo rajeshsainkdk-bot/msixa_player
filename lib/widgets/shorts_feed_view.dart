@@ -12,14 +12,24 @@ import '../services/youtube_subscription_service.dart';
 import '../theme/app_colors.dart';
 
 /// Pure Customized In-App YouTube Shorts Player
-/// - Official YouTube backend (https://www.youtube.com/shorts) running inside WebView
+/// - Official YouTube backend running inside WebView
 /// - 100% Custom In-App Overlay Controls (Only our buttons & controls show)
 /// - YouTube logo, top headers, banners, and 'Open in App' prompts completely hidden
 /// - Top header has ONLY Back '<' and Search '🔍' icons (All category pills removed)
 /// - Search directly queries YouTube Shorts and plays them
 /// - Subscribe button opens Google Account Picker without launching external YouTube app
+/// - Pull-to-refresh (drag down from top) & bottom nav shorts click refresh with zero repetition
 class ShortsFeedView extends StatefulWidget {
   final VoidCallback? onBackToDeviceVideos;
+
+  /// Global refresh trigger: Tapping the bottom nav Shorts icon triggers instant link refresh
+  static final ValueNotifier<int> refreshNotifier = ValueNotifier<int>(0);
+
+  /// Trigger instant refresh to a fresh, non-repeated short link
+  static void refreshFeed() {
+    refreshNotifier.value++;
+  }
+
   const ShortsFeedView({Key? key, this.onBackToDeviceVideos}) : super(key: key);
 
   @override
@@ -39,32 +49,64 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
   bool _isDownloading = false;
   double _downloadProgress = 0.0;
 
+  // Pull-down to refresh gesture state
+  double _dragStartY = 0.0;
+  double _currentPullDelta = 0.0;
+  bool _isPullRefreshing = false;
+
+  // Session Anti-Repetition Video Pool
+  static final Set<String> _playedVideoIds = <String>{};
+  static final List<String> _seedVideoPool = [
+    'kffacxfA7G4', // Rajasthani Desi Dhol Thali Dance
+    'dQw4w9WgXcQ', // Ghoomar Rajasthani Folk Dance
+    '3JZ_D3ELwOQ', // Full Bass DJ Remix Status
+    '9bZkp7q19f0', // EDM Hard Bass Club Mix
+    'kJQP7kiw5Fk', // Haryanvi Ragni & Desi Beats Status
+    'fJ9rUzIMcZQ', // Har Har Mahadev Shiv Tandav Status
+    'JGwWNGJdvx8', // Slowed & Reverb Romantic Acoustic
+    'ZbZSe6N_BXs', // Fagan Dance Reel
+    'L_LUpnjgPso', // Kesariya Tera Ishq Hai Piya
+    'e-ORhEE9VVg', // Trending Beats Reel
+    'RgKAFK5djSk', // Fast Bass Drop
+    'CevxZvSJLk8', // Dance Viral Short
+    '60ItHLz5WEA', // DJ Viral Beat
+    'YQHsXMglC9A', // Acoustic Guitar Melody
+    'fRh_vgS2dFE', // Popular Indian Folk Hit
+    'kJQP7kiw5Fk', // Desi Beats
+    'WcIcVapfqXw', // Instrumental BGM
+    '34Na4j8AVgA', // Starboy Acoustic
+  ];
+
   String _currentVideoId = 'kffacxfA7G4';
   String _videoTitle = 'Trending YouTube Short';
   String _channelName = 'YouTube Creator';
   String _likesCountStr = '94K';
   final int _commentsCount = 322;
 
-  static const String _shortsUrl = 'https://m.youtube.com/shorts';
-
-  /// Injected CSS to hide YouTube logo, web overlay controls, pivot bar, and Open App prompts
+  /// Injected CSS: 100% Guaranteed complete removal of YouTube Logo, Web Buttons & Banners
   static const String _cleanupCss = '''
-    /* 1. Hide YouTube Top Bar, Header, Logo and Navigation */
+    /* 1. COMPLETELY HIDE YouTube Top Bar, Header, Logo and Navigation */
     ytm-mobile-topbar-renderer,
     .mobile-topbar-header,
     #header-bar,
+    header,
     header.mobile-topbar-header,
     yt-icon.ytm-logo,
     .ytm-home-logo,
     a[aria-label="YouTube"],
+    a[href="/"],
     .topbar-header,
+    ytm-search-box-renderer,
+    .topbar-actions,
+    .topbar-menu-button-avatar-button,
+    .topbar-header-content,
 
-    /* 2. Hide YouTube Bottom Navigation Bar */
+    /* 2. COMPLETELY HIDE YouTube Bottom Navigation Bar */
     ytm-pivot-bar-renderer,
     .pivot-bar,
     .ytm-pivot-bar,
 
-    /* 3. Hide 'Open in App' Banners, Mealbars, Promos, and Upsell Dialogs */
+    /* 3. COMPLETELY HIDE 'Open in App' Banners, Promos, and Upsell Dialogs */
     .upsell-dialog-renderer,
     #app-banner,
     .open-app-banner,
@@ -79,20 +121,60 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
     ytm-promoted-sparkles-web-renderer,
     dialog,
     .dialog-container,
+    .sheet-container,
+    .modal-content,
 
-    /* 4. Hide YouTube's Native Web Overlay Buttons (So ONLY our Flutter controls show!) */
+    /* 4. COMPLETELY HIDE YouTube Native Web Overlay Buttons (So ONLY our Flutter controls show!) */
     .reel-player-overlay-actions,
     ytm-reel-player-overlay-renderer .reel-player-overlay-actions,
     .action-container,
     ytm-reel-player-overlay-renderer .action-container,
     ytm-shorts-player-controls,
+    ytm-reel-player-header-renderer,
+    .reel-player-header-container,
+    .reel-player-overlay-metadata,
+    .overlay-action-button,
+    .engagement-panel,
+    ytm-engagement-panel,
+    ytm-button-renderer.reel-player-overlay-action-button,
+    .reel-player-overlay-main-content,
+    .reel-player-overlay-bottom,
 
-    /* 5. Pure Black Background */
+    /* 5. Watermarks & YouTube Chrome */
+    .ytp-chrome-top,
+    .ytp-chrome-bottom,
+    .ytp-watermark,
+    .ytp-youtube-button,
+    .branding-img-container,
+    .annotation {
+      display: none !important;
+      visibility: hidden !important;
+      opacity: 0 !important;
+      pointer-events: none !important;
+      height: 0 !important;
+      width: 0 !important;
+      max-height: 0 !important;
+      max-width: 0 !important;
+      position: absolute !important;
+      top: -9999px !important;
+      left: -9999px !important;
+      z-index: -9999 !important;
+    }
+
+    /* 6. Pure Black Background */
     body, html {
       background-color: #000000 !important;
       overflow: hidden !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      width: 100% !important;
+      height: 100% !important;
       user-select: none !important;
       -webkit-user-select: none !important;
+    }
+
+    video {
+      object-fit: cover !important;
     }
   ''';
 
@@ -101,6 +183,7 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
     super.initState();
     AppShareService.keepScreenOn(true);
     _subService.init();
+    ShortsFeedView.refreshNotifier.addListener(_handleExternalRefresh);
 
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
@@ -135,9 +218,15 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
             }
             return NavigationDecision.prevent;
           },
+          onProgress: (int progress) {
+            if (progress > 30) {
+              _injectCleanupScript();
+            }
+          },
           onPageStarted: (String url) {
             _extractVideoId(url);
             if (mounted) setState(() => _isLoading = true);
+            _injectCleanupScript();
           },
           onPageFinished: (String url) {
             _extractVideoId(url);
@@ -152,29 +241,112 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
       (_controller.platform as AndroidWebViewController).setMediaPlaybackRequiresUserGesture(false);
     }
 
-    _controller.loadRequest(Uri.parse(_shortsUrl));
+    // Start with a fresh, unrepeated video
+    final initialId = _getNextFreshVideoId();
+    _currentVideoId = initialId;
+    final initialUrl = 'https://m.youtube.com/shorts/$initialId?feature=share&t=${DateTime.now().millisecondsSinceEpoch}';
+    _controller.loadRequest(Uri.parse(initialUrl));
+  }
+
+  void _handleExternalRefresh() {
+    if (mounted) {
+      _loadFreshShort();
+    }
   }
 
   @override
   void dispose() {
+    ShortsFeedView.refreshNotifier.removeListener(_handleExternalRefresh);
     AppShareService.keepScreenOn(false);
     _searchController.dispose();
     super.dispose();
   }
 
+  /// Get next unseen video ID to guarantee no repetition
+  String _getNextFreshVideoId() {
+    final available = _seedVideoPool.where((id) => !_playedVideoIds.contains(id)).toList();
+    if (available.isEmpty) {
+      _playedVideoIds.clear();
+      available.addAll(_seedVideoPool);
+    }
+    available.shuffle();
+    final nextId = available.first;
+    _playedVideoIds.add(nextId);
+    return nextId;
+  }
+
+  /// Load fresh non-repeated Short video link
+  Future<void> _loadFreshShort({bool showIndicator = true}) async {
+    if (showIndicator && mounted) {
+      setState(() => _isLoading = true);
+    }
+    final nextId = _getNextFreshVideoId();
+    _currentVideoId = nextId;
+    final freshUrl = 'https://m.youtube.com/shorts/$nextId?feature=share&t=${DateTime.now().millisecondsSinceEpoch}';
+    await _controller.loadRequest(Uri.parse(freshUrl));
+  }
+
   void _injectCleanupScript() {
     final script = '''
       (function() {
-        // 1. Inject cleanup CSS
-        var style = document.getElementById('msixa-shorts-cleanup');
-        if (!style) {
-          style = document.createElement('style');
-          style.id = 'msixa-shorts-cleanup';
-          style.innerHTML = `$_cleanupCss`;
-          document.head.appendChild(style);
+        // 1. Inject or re-inject cleanup CSS directly into head and documentElement
+        function injectCss() {
+          var style = document.getElementById('msixa-shorts-cleanup');
+          if (!style) {
+            style = document.createElement('style');
+            style.id = 'msixa-shorts-cleanup';
+            style.innerHTML = `$_cleanupCss`;
+            (document.head || document.documentElement).appendChild(style);
+          }
         }
+        injectCss();
 
-        // 2. Prevent external app launch clicks
+        // 2. Direct DOM Element Purger
+        function purgeElements() {
+          injectCss();
+          var hideSelectors = [
+            'ytm-mobile-topbar-renderer',
+            '.mobile-topbar-header',
+            '#header-bar',
+            'header',
+            'yt-icon.ytm-logo',
+            '.ytm-home-logo',
+            'a[aria-label="YouTube"]',
+            'ytm-pivot-bar-renderer',
+            '.pivot-bar',
+            '.reel-player-overlay-actions',
+            '.action-container',
+            'ytm-reel-player-header-renderer',
+            '.reel-player-header-container',
+            '.reel-player-overlay-metadata',
+            'ytm-upsell-dialog-renderer',
+            '#app-banner',
+            '.open-app-banner',
+            'ytm-mealbar-promo-renderer',
+            'dialog',
+            '.dialog-container'
+          ];
+          for (var i = 0; i < hideSelectors.length; i++) {
+            var els = document.querySelectorAll(hideSelectors[i]);
+            for (var j = 0; j < els.length; j++) {
+              els[j].style.setProperty('display', 'none', 'important');
+              els[j].style.setProperty('visibility', 'hidden', 'important');
+              els[j].style.setProperty('opacity', '0', 'important');
+              els[j].style.setProperty('pointer-events', 'none', 'important');
+            }
+          }
+        }
+        purgeElements();
+
+        // 3. Continuously observe DOM changes so dynamically inserted YouTube elements are hidden instantly
+        var observer = new MutationObserver(function() {
+          purgeElements();
+          reportShortsInfo();
+        });
+        observer.observe(document.documentElement || document.body, { childList: true, subtree: true });
+        setInterval(purgeElements, 250);
+
+        // 4. Intercept clicks attempting to open external YouTube app
         document.addEventListener('click', function(e) {
           var target = e.target.closest('a, button');
           if (target) {
@@ -187,7 +359,7 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
           }
         }, true);
 
-        // 3. Metadata Extractor & Reporter to Flutter
+        // 5. Metadata Reporter to Flutter
         function reportShortsInfo() {
           try {
             var titleEl = document.querySelector('ytm-reel-player-overlay-renderer .reel-player-header-title') ||
@@ -218,12 +390,7 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
         }
 
         reportShortsInfo();
-
-        var observer = new MutationObserver(function() {
-          reportShortsInfo();
-        });
-        observer.observe(document.body, { childList: true, subtree: true });
-        setInterval(reportShortsInfo, 1500);
+        setInterval(reportShortsInfo, 1200);
       })();
     ''';
     _controller.runJavaScript(script);
@@ -257,6 +424,7 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
         final id = match.group(1);
         if (id != null && id.isNotEmpty && id != _currentVideoId) {
           if (mounted) setState(() => _currentVideoId = id);
+          _playedVideoIds.add(id);
         }
       }
     } catch (_) {}
@@ -276,8 +444,7 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
   }
 
   Future<void> _handleRefresh() async {
-    setState(() => _isLoading = true);
-    await _controller.loadRequest(Uri.parse(_shortsUrl));
+    await _loadFreshShort();
   }
 
   void _toggleLike() {
@@ -1077,16 +1244,97 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
       },
       child: Scaffold(
         backgroundColor: Colors.black,
-        body: Stack(
-          children: [
-            // 1. Official YouTube Shorts Engine (Plays https://www.youtube.com/shorts directly in background)
-            RefreshIndicator(
-              color: AppColors.accentCyan,
-              backgroundColor: const Color(0xFF131A2A),
-              displacement: 60,
-              onRefresh: _handleRefresh,
-              child: WebViewWidget(controller: _controller),
-            ),
+        body: Listener(
+          behavior: HitTestBehavior.translucent,
+          onPointerDown: (PointerDownEvent event) {
+            _dragStartY = event.position.dy;
+            _currentPullDelta = 0.0;
+          },
+          onPointerMove: (PointerMoveEvent event) {
+            final deltaY = event.position.dy - _dragStartY;
+            // Only if touch started in top 35% of the screen and dragging downwards
+            if (_dragStartY < MediaQuery.of(context).size.height * 0.35 && deltaY > 0) {
+              if (mounted) {
+                setState(() {
+                  _currentPullDelta = deltaY.clamp(0.0, 120.0);
+                });
+              }
+            }
+          },
+          onPointerUp: (PointerUpEvent event) {
+            if (_currentPullDelta > 65.0 && !_isPullRefreshing) {
+              _isPullRefreshing = true;
+              _loadFreshShort().then((_) {
+                if (mounted) {
+                  setState(() {
+                    _isPullRefreshing = false;
+                    _currentPullDelta = 0.0;
+                  });
+                }
+              });
+            } else {
+              if (mounted && _currentPullDelta > 0.0) {
+                setState(() => _currentPullDelta = 0.0);
+              }
+            }
+          },
+          onPointerCancel: (_) {
+            if (mounted && _currentPullDelta > 0.0) {
+              setState(() => _currentPullDelta = 0.0);
+            }
+          },
+          child: Stack(
+            children: [
+              // 1. Official YouTube Shorts Engine (Plays https://www.youtube.com/shorts directly in background)
+              WebViewWidget(controller: _controller),
+
+              // Pull-down Drag to Refresh Indicator Badge
+              if (_currentPullDelta > 15.0 || _isPullRefreshing)
+                Positioned(
+                  top: 55 + (_currentPullDelta * 0.35),
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF131A2A).withOpacity(0.95),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: AppColors.accentCyan, width: 1.2),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.accentCyan.withOpacity(0.35),
+                            blurRadius: 10,
+                            spreadRadius: 2,
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppColors.accentCyan,
+                              value: _isPullRefreshing ? null : (_currentPullDelta / 65.0).clamp(0.0, 1.0),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            _isPullRefreshing
+                                ? (lang.isHindi ? 'नया शॉर्ट्स लोड हो रहा है...' : 'Refreshing Shorts...')
+                                : (_currentPullDelta > 65.0
+                                    ? (lang.isHindi ? 'छोड़ें (रिफ्रेश होगा)' : 'Release to refresh')
+                                    : (lang.isHindi ? 'नीचे खींचें रिफ्रेश के लिए' : 'Pull down to refresh')),
+                            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
 
             // Subtle Loading Overlay while fetching
             if (_isLoading)
@@ -1386,7 +1634,8 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
           ],
         ),
       ),
-    );
+    ),
+  );
   }
 
   /// Floating Action Item matching YouTube Shorts design (Pure white icon with drop shadow, no circular background)

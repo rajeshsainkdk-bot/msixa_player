@@ -130,6 +130,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
                       try {
                         Provider.of<PlayerProvider>(context, listen: false).pause();
                       } catch (_) {}
+                      // Direct refresh to fresh, non-repeated short link every time Shorts button is tapped
+                      ShortsFeedView.refreshFeed();
                     }
                     setState(() {
                       _loadedTabs.add(index);

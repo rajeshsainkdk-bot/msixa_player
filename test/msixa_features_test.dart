@@ -21,6 +21,7 @@ import 'package:msixa_player/services/youtube_api_service.dart';
 import 'package:msixa_player/services/shorts_player_controller.dart';
 import 'package:msixa_player/services/app_share_service.dart';
 import 'package:msixa_player/services/youtube_subscription_service.dart';
+import 'package:msixa_player/widgets/shorts_feed_view.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -769,6 +770,14 @@ void main() {
 
       loadedTabs.add(2); // When user taps Shorts
       expect(loadedTabs.contains(2), true);
+    });
+  });
+
+  group('18. Shorts Feed Refresh & Anti-Repetition Tests', () {
+    test('ShortsFeedView.refreshFeed increments refreshNotifier and triggers refresh', () {
+      final initial = ShortsFeedView.refreshNotifier.value;
+      ShortsFeedView.refreshFeed();
+      expect(ShortsFeedView.refreshNotifier.value, initial + 1);
     });
   });
 }
