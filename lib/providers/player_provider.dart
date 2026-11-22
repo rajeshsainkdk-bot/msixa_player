@@ -356,6 +356,11 @@ class PlayerProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> stop() async {
+    await _audioService.stop();
+    notifyListeners();
+  }
+
   Future<void> seek(Duration pos) async {
     _currentPosition = pos;
     _lastPositionNotify = DateTime.now();

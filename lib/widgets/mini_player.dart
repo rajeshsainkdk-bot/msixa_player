@@ -114,6 +114,8 @@ class MiniPlayer extends StatelessWidget {
 
                           // Favorite Heart
                           IconButton(
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                             icon: Icon(
                               currentSong.isFavorite
                                   ? Icons.favorite_rounded
@@ -121,13 +123,15 @@ class MiniPlayer extends StatelessWidget {
                               color: currentSong.isFavorite
                                   ? AppColors.accentPink
                                   : AppColors.textMuted,
-                              size: 22,
+                              size: 20,
                             ),
                             onPressed: () => provider.toggleFavorite(currentSong),
                           ),
 
                           // Play / Pause Button
                           IconButton(
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                             icon: provider.isBuffering
                                 ? const SizedBox(
                                     width: 20,
@@ -142,19 +146,34 @@ class MiniPlayer extends StatelessWidget {
                                         ? Icons.pause_circle_filled_rounded
                                         : Icons.play_circle_fill_rounded,
                                     color: AppColors.accentCyan,
-                                    size: 36,
+                                    size: 34,
                                   ),
                             onPressed: () => provider.togglePlayPause(),
                           ),
 
                           // Next Song Button
                           IconButton(
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                             icon: const Icon(
                               Icons.skip_next_rounded,
                               color: AppColors.textPrimary,
-                              size: 26,
+                              size: 24,
                             ),
                             onPressed: () => provider.next(),
+                          ),
+
+                          // Close / Dismiss Mini Player Button
+                          IconButton(
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                            tooltip: 'Close player',
+                            icon: const Icon(
+                              Icons.close_rounded,
+                              color: Colors.white70,
+                              size: 22,
+                            ),
+                            onPressed: () => provider.stop(),
                           ),
                         ],
                       ),
