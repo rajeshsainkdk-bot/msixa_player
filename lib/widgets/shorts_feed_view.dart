@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:video_player/video_player.dart';
 import '../models/short_video_item.dart';
@@ -12,8 +13,12 @@ import '../services/shorts_player_controller.dart';
 import '../services/youtube_subscription_service.dart';
 import '../theme/app_colors.dart';
 
-/// Pure In-App YouTube Shorts Feed View (100% In-App Playback, Zero External Redirection,
-/// No Ads, No Watermarks, Strictly Vertical 9:16 Shorts with Auto-Scroll & Creator Subscriptions).
+/// Pure In-App YouTube Shorts Feed View
+/// Matches official YouTube Shorts layout:
+/// - Floating right-side buttons (Thumbs Up with count, Thumbs Down 'Dislike', Comments, Share, Download, '...')
+/// - Compact bottom creator row with avatar, channel name, and red '+FOLLOW' subscribe button
+/// - Google Account Picker dialog on subscribe tap
+/// - 100% In-App Playback, Zero External Redirection, No Ads, Strictly Vertical 9:16 Shorts with Auto-Scroll
 class ShortsFeedView extends StatefulWidget {
   final VoidCallback? onBackToDeviceVideos;
   const ShortsFeedView({Key? key, this.onBackToDeviceVideos}) : super(key: key);
@@ -136,7 +141,6 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
         curve: Curves.easeInOutCubic,
       );
     } else {
-      // Reached list end: load next batch and advance to fresh video
       _loadMoreShorts().then((_) {
         if (mounted && _shorts.length > index + 1) {
           _pageController.nextPage(
@@ -224,40 +228,43 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
               ),
             ),
 
-          // 2. Top Header Overlay (Indian Categories & Search)
+          // 2. Top Header Overlay (Simple '<' Back Button from screenshot + Categories)
           Positioned(
             top: 0,
             left: 0,
             right: 0,
             child: SafeArea(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                 child: Row(
                   children: [
-                    if (widget.onBackToDeviceVideos != null)
-                      InkWell(
-                        onTap: widget.onBackToDeviceVideos,
-                        borderRadius: BorderRadius.circular(20),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.55),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: Colors.white24),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.arrow_back_ios_rounded, color: Colors.white, size: 12),
-                              const SizedBox(width: 4),
-                              Text(
-                                lang.isHindi ? 'डिवाइस' : 'Device',
-                                style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-                              ),
-                            ],
-                          ),
+                    // Simple Back Arrow '<' matching screenshot
+                    GestureDetector(
+                      onTap: () {
+                        if (widget.onBackToDeviceVideos != null) {
+                          widget.onBackToDeviceVideos!();
+                        } else if (Navigator.canPop(context)) {
+                          Navigator.pop(context);
+                        }
+                      },
+                      behavior: HitTestBehavior.opaque,
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.35),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.arrow_back_ios_new_rounded,
+                          color: Colors.white,
+                          size: 20,
+                          shadows: [Shadow(color: Colors.black54, blurRadius: 4)],
                         ),
                       ),
+                    ),
                     const SizedBox(width: 8),
+
+                    // Indian Categories or Search
                     Expanded(
                       child: _isSearching
                           ? Container(
@@ -303,10 +310,10 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
                                       child: Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                         decoration: BoxDecoration(
-                                          color: isSelected ? AppColors.accentCyan : Colors.black.withOpacity(0.55),
+                                          color: isSelected ? Colors.white : Colors.black.withOpacity(0.45),
                                           borderRadius: BorderRadius.circular(16),
                                           border: Border.all(
-                                            color: isSelected ? AppColors.accentCyan : Colors.white24,
+                                            color: isSelected ? Colors.white : Colors.white24,
                                           ),
                                         ),
                                         child: Text(
@@ -314,7 +321,7 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
                                           style: TextStyle(
                                             color: isSelected ? Colors.black : Colors.white,
                                             fontSize: 11,
-                                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
                                           ),
                                         ),
                                       ),
@@ -363,7 +370,7 @@ class _NativeShortVideoCard extends StatefulWidget {
   State<_NativeShortVideoCard> createState() => _NativeShortVideoCardState();
 }
 
-class _NativeShortVideoCardState extends State<_NativeShortVideoCard> with SingleTickerProviderStateMixin {
+class _NativeShortVideoCardState extends State<_NativeShortVideoCard> {
   final ShortsService _shortsService = ShortsService();
   final YouTubeSubscriptionService _subService = YouTubeSubscriptionService();
 
@@ -371,18 +378,12 @@ class _NativeShortVideoCardState extends State<_NativeShortVideoCard> with Singl
   bool _showTransientPlayIcon = false;
   bool _isDownloading = false;
   double _downloadProgress = 0.0;
-  bool _isWhatsAppStatusPending = false;
-
-  late final AnimationController _discAnimController;
+  bool _isDisliked = false;
+  final int _commentsCount = 322;
 
   @override
   void initState() {
     super.initState();
-    _discAnimController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 4),
-    )..repeat();
-
     if (widget.isActive) {
       widget.instance.playVideo();
       _isPlaying = true;
@@ -397,19 +398,11 @@ class _NativeShortVideoCardState extends State<_NativeShortVideoCard> with Singl
         widget.instance.videoPlayerController?.seekTo(Duration.zero);
         widget.instance.playVideo();
         setState(() => _isPlaying = true);
-        if (!_discAnimController.isAnimating) _discAnimController.repeat();
       } else {
         widget.instance.pauseVideo();
         setState(() => _isPlaying = false);
-        _discAnimController.stop();
       }
     }
-  }
-
-  @override
-  void dispose() {
-    _discAnimController.dispose();
-    super.dispose();
   }
 
   void _togglePlayPause() {
@@ -419,11 +412,9 @@ class _NativeShortVideoCardState extends State<_NativeShortVideoCard> with Singl
         if (ctrl.value.isPlaying) {
           ctrl.pause();
           _isPlaying = false;
-          _discAnimController.stop();
         } else {
           ctrl.play();
           _isPlaying = true;
-          _discAnimController.repeat();
         }
       } else {
         _isPlaying = !_isPlaying;
@@ -434,6 +425,16 @@ class _NativeShortVideoCardState extends State<_NativeShortVideoCard> with Singl
     Future.delayed(const Duration(milliseconds: 600), () {
       if (mounted) setState(() => _showTransientPlayIcon = false);
     });
+  }
+
+  String _formatCount(int count) {
+    if (count >= 1000000) {
+      return '${(count / 1000000).toStringAsFixed(1)}M';
+    } else if (count >= 1000) {
+      final k = (count / 1000).toStringAsFixed(count % 1000 >= 100 ? 1 : 0);
+      return '${k}K';
+    }
+    return '$count';
   }
 
   Future<void> _handleDownload(BuildContext context) async {
@@ -469,14 +470,7 @@ class _NativeShortVideoCardState extends State<_NativeShortVideoCard> with Singl
   }
 
   Future<void> _handleWhatsAppStatus(BuildContext context) async {
-    if (_isWhatsAppStatusPending) return;
     final lang = LanguageService();
-
-    setState(() {
-      _isWhatsAppStatusPending = true;
-      _downloadProgress = 0.0;
-    });
-
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
@@ -503,17 +497,14 @@ class _NativeShortVideoCardState extends State<_NativeShortVideoCard> with Singl
       },
     );
 
-    if (mounted) {
-      setState(() => _isWhatsAppStatusPending = false);
-      if (!success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(lang.isHindi ? 'व्हाट्सएप नहीं मिला या स्टेटस नहीं लग सका' : 'Could not launch WhatsApp status'),
-            backgroundColor: Colors.redAccent,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
+    if (mounted && !success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(lang.isHindi ? 'व्हाट्सएप नहीं मिला या स्टेटस नहीं लग सका' : 'Could not launch WhatsApp status'),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
@@ -527,11 +518,229 @@ class _NativeShortVideoCardState extends State<_NativeShortVideoCard> with Singl
         await Share.shareXFiles([XFile(cached)], text: widget.short.title);
       } else {
         await Share.share(
-          'Check out "${widget.short.title}" on Msixa Player!',
+          'Check out "${widget.short.title}" on Msixa Player!\nhttps://youtube.com/shorts/${widget.short.id}',
           subject: widget.short.title,
         );
       }
     }
+  }
+
+  void _showShareModal(BuildContext context) {
+    final lang = LanguageService();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1E283C),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (modalCtx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  lang.isHindi ? 'शेयर करें (Share)' : 'Share',
+                  style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    // 1. WhatsApp Status
+                    _buildShareModalOption(
+                      icon: Icons.share_rounded,
+                      color: const Color(0xFF25D366),
+                      label: lang.isHindi ? 'व्हाट्सएप स्टेटस' : 'WhatsApp Status',
+                      onTap: () {
+                        Navigator.pop(modalCtx);
+                        _handleWhatsAppStatus(context);
+                      },
+                    ),
+                    // 2. WhatsApp Direct
+                    _buildShareModalOption(
+                      icon: Icons.chat_rounded,
+                      color: const Color(0xFF25D366),
+                      label: 'WhatsApp',
+                      onTap: () {
+                        Navigator.pop(modalCtx);
+                        _handleGeneralShare();
+                      },
+                    ),
+                    // 3. Copy Link
+                    _buildShareModalOption(
+                      icon: Icons.link_rounded,
+                      color: const Color(0xFF00E5FF),
+                      label: lang.isHindi ? 'लिंक कॉपी' : 'Copy link',
+                      onTap: () async {
+                        Navigator.pop(modalCtx);
+                        await Clipboard.setData(ClipboardData(text: 'https://youtube.com/shorts/${widget.short.id}'));
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(lang.isHindi ? 'लिंक क्लिपबोर्ड पर कॉपी हो गया!' : 'Link copied to clipboard!'),
+                              behavior: SnackBarBehavior.floating,
+                              duration: const Duration(seconds: 2),
+                            ),
+                          );
+                        }
+                      },
+                    ),
+                    // 4. More Apps
+                    _buildShareModalOption(
+                      icon: Icons.more_horiz_rounded,
+                      color: Colors.white,
+                      label: lang.isHindi ? 'अन्य ऐप्स' : 'More',
+                      onTap: () {
+                        Navigator.pop(modalCtx);
+                        _handleGeneralShare();
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildShareModalOption({
+    required IconData icon,
+    required Color color,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.18),
+                shape: BoxShape.circle,
+                border: Border.all(color: color.withOpacity(0.4)),
+              ),
+              child: Icon(icon, color: color, size: 24),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w500),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showMoreOptionsModal(BuildContext context) {
+    final lang = LanguageService();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF131A2A),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (modalCtx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Mute / Unmute
+                ListTile(
+                  leading: Icon(
+                    widget.playbackController.isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+                    color: widget.playbackController.isMuted ? Colors.redAccent : AppColors.accentCyan,
+                  ),
+                  title: Text(
+                    widget.playbackController.isMuted
+                        ? (lang.isHindi ? 'आवाज़ चालू करें (Unmute)' : 'Unmute audio')
+                        : (lang.isHindi ? 'आवाज़ बंद करें (Mute)' : 'Mute audio'),
+                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                  ),
+                  onTap: () {
+                    Navigator.pop(modalCtx);
+                    widget.playbackController.toggleMute();
+                    setState(() {});
+                  },
+                ),
+                // Connected Google Account
+                ListTile(
+                  leading: const Icon(Icons.account_circle_rounded, color: Color(0xFF4285F4)),
+                  title: Text(
+                    _subService.hasGoogleAccount
+                        ? '${_subService.userGmail}'
+                        : (lang.isHindi ? 'Google अकाउंट कनेक्ट करें' : 'Connect Google Account'),
+                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                  ),
+                  subtitle: Text(
+                    _subService.hasGoogleAccount
+                        ? (lang.isHindi ? 'अकाउंट बदलें या नया जोड़ें' : 'Switch or add account')
+                        : (lang.isHindi ? 'सब्सक्राइब करने के लिए लॉगिन करें' : 'Sign in to subscribe'),
+                    style: const TextStyle(color: Colors.white54, fontSize: 11),
+                  ),
+                  trailing: const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white38, size: 14),
+                  onTap: () {
+                    Navigator.pop(modalCtx);
+                    _showGoogleAccountPicker(context, widget.short.author);
+                  },
+                ),
+                // WhatsApp Status shortcut
+                ListTile(
+                  leading: const Icon(Icons.share_rounded, color: Color(0xFF25D366)),
+                  title: Text(
+                    lang.isHindi ? 'सीधा व्हाट्सएप स्टेटस लगाएं' : 'Share to WhatsApp Status',
+                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                  ),
+                  onTap: () {
+                    Navigator.pop(modalCtx);
+                    _handleWhatsAppStatus(context);
+                  },
+                ),
+                // Video Quality info
+                ListTile(
+                  leading: const Icon(Icons.hd_rounded, color: AppColors.accentCyan),
+                  title: Text(
+                    lang.isHindi ? 'वीडियो क्वालिटी (HD 1080p Native)' : 'Video Quality (HD 1080p Native)',
+                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                  ),
+                  subtitle: Text(
+                    lang.isHindi ? 'नॉन-स्टॉप बफर-फ्री प्लेबैक' : 'Smooth buffer-free playback',
+                    style: const TextStyle(color: Colors.white54, fontSize: 11),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   void _showCommentsModal(BuildContext context) {
@@ -541,7 +750,7 @@ class _NativeShortVideoCardState extends State<_NativeShortVideoCard> with Singl
       {'user': 'राजेश सैन', 'text': 'शानदार डांस! दिल खुश हो गया ❤️', 'time': 'अभी'},
       {'user': 'सुनील शर्मा', 'text': 'सुपरहिट देसी बीट्स 🔥🔥', 'time': '10 मिनट पहले'},
       {'user': 'कविता राठौड़', 'text': 'फुल बास साउंड, मजा आ गया!', 'time': '1 घंटा पहले'},
-      {'user': 'अनिल कुमार', 'text': 'मारवाड़ी संस्कृति की जान 👌', 'time': '2 घंटे पहले'},
+      {'user': 'Strictly Fan', 'text': 'Great energy and screen presence 👌', 'time': '2 घंटे पहले'},
     ];
 
     showModalBottomSheet(
@@ -712,91 +921,9 @@ class _NativeShortVideoCardState extends State<_NativeShortVideoCard> with Singl
       return;
     }
 
-    // If user has not linked Gmail yet, prompt Gmail login confirmation
+    // If user has not linked Google account yet, prompt the official Google Account Chooser!
     if (!_subService.hasGoogleAccount) {
-      final emailController = TextEditingController(text: 'rajesh.sain.kdk@gmail.com');
-      showDialog(
-        context: context,
-        builder: (dialogCtx) {
-          return AlertDialog(
-            backgroundColor: const Color(0xFF131A2A),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            title: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Text('G', style: TextStyle(color: Color(0xFF4285F4), fontWeight: FontWeight.bold, fontSize: 18)),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    lang.isHindi ? 'Google / Gmail से सब्सक्राइब करें' : 'Subscribe via Google',
-                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  lang.isHindi
-                      ? 'क्रिएटर "$author" को सब्सक्राइब करने के लिए अपने Google / Gmail अकाउंट से कनेक्ट करें:'
-                      : 'Connect your Google / Gmail account to subscribe to "$author":',
-                  style: const TextStyle(color: Colors.white70, fontSize: 13),
-                ),
-                const SizedBox(height: 14),
-                TextField(
-                  controller: emailController,
-                  style: const TextStyle(color: Colors.white, fontSize: 14),
-                  decoration: InputDecoration(
-                    labelText: 'Gmail Address',
-                    labelStyle: const TextStyle(color: AppColors.accentCyan),
-                    filled: true,
-                    fillColor: const Color(0xFF1E283C),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                    prefixIcon: const Icon(Icons.email_outlined, color: AppColors.accentCyan, size: 20),
-                  ),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialogCtx),
-                child: Text(lang.isHindi ? 'रद्द करें' : 'Cancel', style: const TextStyle(color: Colors.white54)),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  final email = emailController.text.trim();
-                  if (email.isNotEmpty) {
-                    _subService.toggleSubscribe(author, defaultEmail: email);
-                    Navigator.pop(dialogCtx);
-                    setState(() {});
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(lang.isHindi ? '🎉 $author को सफलतापूर्वक सब्सक्राइब कर लिया गया!' : 'Subscribed to $author!'),
-                        backgroundColor: const Color(0xFF00E5FF),
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
-                  }
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFFF007A),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                child: Text(lang.isHindi ? 'सब्सक्राइब करें' : 'Subscribe Now'),
-              ),
-            ],
-          );
-        },
-      );
+      _showGoogleAccountPicker(context, author);
     } else {
       _subService.toggleSubscribe(author);
       setState(() {});
@@ -810,12 +937,302 @@ class _NativeShortVideoCardState extends State<_NativeShortVideoCard> with Singl
     }
   }
 
+  /// Google Account Chooser Dialog (Prompts user to select their phone Google Account)
+  void _showGoogleAccountPicker(BuildContext context, String author) {
+    final lang = LanguageService();
+    final deviceAccounts = _subService.getAvailableDeviceAccounts();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF202124), // Google Dark Surface
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (modalCtx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 38,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.white24,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Google "G" Logo Header
+                Center(
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Center(
+                      child: Text(
+                        'G',
+                        style: TextStyle(
+                          color: Color(0xFF4285F4),
+                          fontSize: 26,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                Center(
+                  child: Text(
+                    lang.isHindi ? 'Google खाता चुनें' : 'Choose an account',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Center(
+                  child: Text(
+                    lang.isHindi
+                        ? 'YouTube पर @$author को सब्सक्राइब करने के लिए'
+                        : 'to subscribe to @$author on YouTube',
+                    style: const TextStyle(color: Colors.white70, fontSize: 13),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Divider(color: Colors.white12),
+
+                // Available Phone Google Accounts List
+                ...deviceAccounts.map((acc) {
+                  final email = acc['email'] ?? '';
+                  final name = acc['name'] ?? email.split('@').first;
+                  final isSelected = _subService.userGmail?.toLowerCase() == email.toLowerCase();
+
+                  return InkWell(
+                    onTap: () async {
+                      Navigator.pop(modalCtx);
+                      await _subService.setGoogleAccount(email, displayName: name);
+                      await _subService.toggleSubscribe(author);
+                      if (mounted) {
+                        setState(() {});
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              lang.isHindi
+                                  ? '✓ $email से YouTube कनेक्ट हुआ • @$author को सब्सक्राइब किया!'
+                                  : '✓ Connected as $email • Subscribed to @$author!',
+                            ),
+                            backgroundColor: const Color(0xFF00E5FF),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 18,
+                            backgroundColor: isSelected ? const Color(0xFF4285F4) : const Color(0xFF0F9D58),
+                            child: Text(
+                              name.isNotEmpty ? name[0].toUpperCase() : 'G',
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  name,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                Text(
+                                  email,
+                                  style: const TextStyle(color: Colors.white54, fontSize: 12),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (isSelected)
+                            const Icon(Icons.check_circle_rounded, color: Color(0xFF4285F4), size: 20),
+                        ],
+                      ),
+                    ),
+                  );
+                }),
+
+                // Add Another Account Option
+                InkWell(
+                  onTap: () {
+                    Navigator.pop(modalCtx);
+                    _showCustomEmailInputDialog(context, author);
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: const BoxDecoration(
+                            color: Colors.white12,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.person_add_alt_1_outlined, color: Colors.white70, size: 20),
+                        ),
+                        const SizedBox(width: 14),
+                        Text(
+                          lang.isHindi ? 'दूसरा खाता जोड़ें' : 'Use another account',
+                          style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+                const Divider(color: Colors.white12),
+                const SizedBox(height: 8),
+
+                // Google Terms/Privacy Footer Note
+                Center(
+                  child: Text(
+                    lang.isHindi
+                        ? 'जारी रखने के लिए, Google आपका नाम और ईमेल पता YouTube के साथ साझा करेगा।'
+                        : 'To continue, Google will share your name and email address with YouTube.',
+                    style: const TextStyle(color: Colors.white38, fontSize: 11),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showCustomEmailInputDialog(BuildContext context, String author) {
+    final lang = LanguageService();
+    final emailCtrl = TextEditingController(text: 'rajesh.sain.kdk@gmail.com');
+
+    showDialog(
+      context: context,
+      builder: (dlgCtx) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF202124),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                child: const Text('G', style: TextStyle(color: Color(0xFF4285F4), fontWeight: FontWeight.bold, fontSize: 16)),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  lang.isHindi ? 'Google अकाउंट दर्ज करें' : 'Enter Google Account',
+                  style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                lang.isHindi
+                    ? 'YouTube पर @$author को सब्सक्राइब करने के लिए अपना Gmail पता डालें:'
+                    : 'Enter your Gmail address to subscribe to @$author on YouTube:',
+                style: const TextStyle(color: Colors.white70, fontSize: 13),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: emailCtrl,
+                autofocus: true,
+                style: const TextStyle(color: Colors.white, fontSize: 14),
+                decoration: InputDecoration(
+                  labelText: 'Gmail / Google ID',
+                  labelStyle: const TextStyle(color: AppColors.accentCyan),
+                  filled: true,
+                  fillColor: const Color(0xFF2D2F33),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                  prefixIcon: const Icon(Icons.email_outlined, color: AppColors.accentCyan, size: 20),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dlgCtx),
+              child: Text(lang.isHindi ? 'रद्द करें' : 'Cancel', style: const TextStyle(color: Colors.white54)),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final email = emailCtrl.text.trim();
+                if (email.isNotEmpty) {
+                  Navigator.pop(dlgCtx);
+                  await _subService.setGoogleAccount(email);
+                  await _subService.toggleSubscribe(author);
+                  if (mounted) {
+                    setState(() {});
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          lang.isHindi
+                              ? '✓ $email से YouTube कनेक्ट हुआ • @$author को सब्सक्राइब किया!'
+                              : '✓ Connected as $email • Subscribed to @$author!',
+                        ),
+                        backgroundColor: const Color(0xFF00E5FF),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFE50914),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              child: Text(lang.isHindi ? 'सब्सक्राइब करें' : 'Subscribe'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final ctrl = widget.instance.videoPlayerController;
     final isReady = ctrl != null && ctrl.value.isInitialized;
     final isSubscribed = _subService.isSubscribed(widget.short.author);
-    final lang = LanguageService();
 
     return GestureDetector(
       onTap: _togglePlayPause,
@@ -906,7 +1323,7 @@ class _NativeShortVideoCardState extends State<_NativeShortVideoCard> with Singl
               ),
             ),
 
-          // 4. Bottom Gradient Vignette
+          // 4. Bottom Gradient Vignette for Readability
           Positioned(
             left: 0,
             right: 0,
@@ -929,87 +1346,16 @@ class _NativeShortVideoCardState extends State<_NativeShortVideoCard> with Singl
             ),
           ),
 
-          // 5. Left Bottom Creator Details, Subscribe Button & Title
+          // 5. Left Bottom Creator Details & Compact Subscribe Button (EXACT MATCH TO SCREENSHOT)
           Positioned(
-            left: 16,
-            bottom: 24,
-            right: 86,
+            left: 14,
+            bottom: 20,
+            right: 76,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Creator Handle & Subscribe Button Row
-                Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 16,
-                      backgroundColor: const Color(0xFFFF007A),
-                      child: Text(
-                        widget.short.author.isNotEmpty ? widget.short.author[0].toUpperCase() : 'M',
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        '@${widget.short.author}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          shadows: [Shadow(color: Colors.black, blurRadius: 4)],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    // Subscribe Button (Red when unsubscribed, frosted grey when subscribed)
-                    GestureDetector(
-                      onTap: _handleSubscribeToggle,
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 250),
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                        decoration: BoxDecoration(
-                          gradient: isSubscribed
-                              ? null
-                              : const LinearGradient(
-                                  colors: [Color(0xFFFF007A), Color(0xFFFF0000)],
-                                ),
-                          color: isSubscribed ? Colors.white.withOpacity(0.25) : null,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: isSubscribed ? Colors.white38 : Colors.transparent,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              isSubscribed ? Icons.check_rounded : Icons.add_rounded,
-                              color: Colors.white,
-                              size: 13,
-                            ),
-                            const SizedBox(width: 3),
-                            Text(
-                              isSubscribed
-                                  ? (lang.isHindi ? 'सब्सक्राइब किया' : 'Subscribed')
-                                  : (lang.isHindi ? 'सब्सक्राइब' : 'Subscribe'),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-
-                // Video Title
+                // Video Title (Clean, 1-2 lines with drop shadow)
                 Text(
                   widget.short.title,
                   maxLines: 2,
@@ -1018,27 +1364,98 @@ class _NativeShortVideoCardState extends State<_NativeShortVideoCard> with Singl
                     color: Colors.white,
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    shadows: [Shadow(color: Colors.black, blurRadius: 4)],
+                    shadows: [
+                      Shadow(color: Colors.black87, blurRadius: 4, offset: Offset(0, 1)),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 10),
 
-                // Category Tag & Audio Track
+                // Creator Row: [Avatar (32dp)] [Channel Name] [Red +FOLLOW Button]
                 Row(
                   children: [
+                    // 1. Creator Circular Avatar (Compact 32x32)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      width: 32,
+                      height: 32,
                       decoration: BoxDecoration(
-                        color: AppColors.accentCyan.withOpacity(0.25),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: AppColors.accentCyan.withOpacity(0.4)),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 1.5),
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF2979FF), Color(0xFF00E5FF)],
+                        ),
                       ),
-                      child: Text(
-                        widget.short.category,
-                        style: const TextStyle(color: AppColors.accentCyan, fontSize: 10, fontWeight: FontWeight.bold),
+                      child: Center(
+                        child: Text(
+                          widget.short.author.isNotEmpty ? widget.short.author[0].toUpperCase() : 'M',
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 8),
+
+                    // 2. Channel Name (Small bold white)
+                    Flexible(
+                      child: Text(
+                        widget.short.author,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          shadows: [Shadow(color: Colors.black87, blurRadius: 4)],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+
+                    // 3. Compact Red Subscribe Button (+FOLLOW / SUBSCRIBE)
+                    GestureDetector(
+                      onTap: _handleSubscribeToggle,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: isSubscribed
+                              ? Colors.white.withOpacity(0.2)
+                              : const Color(0xFFE50914), // Official YouTube Red
+                          borderRadius: BorderRadius.circular(4), // Clean rounded rectangle from screenshot
+                          border: Border.all(
+                            color: isSubscribed ? Colors.white30 : Colors.transparent,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (isSubscribed)
+                              const Icon(Icons.check_rounded, color: Colors.white, size: 12)
+                            else
+                              const Text(
+                                '+',
+                                style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                              ),
+                            const SizedBox(width: 3),
+                            Text(
+                              isSubscribed ? 'SUBSCRIBED' : 'FOLLOW',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+
+                // Audio Track Tag
+                Row(
+                  children: [
                     const Icon(Icons.music_note_rounded, color: Colors.white70, size: 12),
                     const SizedBox(width: 4),
                     Expanded(
@@ -1046,7 +1463,11 @@ class _NativeShortVideoCardState extends State<_NativeShortVideoCard> with Singl
                         '${widget.short.author} • Original Audio',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Colors.white70, fontSize: 11),
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 11,
+                          shadows: [Shadow(color: Colors.black87, blurRadius: 4)],
+                        ),
                       ),
                     ),
                   ],
@@ -1055,128 +1476,77 @@ class _NativeShortVideoCardState extends State<_NativeShortVideoCard> with Singl
             ),
           ),
 
-          // 6. Right Floating Actions Column (Creator Avatar, Like, Comment, WhatsApp Status, Share, Download, Sound, Disc)
+          // 6. Right Side Panel Actions Suite (EXACT MATCH TO SCREENSHOT)
+          // 1. Thumbs Up (Like) with count (e.g. 94K)
+          // 2. Thumbs Down (Dislike) with label 'Dislike'
+          // 3. Comments with count (e.g. 322)
+          // 4. Share with label 'Share'
+          // 5. Download with label 'Download'
+          // 6. More options '...' with no label
           Positioned(
             right: 12,
-            bottom: 24,
+            bottom: 20,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // 1. Creator Profile Avatar with Subscribe '+' Badge
-                GestureDetector(
-                  onTap: _handleSubscribeToggle,
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 1.5),
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFFFF007A), Color(0xFFFF8C00)],
-                          ),
-                        ),
-                        child: Center(
-                          child: Text(
-                            widget.short.author.isNotEmpty ? widget.short.author[0].toUpperCase() : 'M',
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
-                          ),
-                        ),
-                      ),
-                      if (!isSubscribed)
-                        Positioned(
-                          bottom: -4,
-                          left: 14,
-                          child: Container(
-                            padding: const EdgeInsets.all(2),
-                            decoration: const BoxDecoration(
-                              color: Color(0xFFFF007A),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(Icons.add_rounded, color: Colors.white, size: 12),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 14),
-
-                // 2. Like Button
+                // 1. Thumbs Up (Like)
                 _buildActionItem(
-                  icon: widget.short.isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                  color: widget.short.isLiked ? const Color(0xFFFF007A) : Colors.white,
-                  label: '${widget.short.likesCount}',
-                  onTap: widget.onLikeToggle,
+                  icon: widget.short.isLiked ? Icons.thumb_up_rounded : Icons.thumb_up_alt_outlined,
+                  color: widget.short.isLiked ? const Color(0xFF00E5FF) : Colors.white,
+                  label: _formatCount(widget.short.likesCount),
+                  onTap: () {
+                    widget.onLikeToggle();
+                    if (_isDisliked) {
+                      setState(() => _isDisliked = false);
+                    }
+                  },
                 ),
-                const SizedBox(height: 12),
 
-                // 3. Comments Button (In-App Bottom Sheet)
+                // 2. Thumbs Down (Dislike)
+                _buildActionItem(
+                  icon: _isDisliked ? Icons.thumb_down_rounded : Icons.thumb_down_alt_outlined,
+                  color: _isDisliked ? const Color(0xFF00E5FF) : Colors.white,
+                  label: 'Dislike',
+                  onTap: () {
+                    setState(() {
+                      _isDisliked = !_isDisliked;
+                      if (_isDisliked && widget.short.isLiked) {
+                        widget.onLikeToggle();
+                      }
+                    });
+                  },
+                ),
+
+                // 3. Comments
                 _buildActionItem(
                   icon: Icons.chat_bubble_outline_rounded,
                   color: Colors.white,
-                  label: 'टिप्पणी',
+                  label: _formatCount(_commentsCount),
                   onTap: () => _showCommentsModal(context),
                 ),
-                const SizedBox(height: 12),
 
-                // 4. Direct WhatsApp Status Button
+                // 4. Share
                 _buildActionItem(
                   icon: Icons.share_rounded,
-                  color: const Color(0xFF25D366),
-                  label: 'स्टेटस',
-                  onTap: () => _handleWhatsAppStatus(context),
-                ),
-                const SizedBox(height: 12),
-
-                // 5. General Share Button
-                _buildActionItem(
-                  icon: Icons.reply_rounded,
                   color: Colors.white,
-                  label: 'शेयर',
-                  onTap: _handleGeneralShare,
+                  label: 'Share',
+                  onTap: () => _showShareModal(context),
                 ),
-                const SizedBox(height: 12),
 
-                // 6. Download Video Button (Direct to Phone Storage)
+                // 5. Download
                 _buildActionItem(
                   icon: _isDownloading ? Icons.hourglass_top_rounded : Icons.download_rounded,
                   color: _isDownloading ? AppColors.accentCyan : Colors.white,
-                  label: _isDownloading ? '${(_downloadProgress * 100).toInt()}%' : 'डाउनलोड',
+                  label: _isDownloading ? '${(_downloadProgress * 100).toInt()}%' : 'Download',
                   onTap: () => _handleDownload(context),
                 ),
-                const SizedBox(height: 12),
 
-                // 7. Audio Mute Toggle
+                // 6. More Options (...)
                 _buildActionItem(
-                  icon: widget.playbackController.isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
-                  color: widget.playbackController.isMuted ? Colors.redAccent : Colors.white,
-                  label: widget.playbackController.isMuted ? 'म्यूट' : 'आवाज़',
-                  onTap: () {
-                    widget.playbackController.toggleMute();
-                    setState(() {});
-                  },
-                ),
-                const SizedBox(height: 12),
-
-                // 8. Spinning Vinyl Music Disc
-                RotationTransition(
-                  turns: _discAnimController,
-                  child: Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: const RadialGradient(
-                        colors: [Color(0xFF1E283C), Color(0xFF0B0F19), Color(0xFF000000)],
-                      ),
-                      border: Border.all(color: Colors.white30, width: 2),
-                    ),
-                    child: const Center(
-                      child: Icon(Icons.music_note_rounded, color: AppColors.accentCyan, size: 15),
-                    ),
-                  ),
+                  icon: Icons.more_horiz_rounded,
+                  color: Colors.white,
+                  label: '',
+                  onTap: () => _showMoreOptionsModal(context),
                 ),
               ],
             ),
@@ -1186,6 +1556,7 @@ class _NativeShortVideoCardState extends State<_NativeShortVideoCard> with Singl
     );
   }
 
+  /// Floating Action Item matching YouTube Shorts design (Pure white icon with drop shadow, no circular background)
   Widget _buildActionItem({
     required IconData icon,
     required Color color,
@@ -1194,28 +1565,36 @@ class _NativeShortVideoCardState extends State<_NativeShortVideoCard> with Singl
   }) {
     return GestureDetector(
       onTap: onTap,
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(9),
-            decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.5),
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white12),
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              color: color,
+              size: 28,
+              shadows: const [
+                Shadow(color: Colors.black54, blurRadius: 6, offset: Offset(0, 2)),
+              ],
             ),
-            child: Icon(icon, color: color, size: 24),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-              shadows: [Shadow(color: Colors.black, blurRadius: 4)],
-            ),
-          ),
-        ],
+            if (label.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  shadows: [
+                    Shadow(color: Colors.black87, blurRadius: 4, offset: Offset(0, 1)),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }

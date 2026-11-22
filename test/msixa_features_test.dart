@@ -735,6 +735,15 @@ void main() {
       expect(subscribed, isTrue);
       expect(sub.isSubscribed('MarwadiFolk'), isTrue);
       expect(sub.hasGoogleAccount, isTrue);
+
+      final accounts = sub.getAvailableDeviceAccounts();
+      expect(accounts.isNotEmpty, isTrue);
+      expect(accounts.any((a) => a['email']!.contains('gmail.com')), isTrue);
+
+      await sub.setGoogleAccount('rajesh.sain.kdk@gmail.com', displayName: 'Rajesh Sain');
+      expect(sub.userGmail, 'rajesh.sain.kdk@gmail.com');
+      expect(sub.userName, 'Rajesh Sain');
+
       final unsubscribed = await sub.toggleSubscribe('MarwadiFolk');
       expect(unsubscribed, isFalse);
       expect(sub.isSubscribed('MarwadiFolk'), isFalse);
