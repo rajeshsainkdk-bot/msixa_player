@@ -1055,50 +1055,100 @@ class _NativeShortVideoCardState extends State<_NativeShortVideoCard> with Singl
             ),
           ),
 
-          // 6. Right Floating Actions Column (Like, Comment, WhatsApp Status, Download, Sound, Disc)
+          // 6. Right Floating Actions Column (Creator Avatar, Like, Comment, WhatsApp Status, Share, Download, Sound, Disc)
           Positioned(
             right: 12,
             bottom: 24,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // 1. Like Button
+                // 1. Creator Profile Avatar with Subscribe '+' Badge
+                GestureDetector(
+                  onTap: _handleSubscribeToggle,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 1.5),
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFFF007A), Color(0xFFFF8C00)],
+                          ),
+                        ),
+                        child: Center(
+                          child: Text(
+                            widget.short.author.isNotEmpty ? widget.short.author[0].toUpperCase() : 'M',
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                          ),
+                        ),
+                      ),
+                      if (!isSubscribed)
+                        Positioned(
+                          bottom: -4,
+                          left: 14,
+                          child: Container(
+                            padding: const EdgeInsets.all(2),
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFFF007A),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.add_rounded, color: Colors.white, size: 12),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+
+                // 2. Like Button
                 _buildActionItem(
                   icon: widget.short.isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
                   color: widget.short.isLiked ? const Color(0xFFFF007A) : Colors.white,
                   label: '${widget.short.likesCount}',
                   onTap: widget.onLikeToggle,
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 12),
 
-                // 2. Comments Button (In-App Bottom Sheet)
+                // 3. Comments Button (In-App Bottom Sheet)
                 _buildActionItem(
                   icon: Icons.chat_bubble_outline_rounded,
                   color: Colors.white,
                   label: 'टिप्पणी',
                   onTap: () => _showCommentsModal(context),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 12),
 
-                // 3. Direct WhatsApp Status Button
+                // 4. Direct WhatsApp Status Button
                 _buildActionItem(
                   icon: Icons.share_rounded,
                   color: const Color(0xFF25D366),
                   label: 'स्टेटस',
                   onTap: () => _handleWhatsAppStatus(context),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 12),
 
-                // 4. Download Video Button (Direct to Phone Storage)
+                // 5. General Share Button
+                _buildActionItem(
+                  icon: Icons.reply_rounded,
+                  color: Colors.white,
+                  label: 'शेयर',
+                  onTap: _handleGeneralShare,
+                ),
+                const SizedBox(height: 12),
+
+                // 6. Download Video Button (Direct to Phone Storage)
                 _buildActionItem(
                   icon: _isDownloading ? Icons.hourglass_top_rounded : Icons.download_rounded,
                   color: _isDownloading ? AppColors.accentCyan : Colors.white,
                   label: _isDownloading ? '${(_downloadProgress * 100).toInt()}%' : 'डाउनलोड',
                   onTap: () => _handleDownload(context),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 12),
 
-                // 5. Audio Mute Toggle
+                // 7. Audio Mute Toggle
                 _buildActionItem(
                   icon: widget.playbackController.isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
                   color: widget.playbackController.isMuted ? Colors.redAccent : Colors.white,
@@ -1108,14 +1158,14 @@ class _NativeShortVideoCardState extends State<_NativeShortVideoCard> with Singl
                     setState(() {});
                   },
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 12),
 
-                // 6. Spinning Vinyl Music Disc
+                // 8. Spinning Vinyl Music Disc
                 RotationTransition(
                   turns: _discAnimController,
                   child: Container(
-                    width: 38,
-                    height: 38,
+                    width: 36,
+                    height: 36,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       gradient: const RadialGradient(
@@ -1124,7 +1174,7 @@ class _NativeShortVideoCardState extends State<_NativeShortVideoCard> with Singl
                       border: Border.all(color: Colors.white30, width: 2),
                     ),
                     child: const Center(
-                      child: Icon(Icons.music_note_rounded, color: AppColors.accentCyan, size: 16),
+                      child: Icon(Icons.music_note_rounded, color: AppColors.accentCyan, size: 15),
                     ),
                   ),
                 ),
