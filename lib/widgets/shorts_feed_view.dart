@@ -1082,7 +1082,7 @@ class _NativeShortVideoCardState extends State<_NativeShortVideoCard> with Singl
 
                 // 3. Direct WhatsApp Status Button
                 _buildActionItem(
-                  icon: Icons.whatsapp_rounded,
+                  icon: Icons.share_rounded,
                   color: const Color(0xFF25D366),
                   label: 'स्टेटस',
                   onTap: () => _handleWhatsAppStatus(context),
