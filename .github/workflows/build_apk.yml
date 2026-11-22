@@ -33,6 +33,44 @@ jobs:
           rm -rf android
           flutter create . --platforms=android --org=com.msixa
 
+          # Configure native dark launch background and styles to eliminate white screen flicker on startup
+          mkdir -p android/app/src/main/res/drawable
+          mkdir -p android/app/src/main/res/values
+          mkdir -p android/app/src/main/res/values-night
+
+          cat << 'EOF' > android/app/src/main/res/drawable/launch_background.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+              <item>
+                  <color android:color="#0A0E17"/>
+              </item>
+          </layer-list>
+          EOF
+
+          cat << 'EOF' > android/app/src/main/res/values/styles.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <style name="LaunchTheme" parent="@android:style/Theme.Black.NoTitleBar">
+                  <item name="android:windowBackground">@drawable/launch_background</item>
+              </style>
+              <style name="NormalTheme" parent="@android:style/Theme.Black.NoTitleBar">
+                  <item name="android:windowBackground">@drawable/launch_background</item>
+              </style>
+          </resources>
+          EOF
+
+          cat << 'EOF' > android/app/src/main/res/values-night/styles.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <style name="LaunchTheme" parent="@android:style/Theme.Black.NoTitleBar">
+                  <item name="android:windowBackground">@drawable/launch_background</item>
+              </style>
+              <style name="NormalTheme" parent="@android:style/Theme.Black.NoTitleBar">
+                  <item name="android:windowBackground">@drawable/launch_background</item>
+              </style>
+          </resources>
+          EOF
+
       - name: Configure Android Permissions and Media Service
         run: |
           cat << 'EOF' > android/app/src/main/AndroidManifest.xml

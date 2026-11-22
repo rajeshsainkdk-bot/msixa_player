@@ -1471,7 +1471,7 @@ class _HomeScreenState extends State<HomeScreen> {
     required PlayerProvider provider,
     required LanguageService lang,
   }) {
-    if (songs.isEmpty && !provider.isLoadingOnlineTrending) {
+    if (songs.isEmpty) {
       return const SizedBox.shrink();
     }
 
@@ -1544,15 +1544,9 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
         ),
-        if (provider.isLoadingOnlineTrending && songs.isEmpty)
-          const SizedBox(
-            height: 190,
-            child: Center(child: CircularProgressIndicator(color: Color(0xFF00E5FF))),
-          )
-        else
-          SizedBox(
-            height: 190,
-            child: ListView.separated(
+        SizedBox(
+          height: 190,
+          child: ListView.separated(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               scrollDirection: Axis.horizontal,
               itemCount: songs.length,

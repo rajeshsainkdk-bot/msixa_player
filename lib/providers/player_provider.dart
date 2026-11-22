@@ -213,7 +213,6 @@ class PlayerProvider extends ChangeNotifier {
       _trendingSongs = List.from(CatalogService.getCuratedSongs());
       _cachedArtists = AiMusicService().extractArtists(_trendingSongs);
       _cachedAlbums = AiMusicService().extractAlbums(_trendingSongs);
-      notifyListeners();
     }
 
     // 2. Load cached persistence concurrently with Future.wait
@@ -224,6 +223,7 @@ class PlayerProvider extends ChangeNotifier {
       _storageService.loadCustomPlaylists(currentUserPhone),
       _storageService.loadEqualizerSettings(),
       _storageService.loadPlayCounts(),
+      _loadCachedOnlineSections(), // Awaited in parallel so songs are ready in RAM on frame 1 with ZERO blink!
     ]);
     _favorites = results[0] as List<Song>;
     _recentlyPlayed = results[1] as List<Song>;
@@ -247,10 +247,10 @@ class PlayerProvider extends ChangeNotifier {
       });
     }
 
-    // 4. Load cached online streaming sections immediately from disk cache (0ms instant startup)
-    _loadCachedOnlineSections();
+    // Notify listeners once with fully initialized cached data for a smooth, single-pass render
+    notifyListeners();
 
-    // 5. Load online catalog in background without blocking UI startup!
+    // 4. Load online catalog in background without blocking UI startup or blinking
     Future.microtask(() => refreshCatalog());
   }
 
@@ -281,8 +281,12 @@ class PlayerProvider extends ChangeNotifier {
   }
 
   Future<void> refreshCatalog() async {
-    _isLoadingTrending = true;
-    notifyListeners();
+    // Only set _isLoadingTrending = true if we have zero songs in memory!
+    // If tracks are already present, refresh silently in the background with ZERO flicker/blink!
+    if (_trendingSongs.isEmpty) {
+      _isLoadingTrending = true;
+      notifyListeners();
+    }
 
     final backend = CloudBackendService();
 
@@ -599,13 +603,23 @@ class PlayerProvider extends ChangeNotifier {
         _onlineRajasthaniSongs.isNotEmpty &&
         _onlineMarwadiSongs.isNotEmpty;
 
-    if (hasData && !forceRefresh) return;
+    // If data is already in memory from disk cache, update silently in background with ZERO UI flicker or blink!
+    if (hasData && !forceRefresh) {
+      _fetchOnlineTrendingSilently();
+      return;
+    }
 
     if (!hasData) {
       _isLoadingOnlineTrending = true;
       notifyListeners();
     }
 
+    await _fetchOnlineTrendingSilently();
+    _isLoadingOnlineTrending = false;
+    notifyListeners();
+  }
+
+  Future<void> _fetchOnlineTrendingSilently() async {
     try {
       final futures = await Future.wait([
         _saavnService.getTrendingToday(),
@@ -655,9 +669,6 @@ class PlayerProvider extends ChangeNotifier {
     } catch (e) {
       debugPrint('Error loading online streaming sections: $e');
     }
-
-    _isLoadingOnlineTrending = false;
-    notifyListeners();
   }
 
   Future<void> _loadCachedOnlineSections() async {

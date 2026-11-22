@@ -58,13 +58,27 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
     }
   }
 
-  final List<Widget> _screens = const [
-    HomeScreen(),
-    VideosScreen(),
-    ShortsFeedView(),
-    LibraryScreen(),
-    EqualizerScreen(),
-  ];
+  final Set<int> _loadedTabs = {0}; // Only instantiate Tab 0 (HomeScreen) on cold start!
+
+  Widget _getScreen(int index) {
+    if (!_loadedTabs.contains(index)) {
+      return const SizedBox.shrink();
+    }
+    switch (index) {
+      case 0:
+        return const HomeScreen();
+      case 1:
+        return const VideosScreen();
+      case 2:
+        return const ShortsFeedView();
+      case 3:
+        return const LibraryScreen();
+      case 4:
+        return const EqualizerScreen();
+      default:
+        return const HomeScreen();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -76,10 +90,16 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
           backgroundColor: AppColors.background,
           body: Stack(
             children: [
-              // Active Tab Screen
+              // Active Tab Screen with Instant Lazy Loading
               IndexedStack(
                 index: _currentIndex,
-                children: _screens,
+                children: [
+                  _getScreen(0),
+                  _getScreen(1),
+                  _getScreen(2),
+                  _getScreen(3),
+                  _getScreen(4),
+                ],
               ),
 
               // Floating Persistent MiniPlayer above navigation (hidden on full-screen Shorts tab)
@@ -112,6 +132,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
                       } catch (_) {}
                     }
                     setState(() {
+                      _loadedTabs.add(index);
                       _currentIndex = index;
                     });
                   },
