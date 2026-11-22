@@ -241,7 +241,7 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
 
     return PopScope(
       canPop: false,
-      onPopInvokedWithResult: (didPop, result) async {
+      onPopInvoked: (didPop) async {
         if (didPop) return;
         if (await _controller.canGoBack()) {
           _controller.goBack();
