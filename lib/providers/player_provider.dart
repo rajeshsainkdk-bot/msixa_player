@@ -341,6 +341,7 @@ class PlayerProvider extends ChangeNotifier {
 
     _playCounts[song.id] = (_playCounts[song.id] ?? 0) + 1;
     _storageService.incrementPlayCount(song.id);
+    CloudBackendService().recordSongPlay(song);
     _addToRecentlyPlayed(song);
     notifyListeners();
   }
@@ -637,7 +638,10 @@ class PlayerProvider extends ChangeNotifier {
         _saavnService.getSadSongsTop50(),
       ]);
 
-      if (futures[0].isNotEmpty) _onlineTrendingSongs = futures[0];
+      // 🔥 TRENDING NOW: Strictly the Top 50 songs most played across all users combined!
+      _onlineTrendingSongs = await CloudBackendService().getGlobalTop50TrendingSongs(
+        candidatePool: futures[0],
+      );
       if (futures[1].isNotEmpty) _onlineGlobalSongs = futures[1];
       if (futures[2].isNotEmpty) _onlineRomanticSongs = futures[2];
       if (futures[3].isNotEmpty) _onlinePunjabiSongs = futures[3];

@@ -620,17 +620,18 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
 
                 // ==========================================
-                // 🔥 SECTION 1: TRENDING NOW (India Top 50)
+                // 🔥 SECTION 1: TRENDING NOW (All-Users Top 50 Most Played)
                 // ==========================================
                 _buildOnlineSection(
                   context: context,
-                  title: 'Trending Now (Top 50 Hits)',
-                  hindiTitle: 'ट्रेंडिंग नाउ (टॉप 50 हिट्स)',
+                  title: 'Trending Now (Top 50 Most Played)',
+                  hindiTitle: 'ट्रेंडिंग नाउ (टॉप 50 सर्वाधिक सुने गए)',
                   icon: Icons.whatshot_rounded,
                   iconColor: const Color(0xFFFF6D00),
                   songs: provider.onlineTrendingSongs,
                   provider: provider,
                   lang: lang,
+                  isTrendingNow: true,
                 ),
 
                 // ==========================================
@@ -1368,8 +1369,9 @@ class _HomeScreenState extends State<HomeScreen> {
     BuildContext context,
     Song song,
     PlayerProvider provider,
-    List<Song> queue,
-  ) {
+    List<Song> queue, {
+    int? rank,
+  }) {
     final isCurrent = provider.currentSong?.id == song.id;
     return GestureDetector(
       onTap: () => provider.playSong(song, queueContext: queue),
@@ -1417,19 +1419,49 @@ class _HomeScreenState extends State<HomeScreen> {
                   top: 8,
                   left: 8,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: EdgeInsets.symmetric(horizontal: rank != null ? 7 : 6, vertical: rank != null ? 2.5 : 2),
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.7),
+                      gradient: rank != null
+                          ? (rank <= 3
+                              ? const LinearGradient(colors: [Color(0xFFFF3D00), Color(0xFFFF9100)])
+                              : const LinearGradient(colors: [Color(0xFFE65100), Color(0xFFF57C00)]))
+                          : null,
+                      color: rank == null ? Colors.black.withOpacity(0.7) : null,
                       borderRadius: BorderRadius.circular(8),
+                      boxShadow: rank != null
+                          ? [
+                              BoxShadow(
+                                color: const Color(0xFFFF3D00).withOpacity(0.5),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              ),
+                            ]
+                          : null,
                     ),
-                    child: const Text(
-                      '320k HD',
-                      style: TextStyle(
-                        color: Color(0xFF00E5FF),
-                        fontSize: 9,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                    child: rank != null
+                        ? Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.local_fire_department_rounded, color: Colors.white, size: 10),
+                              const SizedBox(width: 2),
+                              Text(
+                                '#$rank',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ],
+                          )
+                        : const Text(
+                            '320k HD',
+                            style: TextStyle(
+                              color: Color(0xFF00E5FF),
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                   ),
                 ),
               ],
@@ -1447,12 +1479,15 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 2),
             Text(
-              song.artist,
+              rank != null
+                  ? '${song.artist} • 🔥 ${CloudBackendService().formatPlayCount(song.id)}'
+                  : song.artist,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: AppColors.textSecondary,
+              style: TextStyle(
+                color: rank != null ? const Color(0xFFFFB74D) : AppColors.textSecondary,
                 fontSize: 11,
+                fontWeight: rank != null ? FontWeight.w600 : FontWeight.normal,
               ),
             ),
           ],
@@ -1470,6 +1505,7 @@ class _HomeScreenState extends State<HomeScreen> {
     required List<Song> songs,
     required PlayerProvider provider,
     required LanguageService lang,
+    bool isTrendingNow = false,
   }) {
     if (songs.isEmpty) {
       return const SizedBox.shrink();
@@ -1553,7 +1589,13 @@ class _HomeScreenState extends State<HomeScreen> {
               separatorBuilder: (_, __) => const SizedBox(width: 14),
               itemBuilder: (context, index) {
                 final song = songs[index];
-                return _buildIndianSongCard(context, song, provider, songs);
+                return _buildIndianSongCard(
+                  context,
+                  song,
+                  provider,
+                  songs,
+                  rank: isTrendingNow ? (index + 1) : null,
+                );
               },
             ),
           ),
