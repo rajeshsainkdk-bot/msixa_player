@@ -10,6 +10,7 @@ import 'home_screen.dart';
 import 'videos_screen.dart';
 import 'library_screen.dart';
 import 'equalizer_screen.dart';
+import '../widgets/shorts_feed_view.dart';
 import '../services/intent_service.dart';
 
 class MainNavigationScreen extends StatefulWidget {
@@ -60,6 +61,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
   final List<Widget> _screens = const [
     HomeScreen(),
     VideosScreen(),
+    ShortsFeedView(),
     LibraryScreen(),
     EqualizerScreen(),
   ];
@@ -80,13 +82,14 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
                 children: _screens,
               ),
 
-              // Floating Persistent MiniPlayer above navigation
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: const MiniPlayer(),
-              ),
+              // Floating Persistent MiniPlayer above navigation (hidden on full-screen Shorts tab)
+              if (_currentIndex != 2)
+                const Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: MiniPlayer(),
+                ),
             ],
           ),
           bottomNavigationBar: Container(
@@ -102,6 +105,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
                 child: BottomNavigationBar(
                   currentIndex: _currentIndex,
                   onTap: (index) {
+                    if (index == 2) {
+                      // Pause music player so Shorts video sound plays with 100% clarity
+                      try {
+                        Provider.of<PlayerProvider>(context, listen: false).pause();
+                      } catch (_) {}
+                    }
                     setState(() {
                       _currentIndex = index;
                     });
@@ -116,11 +125,82 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
                   items: [
                     BottomNavigationBarItem(
                       icon: const Icon(Icons.explore_rounded),
-                      label: lang.isHindi ? 'डिस्कवर व सर्च' : 'Discover',
+                      label: lang.isHindi ? 'डिस्कवर' : 'Discover',
                     ),
                     BottomNavigationBarItem(
                       icon: const Icon(Icons.video_library_rounded),
                       label: lang.t('nav_videos'),
+                    ),
+                    // Center Highlighted Unique Neon Shorts Button
+                    BottomNavigationBarItem(
+                      icon: Container(
+                        margin: const EdgeInsets.only(top: 2),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFFF007A), Color(0xFFFF8C00)], // Neon Magenta to Amber Glow
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFFF007A).withOpacity(0.55),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.bolt_rounded, color: Colors.white, size: 16),
+                            SizedBox(width: 2),
+                            Text(
+                              'SHORTS',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      activeIcon: Container(
+                        margin: const EdgeInsets.only(top: 2),
+                        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 4),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFFF007A), Color(0xFFFF8C00)],
+                          ),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: Colors.white, width: 1.5),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFFF007A).withOpacity(0.85),
+                              blurRadius: 12,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.bolt_rounded, color: Colors.white, size: 17),
+                            SizedBox(width: 2),
+                            Text(
+                              'SHORTS',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      label: '',
                     ),
                     BottomNavigationBarItem(
                       icon: const Icon(Icons.library_music_rounded),

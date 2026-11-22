@@ -73,6 +73,24 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
     }
   }
 
+  void _onVideoCompleted(int index) {
+    if (!mounted) return;
+    // Auto-scroll hands-free to next video upon completion
+    if (index < _shorts.length - 1) {
+      _pageController.nextPage(
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeInOutCubic,
+      );
+    } else {
+      // Loop back to the first video smoothly
+      _pageController.animateToPage(
+        0,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOutCubic,
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final lang = LanguageService();
@@ -81,7 +99,7 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // 1. Vertical Swipeable PageView Feed
+          // 1. Fullscreen Vertical Swipeable PageView Feed
           if (_isLoading)
             const Center(
               child: CircularProgressIndicator(color: AppColors.accentCyan),
@@ -123,6 +141,7 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
                   key: ValueKey(_shorts[index].id),
                   short: _shorts[index],
                   isActive: isCurrent,
+                  onVideoCompleted: () => _onVideoCompleted(index),
                   onLikeToggle: () {
                     setState(() {
                       final item = _shorts[index];
@@ -139,7 +158,6 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Top Action Bar
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: Row(
@@ -255,12 +273,14 @@ class _ShortVideoPlayerCard extends StatefulWidget {
   final ShortVideoItem short;
   final bool isActive;
   final VoidCallback onLikeToggle;
+  final VoidCallback onVideoCompleted;
 
   const _ShortVideoPlayerCard({
     Key? key,
     required this.short,
     required this.isActive,
     required this.onLikeToggle,
+    required this.onVideoCompleted,
   }) : super(key: key);
 
   @override
@@ -275,6 +295,7 @@ class _ShortVideoPlayerCardState extends State<_ShortVideoPlayerCard> {
   bool _isDownloading = false;
   double _downloadProgress = 0.0;
   bool _isWhatsAppStatusPending = false;
+  bool _hasTriggeredCompletion = false;
 
   @override
   void initState() {
@@ -289,9 +310,11 @@ class _ShortVideoPlayerCardState extends State<_ShortVideoPlayerCard> {
     super.didUpdateWidget(oldWidget);
     if (widget.isActive != oldWidget.isActive) {
       if (widget.isActive) {
+        _hasTriggeredCompletion = false;
         if (_controller == null) {
           _initVideo();
         } else {
+          _controller?.seekTo(Duration.zero);
           _controller?.play();
           setState(() => _isPlaying = true);
         }
@@ -304,8 +327,22 @@ class _ShortVideoPlayerCardState extends State<_ShortVideoPlayerCard> {
 
   @override
   void dispose() {
+    _controller?.removeListener(_checkVideoCompletion);
     _controller?.dispose();
     super.dispose();
+  }
+
+  void _checkVideoCompletion() {
+    if (!mounted || _controller == null || !widget.isActive) return;
+    final val = _controller!.value;
+    if (val.isInitialized && val.duration > Duration.zero) {
+      if (val.position >= val.duration) {
+        if (!_hasTriggeredCompletion) {
+          _hasTriggeredCompletion = true;
+          widget.onVideoCompleted();
+        }
+      }
+    }
   }
 
   Future<void> _initVideo() async {
@@ -316,9 +353,14 @@ class _ShortVideoPlayerCardState extends State<_ShortVideoPlayerCard> {
       }
 
       if (streamUrl != null && streamUrl.isNotEmpty && mounted) {
-        final ctrl = VideoPlayerController.networkUrl(Uri.parse(streamUrl));
+        final ctrl = VideoPlayerController.networkUrl(
+          Uri.parse(streamUrl),
+          videoPlayerOptions: VideoPlayerOptions(mixWithOthers: false),
+        );
         await ctrl.initialize();
-        ctrl.setLooping(true);
+        ctrl.setLooping(false); // Loop handled by auto-scroll on completion!
+        ctrl.addListener(_checkVideoCompletion);
+
         if (widget.isActive) {
           ctrl.play();
         }
@@ -338,10 +380,10 @@ class _ShortVideoPlayerCardState extends State<_ShortVideoPlayerCard> {
     setState(() {
       if (_controller!.value.isPlaying) {
         _controller!.pause();
-        _isPlaying = false;
+        _isPlaying = false; // Buttons & overlay become visible on pause!
       } else {
         _controller!.play();
-        _isPlaying = true;
+        _isPlaying = true; // Buttons & overlay hide when video plays!
       }
     });
   }
@@ -387,7 +429,6 @@ class _ShortVideoPlayerCardState extends State<_ShortVideoPlayerCard> {
       _downloadProgress = 0.0;
     });
 
-    // Show indicator
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
@@ -442,17 +483,26 @@ class _ShortVideoPlayerCardState extends State<_ShortVideoPlayerCard> {
 
   @override
   Widget build(BuildContext context) {
+    // Only show side buttons and overlay when the video is paused by the user!
+    // When playing: pure, clean full-screen video with zero distractions.
+    final showControls = !_isPlaying && _isInit;
+
     return GestureDetector(
       onTap: _togglePlayPause,
+      behavior: HitTestBehavior.opaque,
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // Background Video / Thumbnail
+          // 1. Pure Edge-to-Edge Fullscreen Video Player (FittedBox.cover)
           if (_controller != null && _isInit)
-            Center(
-              child: AspectRatio(
-                aspectRatio: _controller!.value.aspectRatio > 0 ? _controller!.value.aspectRatio : 9 / 16,
-                child: VideoPlayer(_controller!),
+            SizedBox.expand(
+              child: FittedBox(
+                fit: BoxFit.cover,
+                child: SizedBox(
+                  width: _controller!.value.size.width > 0 ? _controller!.value.size.width : 1080,
+                  height: _controller!.value.size.height > 0 ? _controller!.value.size.height : 1920,
+                  child: VideoPlayer(_controller!),
+                ),
               ),
             )
           else
@@ -473,139 +523,178 @@ class _ShortVideoPlayerCardState extends State<_ShortVideoPlayerCard> {
               ],
             ),
 
-          // Play / Pause Indicator on Tap
-          if (!_isPlaying && _isInit)
+          // 2. Center Animated Play/Pause Indicator (Shown when Paused)
+          if (showControls)
             Center(
               child: Container(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.55),
+                  color: Colors.black.withOpacity(0.65),
                   shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white24, width: 2),
                 ),
-                child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 54),
+                child: const Icon(Icons.pause_rounded, color: Colors.white, size: 54),
               ),
             ),
 
-          // Gradient Vignette for bottom readable text
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            height: 220,
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.bottomCenter,
-                  end: Alignment.topCenter,
-                  colors: [
-                    Colors.black.withOpacity(0.9),
-                    Colors.black.withOpacity(0.4),
-                    Colors.transparent,
-                  ],
+          // 3. Subtle bottom video progress indicator
+          if (_controller != null && _isInit)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: VideoProgressIndicator(
+                _controller!,
+                allowScrubbing: true,
+                colors: const VideoProgressColors(
+                  playedColor: Color(0xFF00E5FF),
+                  bufferedColor: Colors.white24,
+                  backgroundColor: Colors.transparent,
+                ),
+              ),
+            ),
+
+          // 4. Bottom Text Gradient Vignette (Fade-in on Pause)
+          AnimatedOpacity(
+            opacity: showControls ? 1.0 : 0.0,
+            duration: const Duration(milliseconds: 250),
+            child: IgnorePointer(
+              ignoring: !showControls,
+              child: Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                height: 240,
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.topCenter,
+                      colors: [
+                        Colors.black.withOpacity(0.92),
+                        Colors.black.withOpacity(0.5),
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
           ),
 
-          // Left Bottom Title & Creator
-          Positioned(
-            left: 16,
-            bottom: 30,
-            right: 80,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: AppColors.accentCyan.withOpacity(0.25),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColors.accentCyan.withOpacity(0.5)),
-                  ),
-                  child: Text(
-                    widget.short.category,
-                    style: const TextStyle(color: AppColors.accentCyan, fontSize: 10, fontWeight: FontWeight.bold),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  widget.short.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    shadows: [Shadow(color: Colors.black, blurRadius: 4)],
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Row(
+          // 5. Left Bottom Video Title & Creator Handle (Fade-in on Pause)
+          AnimatedOpacity(
+            opacity: showControls ? 1.0 : 0.0,
+            duration: const Duration(milliseconds: 250),
+            child: IgnorePointer(
+              ignoring: !showControls,
+              child: Positioned(
+                left: 16,
+                bottom: 30,
+                right: 86,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.music_note_rounded, color: AppColors.accentCyan, size: 14),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        widget.short.author,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Colors.white70, fontSize: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AppColors.accentCyan.withOpacity(0.25),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.accentCyan.withOpacity(0.5)),
                       ),
+                      child: Text(
+                        widget.short.category,
+                        style: const TextStyle(color: AppColors.accentCyan, fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      widget.short.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        shadows: [Shadow(color: Colors.black, blurRadius: 4)],
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        const Icon(Icons.music_note_rounded, color: AppColors.accentCyan, size: 14),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            widget.short.author,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Colors.white70, fontSize: 12),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
+              ),
             ),
           ),
 
-          // Right Floating Actions Column (Reels / Shorts Style)
-          Positioned(
-            right: 12,
-            bottom: 30,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // 1. Like Button
-                _buildActionItem(
-                  icon: widget.short.isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                  color: widget.short.isLiked ? Colors.redAccent : Colors.white,
-                  label: '${widget.short.likesCount}',
-                  onTap: widget.onLikeToggle,
-                ),
-                const SizedBox(height: 16),
+          // 6. Right Floating Actions Column (Fade-in on Pause ONLY)
+          AnimatedOpacity(
+            opacity: showControls ? 1.0 : 0.0,
+            duration: const Duration(milliseconds: 250),
+            child: IgnorePointer(
+              ignoring: !showControls,
+              child: Positioned(
+                right: 12,
+                bottom: 30,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // 1. Like Button
+                    _buildActionItem(
+                      icon: widget.short.isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                      color: widget.short.isLiked ? Colors.redAccent : Colors.white,
+                      label: '${widget.short.likesCount}',
+                      onTap: widget.onLikeToggle,
+                    ),
+                    const SizedBox(height: 16),
 
-                // 2. Download Button
-                _buildActionItem(
-                  icon: _isDownloading
-                      ? Icons.downloading_rounded
-                      : (widget.short.isDownloaded ? Icons.check_circle_rounded : Icons.download_rounded),
-                  color: widget.short.isDownloaded ? AppColors.accentCyan : Colors.white,
-                  label: _isDownloading
-                      ? '${(_downloadProgress * 100).toInt()}%'
-                      : (widget.short.isDownloaded ? 'सेव्ड' : 'डाउनलोड'),
-                  onTap: () => _handleDownload(context),
-                ),
-                const SizedBox(height: 16),
+                    // 2. Download Button
+                    _buildActionItem(
+                      icon: _isDownloading
+                          ? Icons.downloading_rounded
+                          : (widget.short.isDownloaded ? Icons.check_circle_rounded : Icons.download_rounded),
+                      color: widget.short.isDownloaded ? AppColors.accentCyan : Colors.white,
+                      label: _isDownloading
+                          ? '${(_downloadProgress * 100).toInt()}%'
+                          : (widget.short.isDownloaded ? 'सेव्ड' : 'डाउनलोड'),
+                      onTap: () => _handleDownload(context),
+                    ),
+                    const SizedBox(height: 16),
 
-                // 3. WhatsApp Status Direct Button
-                _buildActionItem(
-                  icon: Icons.chat_bubble_rounded,
-                  color: const Color(0xFF25D366), // WhatsApp brand green
-                  label: 'स्टेटस',
-                  onTap: () => _handleWhatsAppStatus(context),
-                  badge: 'WA',
-                ),
-                const SizedBox(height: 16),
+                    // 3. WhatsApp Status Direct Button
+                    _buildActionItem(
+                      icon: Icons.chat_bubble_rounded,
+                      color: const Color(0xFF25D366), // WhatsApp brand green
+                      label: 'स्टेटस',
+                      onTap: () => _handleWhatsAppStatus(context),
+                      badge: 'WA',
+                    ),
+                    const SizedBox(height: 16),
 
-                // 4. Share Button
-                _buildActionItem(
-                  icon: Icons.share_rounded,
-                  color: Colors.white,
-                  label: 'शेयर',
-                  onTap: _handleGeneralShare,
+                    // 4. Share Button
+                    _buildActionItem(
+                      icon: Icons.share_rounded,
+                      color: Colors.white,
+                      label: 'शेयर',
+                      onTap: _handleGeneralShare,
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ],

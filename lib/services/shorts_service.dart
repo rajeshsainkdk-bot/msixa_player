@@ -79,15 +79,21 @@ class ShortsService {
       return videoId;
     }
 
-    // Use YoutubeExplode for direct clean MP4 stream extraction
+    // Use YoutubeExplode for direct clean MP4 stream extraction with highest HD quality
     YoutubeExplode? yt;
     try {
       yt = YoutubeExplode();
       final manifest = await yt.videos.streamsClient.getManifest(videoId).timeout(
-        const Duration(seconds: 7),
+        const Duration(seconds: 8),
       );
-      final muxedStreams = manifest.muxed.sortByVideoQuality();
+      final muxedStreams = manifest.muxed.toList();
       if (muxedStreams.isNotEmpty) {
+        // Sort descending by video resolution and bitrate for highest HD quality (1080p/720p 60fps)
+        muxedStreams.sort((a, b) {
+          final resCmp = b.videoResolution.height.compareTo(a.videoResolution.height);
+          if (resCmp != 0) return resCmp;
+          return b.bitrate.bitsPerSecond.compareTo(a.bitrate.bitsPerSecond);
+        });
         final url = muxedStreams.first.url.toString();
         _streamCache[videoId] = url;
         return url;
