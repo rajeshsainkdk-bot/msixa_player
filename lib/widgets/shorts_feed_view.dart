@@ -1127,10 +1127,10 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
               right: 0,
               child: SafeArea(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   child: Row(
                     children: [
-                      // Back '<' Icon
+                      // Back '<' Icon (Clean minimal chevron matching screenshot)
                       GestureDetector(
                         onTap: () {
                           if (widget.onBackToDeviceVideos != null) {
@@ -1140,18 +1140,13 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
                           }
                         },
                         behavior: HitTestBehavior.opaque,
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.5),
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white24),
-                          ),
-                          child: const Icon(
+                        child: const Padding(
+                          padding: EdgeInsets.all(8.0),
+                          child: Icon(
                             Icons.arrow_back_ios_new_rounded,
                             color: Colors.white,
-                            size: 20,
-                            shadows: [Shadow(color: Colors.black54, blurRadius: 4)],
+                            size: 22,
+                            shadows: [Shadow(color: Colors.black87, blurRadius: 6, offset: Offset(0, 1))],
                           ),
                         ),
                       ),
@@ -1160,7 +1155,7 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
                       if (_isSearching)
                         Expanded(
                           child: Padding(
-                            padding: const EdgeInsets.only(left: 10),
+                            padding: const EdgeInsets.only(left: 8),
                             child: Container(
                               height: 40,
                               decoration: BoxDecoration(
@@ -1193,18 +1188,13 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
                         GestureDetector(
                           onTap: () => setState(() => _isSearching = true),
                           behavior: HitTestBehavior.opaque,
-                          child: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.5),
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white24),
-                            ),
-                            child: const Icon(
+                          child: const Padding(
+                            padding: EdgeInsets.all(8.0),
+                            child: Icon(
                               Icons.search_rounded,
                               color: Colors.white,
-                              size: 22,
-                              shadows: [Shadow(color: Colors.black54, blurRadius: 4)],
+                              size: 24,
+                              shadows: [Shadow(color: Colors.black87, blurRadius: 6, offset: Offset(0, 1))],
                             ),
                           ),
                         ),
@@ -1224,37 +1214,39 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Video Title
-                  Text(
-                    _videoTitle,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      shadows: [Shadow(color: Colors.black87, blurRadius: 4, offset: Offset(0, 1))],
+                  // Video Title (Clean and compact)
+                  if (_videoTitle.isNotEmpty && _videoTitle != 'Trending YouTube Short') ...[
+                    Text(
+                      _videoTitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        shadows: [Shadow(color: Colors.black87, blurRadius: 4, offset: Offset(0, 1))],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 10),
+                    const SizedBox(height: 8),
+                  ],
 
-                  // Creator Row: [Avatar (32dp)] [Channel Name] [Red +FOLLOW Button]
+                  // Creator Row: [Avatar (34dp)] [Channel Name] [Red +FOLLOW Button]
                   Row(
                     children: [
                       Container(
-                        width: 32,
-                        height: 32,
+                        width: 34,
+                        height: 34,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           border: Border.all(color: Colors.white, width: 1.5),
                           gradient: const LinearGradient(
-                            colors: [Color(0xFF2979FF), Color(0xFF00E5FF)],
+                            colors: [Color(0xFF1565C0), Color(0xFF00B0FF)],
                           ),
                         ),
                         child: Center(
                           child: Text(
                             _channelName.isNotEmpty ? _channelName[0].toUpperCase() : 'Y',
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
                           ),
                         ),
                       ),
@@ -1290,48 +1282,14 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
                               color: isSubscribed ? Colors.white30 : Colors.transparent,
                             ),
                           ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (isSubscribed)
-                                const Icon(Icons.check_rounded, color: Colors.white, size: 12)
-                              else
-                                const Text(
-                                  '+',
-                                  style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                                ),
-                              const SizedBox(width: 3),
-                              Text(
-                                isSubscribed ? 'SUBSCRIBED' : 'FOLLOW',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 0.3,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-
-                  // Audio Track Tag
-                  Row(
-                    children: [
-                      const Icon(Icons.music_note_rounded, color: Colors.white70, size: 12),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          '$_channelName • Original Audio',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 11,
-                            shadows: [Shadow(color: Colors.black87, blurRadius: 4)],
+                          child: Text(
+                            isSubscribed ? 'SUBSCRIBED' : '+FOLLOW',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.4,
+                            ),
                           ),
                         ),
                       ),
@@ -1350,48 +1308,75 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
                 children: [
                   // 1. Thumbs Up (Like)
                   _buildActionItem(
-                    icon: _isLiked ? Icons.thumb_up_rounded : Icons.thumb_up_alt_outlined,
-                    color: _isLiked ? const Color(0xFF00E5FF) : Colors.white,
+                    iconWidget: Icon(
+                      _isLiked ? Icons.thumb_up_rounded : Icons.thumb_up_alt_outlined,
+                      color: _isLiked ? const Color(0xFF00E5FF) : Colors.white,
+                      size: 28,
+                      shadows: const [Shadow(color: Colors.black54, blurRadius: 6, offset: Offset(0, 2))],
+                    ),
                     label: _likesCountStr,
                     onTap: _toggleLike,
                   ),
 
                   // 2. Thumbs Down (Dislike)
                   _buildActionItem(
-                    icon: _isDisliked ? Icons.thumb_down_rounded : Icons.thumb_down_alt_outlined,
-                    color: _isDisliked ? const Color(0xFF00E5FF) : Colors.white,
+                    iconWidget: Icon(
+                      _isDisliked ? Icons.thumb_down_rounded : Icons.thumb_down_alt_outlined,
+                      color: _isDisliked ? const Color(0xFF00E5FF) : Colors.white,
+                      size: 28,
+                      shadows: const [Shadow(color: Colors.black54, blurRadius: 6, offset: Offset(0, 2))],
+                    ),
                     label: 'Dislike',
                     onTap: _toggleDislike,
                   ),
 
-                  // 3. Comments
+                  // 3. Comments (Rounded chat bubble matching screenshot)
                   _buildActionItem(
-                    icon: Icons.chat_bubble_outline_rounded,
-                    color: Colors.white,
+                    iconWidget: const Icon(
+                      Icons.chat_bubble_rounded,
+                      color: Colors.white,
+                      size: 26,
+                      shadows: [Shadow(color: Colors.black54, blurRadius: 6, offset: Offset(0, 2))],
+                    ),
                     label: '$_commentsCount',
                     onTap: () => _showCommentsModal(context),
                   ),
 
-                  // 4. Share
+                  // 4. Share (Curved arrow pointing right matching screenshot)
                   _buildActionItem(
-                    icon: Icons.share_rounded,
-                    color: Colors.white,
+                    iconWidget: Transform.flip(
+                      flipX: true,
+                      child: const Icon(
+                        Icons.reply_rounded,
+                        color: Colors.white,
+                        size: 30,
+                        shadows: [Shadow(color: Colors.black54, blurRadius: 6, offset: Offset(0, 2))],
+                      ),
+                    ),
                     label: 'Share',
                     onTap: () => _showShareModal(context),
                   ),
 
-                  // 5. Download Video to Gallery
+                  // 5. Download Video to Gallery (Downward arrow to tray)
                   _buildActionItem(
-                    icon: _isDownloading ? Icons.hourglass_top_rounded : Icons.download_rounded,
-                    color: _isDownloading ? AppColors.accentCyan : Colors.white,
+                    iconWidget: Icon(
+                      _isDownloading ? Icons.hourglass_top_rounded : Icons.download_rounded,
+                      color: _isDownloading ? AppColors.accentCyan : Colors.white,
+                      size: 28,
+                      shadows: const [Shadow(color: Colors.black54, blurRadius: 6, offset: Offset(0, 2))],
+                    ),
                     label: _isDownloading ? '${(_downloadProgress * 100).toInt()}%' : 'Download',
                     onTap: _handleDownload,
                   ),
 
                   // 6. More Options (...)
                   _buildActionItem(
-                    icon: Icons.more_horiz_rounded,
-                    color: Colors.white,
+                    iconWidget: const Icon(
+                      Icons.more_horiz_rounded,
+                      color: Colors.white,
+                      size: 28,
+                      shadows: [Shadow(color: Colors.black54, blurRadius: 6, offset: Offset(0, 2))],
+                    ),
                     label: '',
                     onTap: () => _showMoreOptionsModal(context),
                   ),
@@ -1406,8 +1391,7 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
 
   /// Floating Action Item matching YouTube Shorts design (Pure white icon with drop shadow, no circular background)
   Widget _buildActionItem({
-    required IconData icon,
-    required Color color,
+    required Widget iconWidget,
     required String label,
     required VoidCallback onTap,
   }) {
@@ -1419,14 +1403,7 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              color: color,
-              size: 28,
-              shadows: const [
-                Shadow(color: Colors.black54, blurRadius: 6, offset: Offset(0, 2)),
-              ],
-            ),
+            iconWidget,
             if (label.isNotEmpty) ...[
               const SizedBox(height: 4),
               Text(
