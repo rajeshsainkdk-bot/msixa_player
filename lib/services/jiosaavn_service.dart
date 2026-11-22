@@ -287,13 +287,87 @@ class JioSaavnService {
   Future<List<Song>> getSadSongsTop50({int limit = 50}) =>
       getPlaylistSongs('802336660', genre: 'Sad Songs', subCategory: 'Broken Heart', defaultAlbum: 'Emotional Melodies', limit: limit);
 
-  /// Marwadi Desi & DJ Regional Hits
-  Future<List<Song>> getMarwadiHits({int limit = 30}) =>
-      searchSongs('Marwadi DJ Song', limit: limit);
+  /// Marwadi Desi & DJ Regional Hits with massive song coverage
+  Future<List<Song>> getMarwadiHits({int limit = 60}) =>
+      getGenreSongs('Marwadi', limit: limit);
 
   /// Lo-Fi Chill & Relax Hits
-  Future<List<Song>> getLofiHits({int limit = 30}) =>
-      searchSongs('Hindi Lo-Fi Chill', limit: limit);
+  Future<List<Song>> getLofiHits({int limit = 40}) =>
+      getGenreSongs('Desi Lo-Fi', limit: limit);
+
+  /// Deep multi-query search to get maximum coverage (50-100+ songs) for any genre/card
+  Future<List<Song>> getGenreSongs(String genreName, {int limit = 80}) async {
+    final clean = genreName.trim();
+    List<String> queries;
+
+    switch (clean.toLowerCase()) {
+      case 'marwadi':
+        queries = ['Marwadi DJ Song', 'New Marwadi Song', 'Rajasthani Marwadi Dhamaka', 'Prakash Mali Marwadi'];
+        break;
+      case 'rajasthani':
+        queries = ['Rajasthani DJ Song', 'Rajasthani Folk Song', 'Veena Rajasthani Hits', 'Seema Mishra Rajasthani'];
+        break;
+      case 'dj remix':
+        queries = ['Hindi DJ Remix Song', 'Desi Bass Booster Remix', 'Bollywood DJ Party Mix'];
+        break;
+      case 'haryanvi':
+        queries = ['Haryanvi DJ Songs', 'New Haryanvi Hits', 'Renuka Panwar Hits', 'Gulzaar Chhaniwala'];
+        break;
+      case 'bhojpuri':
+        queries = ['Bhojpuri DJ Remix', 'Pawan Singh Superhits', 'Khesari Lal Hits', 'Shilpi Raj Bhojpuri'];
+        break;
+      case 'punjabi':
+        queries = ['Punjabi Top Hits', 'Sidhu Moose Wala', 'Diljit Dosanjh Hits', 'Karan Aujla Hits'];
+        break;
+      case '90s retro':
+        queries = ['90s Bollywood Evergreen', 'Kumar Sanu Hits', 'Alka Yagnik Romantic', 'Udit Narayan 90s'];
+        break;
+      case 'romantic':
+        queries = ['Arijit Singh Romantic Hits', 'Bollywood Love Songs', 'Shreya Ghoshal Romantic'];
+        break;
+      case 'bhakti':
+        queries = ['Hanuman Chalisa', 'Shiv Tandav Stotram', 'Krishna Bhajan Hits', 'Mata Ke Bhajan'];
+        break;
+      case 'sad songs':
+        queries = ['Sad Hindi Songs', 'Arijit Singh Broken Heart', 'Judai Sad Songs', 'Dard Bhare Nagme'];
+        break;
+      case 'desi lo-fi':
+        queries = ['Hindi Lo-Fi Chill', 'Desi Lo-Fi Slowed Reverb', 'Bollywood Lo-Fi Beats'];
+        break;
+      case 'gym & workout':
+        queries = ['Gym Workout Motivational Hindi', 'Desi Gym Bass Songs', 'Workout Energy Beats'];
+        break;
+      case 'ghazal & sufi':
+        queries = ['Jagjit Singh Ghazals', 'Rahat Fateh Ali Khan Sufi', 'Nusrat Fateh Ali Khan Qawwali', 'Pankaj Udhas'];
+        break;
+      case 'gujarati':
+        queries = ['Gujarati Garba Songs', 'Kinjal Dave Hits', 'Geeta Rabari Songs', 'Kirtidan Gadhvi'];
+        break;
+      case 'south special':
+        queries = ['South Hindi Dubbed Hits', 'Anirudh Ravichander Hits', 'Pushpa KGF RRR Songs', 'Deva Deva South'];
+        break;
+      case 'bollywood':
+        queries = ['Latest Bollywood Hits', 'Trending Hindi Songs 2024', 'Arijit Singh Hits'];
+        break;
+      default:
+        queries = ['$clean Songs', '$clean Hits', '$clean Remix'];
+        break;
+    }
+
+    final futures = queries.map((q) => searchSongs(q, limit: 30)).toList();
+    final results = await Future.wait(futures);
+
+    final Set<String> seenIds = {};
+    final List<Song> combined = [];
+    for (final list in results) {
+      for (final s in list) {
+        if (seenIds.add(s.id)) {
+          combined.add(s.copyWith(genre: clean, subCategory: '$clean Special'));
+        }
+      }
+    }
+    return combined.take(limit).toList();
+  }
 
   /// Curated Top Artists with verified 500x500 HD official artwork
   static List<Map<String, String>> getTopArtists() {

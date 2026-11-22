@@ -10,6 +10,7 @@ import '../services/language_service.dart';
 import '../services/background_upload_service.dart';
 import '../providers/player_provider.dart';
 import '../services/song_artwork_resolver.dart';
+import '../widgets/mini_player.dart';
 
 class UploadSongScreen extends StatefulWidget {
   const UploadSongScreen({Key? key}) : super(key: key);
@@ -537,6 +538,7 @@ class _UploadSongScreenState extends State<UploadSongScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF0B0F19),
+      bottomNavigationBar: const MiniPlayer(),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,

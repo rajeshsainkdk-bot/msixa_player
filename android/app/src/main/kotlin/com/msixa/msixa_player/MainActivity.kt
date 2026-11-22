@@ -30,6 +30,7 @@ class MainActivity: AudioServiceActivity() {
     private var initialMediaName: String? = null
     private var syncAudioPlayer: MediaPlayer? = null
     private var isVideoPlaying = false
+    private var appShareChannel: MethodChannel? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -81,7 +82,9 @@ class MainActivity: AudioServiceActivity() {
         super.configureFlutterEngine(flutterEngine)
         val ctx: Context = applicationContext
 
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
+        val ch = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
+        appShareChannel = ch
+        ch.setMethodCallHandler { call, result ->
             when (call.method) {
                 "keepScreenOn" -> {
                     val enable = call.argument<Boolean>("enable") ?: true
@@ -686,8 +689,12 @@ class MainActivity: AudioServiceActivity() {
                                     syncAudioPlayer = mp
                                 } catch (_: Throwable) {}
                             }
-                            player.setOnErrorListener { mp, _, _ ->
+                            player.setOnErrorListener { mp, what, extra ->
                                 try { mp.release() } catch (_: Throwable) {}
+                                syncAudioPlayer = null
+                                runOnUiThread {
+                                    appShareChannel?.invokeMethod("onSyncAudioError", mapOf("what" to what, "extra" to extra))
+                                }
                                 true
                             }
                             player.prepareAsync()

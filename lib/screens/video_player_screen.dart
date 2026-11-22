@@ -271,6 +271,17 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       } catch (_) {}
     });
 
+    _channel.setMethodCallHandler((call) async {
+      if (call.method == 'onSyncAudioError') {
+        if (mounted) {
+          _isSyncAudioPlaying = false;
+          await _controller.setVolume(_isMuted ? 0.0 : _volume);
+          _showPillHud('⚠️ Hardware audio restored (Codec unsupported)', icon: Icons.volume_up_rounded);
+          setState(() {});
+        }
+      }
+    });
+
     // 2. Keep screen awake (Prevents phone from locking or sleeping)
     _setWakeLock(true);
 
@@ -596,6 +607,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           await _controller.setVolume(_isMuted ? 0.0 : _volume);
           if (initialTrackIdx > 0) {
             await _switchAudioTrack(initialTrackIdx);
+          } else if (firstIsDolby) {
+            _showPillHud('ℹ️ Video has Dolby/DTS audio. Audio options available.', icon: Icons.audiotrack_rounded);
           }
         }
       }
@@ -1765,6 +1778,41 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                       setAudioState(() {});
                                       setState(() {});
                                     },
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+
+                            // Audio Voice Diagnostics & Format Help Card
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF1E293B).withOpacity(0.6),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: Colors.white.withOpacity(0.08)),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: const [
+                                      Icon(Icons.info_outline_rounded, color: Color(0xFF00E5FF), size: 15),
+                                      SizedBox(width: 6),
+                                      Text(
+                                        'ऑडियो और आवाज सहायता (Voice Diagnostics)',
+                                        style: TextStyle(color: Color(0xFF00E5FF), fontSize: 11, fontWeight: FontWeight.bold),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    _audioTracks.isNotEmpty
+                                        ? '• वर्तमान ट्रैक: $_audioTrackName\n'
+                                          '• यदि इस वीडियो में आवाज नहीं आ रही है, तो ऊपर सूची में से "AAC Stereo" या दूसरा ऑडियो ट्रैक चुनें।\n'
+                                          '• Dolby AC-3 / DTS 5.1 ट्रैक के लिए ऊपर "Software Audio Engine" ऑन करें।'
+                                        : '• मानक हार्डवेयर डिकोडर सक्रिय है। किसी मूवी में आवाज न आने पर ऊपर "Software Audio Engine" ऑन करें।',
+                                    style: const TextStyle(color: Colors.white70, fontSize: 10, height: 1.35),
                                   ),
                                 ],
                               ),

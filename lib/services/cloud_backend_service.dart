@@ -214,9 +214,10 @@ class CloudBackendService extends ChangeNotifier {
     await _loadSharedSongs();
     await _loadSharedPlaylists();
 
-    // 5. Seed initial curated catalog ONLY if BOTH local and cloud are completely empty
+    // 5. Seed initial curated catalog ONLY if Cloudflare R2 is NOT active and local is empty
     final isCatalogSeeded = prefs.getBool(_keyCatalogSeeded) ?? false;
-    if (!isCatalogSeeded && _deletedSongIds.isEmpty && _communitySongs.isEmpty) {
+    final r2 = R2StorageService();
+    if (!isCatalogSeeded && !r2.isConfigured && _deletedSongIds.isEmpty && _communitySongs.isEmpty) {
       for (final s in CatalogService.getCuratedSongs()) {
         if (!_deletedSongIds.contains(s.id) && !_communitySongs.any((existing) => existing.id == s.id)) {
           _communitySongs.add(s.copyWith(status: 'approved'));
@@ -1137,8 +1138,17 @@ class CloudBackendService extends ChangeNotifier {
     if (hasChanges) {
       try {
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setStringList(_keyCommunitySongs, _communitySongs.map((s) => jsonEncode(s.toJson())).toList());
+        final songJsonList = _communitySongs.map((s) => jsonEncode(s.toJson())).toList();
+        await prefs.setStringList(_keyCommunitySongs, songJsonList);
         await prefs.setStringList(_keyDeletedSongIds, _deletedSongIds.toList());
+        final cleanSongJson = jsonEncode(_communitySongs.map((s) => s.toJson()).toList());
+        for (final p in _sharedSongFilePaths) {
+          try {
+            final f = File(p);
+            if (!await f.parent.exists()) await f.parent.create(recursive: true);
+            await f.writeAsString(cleanSongJson, flush: true);
+          } catch (_) {}
+        }
         final delJson = jsonEncode(_deletedSongIds.toList());
         for (final p in _sharedDeletedSongFilePaths) {
           try {

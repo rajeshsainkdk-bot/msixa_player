@@ -106,39 +106,61 @@ class AudioPlayerService {
   Future<void> setQueue(List<Song> songs, {int initialIndex = 0}) async {
     final currentToken = ++_sessionToken;
 
+    if (songs.isEmpty) return;
+
+    // Check if the current queue already matches the requested songs
+    final bool isSameQueue = _queue.isNotEmpty &&
+        _queue.length == songs.length &&
+        _queue.first.id == songs.first.id &&
+        _queue.last.id == songs.last.id;
+
+    if (isSameQueue && _player.audioSource is ConcatenatingAudioSource) {
+      _currentIndex = initialIndex.clamp(0, _queue.length - 1);
+      _currentSong = _queue[_currentIndex];
+      try {
+        await _player.seek(Duration.zero, index: _currentIndex);
+        await _player.play();
+        return;
+      } catch (e) {
+        debugPrint('Seek in existing queue failed: $e, rebuilding source');
+      }
+    }
+
     _queue = List.from(songs);
     _currentIndex = initialIndex.clamp(0, _queue.isNotEmpty ? _queue.length - 1 : 0);
     if (_isShuffle) {
       _generateShuffleIndices();
     }
 
-    if (_queue.isNotEmpty) {
-      _currentSong = _queue[_currentIndex];
+    _currentSong = _queue[_currentIndex];
+
+    try {
+      // Pause smoothly to release audio focus; DO NOT call stop() to avoid destroying ExoPlayer pipeline
       try {
-        // ALWAYS pause and cleanly stop previous playback to avoid native channel deadlock
-        try {
-          await _player.pause();
-          await _player.stop();
-        } catch (_) {}
-        if (currentToken != _sessionToken) return;
+        await _player.pause();
+      } catch (_) {}
+      if (currentToken != _sessionToken) return;
 
-        final playlist = ConcatenatingAudioSource(
-          useLazyPreparation: true,
-          children: _queue.map((s) => _createAudioSource(s)).toList(),
-        );
+      final playlist = ConcatenatingAudioSource(
+        useLazyPreparation: true,
+        children: _queue.map((s) => _createAudioSource(s)).toList(),
+      );
 
-        await _player.setAudioSource(playlist, initialIndex: _currentIndex).timeout(
-          const Duration(seconds: 12),
-          onTimeout: () => throw TimeoutException('Playlist load timed out'),
-        );
-        if (currentToken != _sessionToken) return;
+      await _player.setAudioSource(
+        playlist,
+        initialIndex: _currentIndex,
+        preload: false,
+      ).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () => throw TimeoutException('Playlist load timed out'),
+      );
+      if (currentToken != _sessionToken) return;
 
-        await _player.play();
-      } catch (e) {
-        debugPrint('setQueue error: $e, falling back to direct playSong');
-        if (currentToken == _sessionToken) {
-          await playSong(_queue[_currentIndex]);
-        }
+      await _player.play();
+    } catch (e) {
+      debugPrint('setQueue error: $e, falling back to direct playSong');
+      if (currentToken == _sessionToken) {
+        await playSong(_queue[_currentIndex]);
       }
     }
   }
@@ -150,6 +172,15 @@ class AudioPlayerService {
       _currentSong = song;
 
       final idx = _queue.indexWhere((s) => s.id == song.id);
+      if (idx != -1 && _player.audioSource is ConcatenatingAudioSource) {
+        _currentIndex = idx;
+        try {
+          await _player.seek(Duration.zero, index: _currentIndex);
+          await _player.play();
+          return;
+        } catch (_) {}
+      }
+
       if (idx != -1) {
         _currentIndex = idx;
       } else {
@@ -157,16 +188,14 @@ class AudioPlayerService {
         _currentIndex = _queue.length - 1;
       }
 
-      // Stop previous playback to ensure strictly ONE song plays without collision
       try {
         await _player.pause();
-        await _player.stop();
       } catch (_) {}
       if (currentToken != _sessionToken) return;
 
       final source = _createAudioSource(song);
       await _player.setAudioSource(source).timeout(
-        const Duration(seconds: 10),
+        const Duration(seconds: 8),
         onTimeout: () => throw TimeoutException('Single song load timed out'),
       );
       if (currentToken != _sessionToken) return;

@@ -7,6 +7,7 @@ import '../providers/player_provider.dart';
 import '../theme/app_colors.dart';
 import '../widgets/song_list_tile.dart';
 import '../widgets/song_thumbnail_widget.dart';
+import '../widgets/mini_player.dart';
 import '../services/language_service.dart';
 
 class AlbumDetailScreen extends StatelessWidget {
@@ -24,6 +25,7 @@ class AlbumDetailScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
+      bottomNavigationBar: const MiniPlayer(),
       body: CustomScrollView(
         slivers: [
           // Album Header with Vinyl Disc Art

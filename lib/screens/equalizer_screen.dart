@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../models/equalizer_preset.dart';
 import '../providers/player_provider.dart';
 import '../services/language_service.dart';
+import '../widgets/mini_player.dart';
 import '../theme/app_colors.dart';
 
 class EqualizerScreen extends StatelessWidget {
@@ -28,6 +29,7 @@ class EqualizerScreen extends StatelessWidget {
 
             return Scaffold(
               backgroundColor: AppColors.background,
+              bottomNavigationBar: (ModalRoute.of(context)?.isFirst ?? true) ? null : const MiniPlayer(),
               appBar: AppBar(
                 title: Text(lang.t('sound_fx_title')),
                 actions: [

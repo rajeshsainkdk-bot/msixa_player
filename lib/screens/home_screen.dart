@@ -20,6 +20,7 @@ import 'profile_screen.dart';
 import 'artist_detail_screen.dart';
 import 'album_detail_screen.dart';
 import 'search_screen.dart';
+import 'genre_section_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -127,6 +128,30 @@ class _HomeScreenState extends State<HomeScreen> {
       'icon': Icons.movie_filter_rounded,
       'gradient': LinearGradient(colors: [Color(0xFFE11D48), Color(0xFF9333EA)]),
       'image': 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=600&q=80',
+    },
+    {
+      'title': 'Gujarati',
+      'icon': Icons.music_note_rounded,
+      'gradient': LinearGradient(colors: [Color(0xFF0D9488), Color(0xFF14B8A6)]),
+      'image': 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&q=80',
+    },
+    {
+      'title': 'South Special',
+      'icon': Icons.flash_on_rounded,
+      'gradient': LinearGradient(colors: [Color(0xFF6366F1), Color(0xFFA855F7)]),
+      'image': 'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=600&q=80',
+    },
+    {
+      'title': 'Classical',
+      'icon': Icons.graphic_eq_rounded,
+      'gradient': LinearGradient(colors: [Color(0xFF78350F), Color(0xFFB45309)]),
+      'image': 'https://images.unsplash.com/photo-1511192336575-5a79af67a629?w=600&q=80',
+    },
+    {
+      'title': 'Party Dance',
+      'icon': Icons.nightlife_rounded,
+      'gradient': LinearGradient(colors: [Color(0xFFEC4899), Color(0xFF8B5CF6)]),
+      'image': 'https://images.unsplash.com/photo-1571266028243-3716f02d2d2e?w=600&q=80',
     },
     {
       'title': 'All Indian',
@@ -684,21 +709,13 @@ class _HomeScreenState extends State<HomeScreen> {
                         imageUrl: g['image'] as String?,
                         isSelected: isSelected,
                         onTap: () {
-                          final genreName = g['title'] as String;
-                          provider.searchOnline('$genreName Songs');
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => Scaffold(
-                                appBar: AppBar(
-                                  backgroundColor: AppColors.surface,
-                                  elevation: 0,
-                                  title: Text(
-                                    lang.isHindi ? '$genreName स्पेशल' : '$genreName Hits',
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                                  ),
-                                ),
-                                body: const SearchScreen(),
+                              builder: (_) => GenreSectionScreen(
+                                title: g['title'] as String,
+                                icon: g['icon'] as IconData,
+                                gradient: g['gradient'] as LinearGradient,
                               ),
                             ),
                           );
@@ -1193,17 +1210,49 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ],
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF00E5FF).withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFF00E5FF).withOpacity(0.3)),
-                ),
-                child: const Text(
-                  'Ultra HD 320k',
-                  style: TextStyle(color: Color(0xFF00E5FF), fontSize: 10, fontWeight: FontWeight.bold),
-                ),
+              Row(
+                children: [
+                  InkWell(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => GenreSectionScreen(
+                            title: title,
+                            icon: icon,
+                            gradient: LinearGradient(colors: [iconColor, iconColor.withOpacity(0.5)]),
+                            initialSongs: songs,
+                          ),
+                        ),
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      margin: const EdgeInsets.only(right: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        lang.isHindi ? 'सभी देखें' : 'See All',
+                        style: const TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF00E5FF).withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFF00E5FF).withOpacity(0.3)),
+                    ),
+                    child: const Text(
+                      'Ultra HD 320k',
+                      style: TextStyle(color: Color(0xFF00E5FF), fontSize: 10, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

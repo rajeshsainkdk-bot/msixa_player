@@ -7,6 +7,7 @@ import '../providers/player_provider.dart';
 import '../services/language_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/song_list_tile.dart';
+import '../widgets/mini_player.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({Key? key}) : super(key: key);
@@ -85,6 +86,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
         return Scaffold(
           backgroundColor: AppColors.background,
+          bottomNavigationBar: (ModalRoute.of(context)?.isFirst ?? true) ? null : const MiniPlayer(),
           appBar: AppBar(
             backgroundColor: AppColors.background,
             elevation: 0,

@@ -8,6 +8,7 @@ import '../services/update_service.dart';
 import '../services/app_share_service.dart';
 import '../providers/player_provider.dart';
 import '../theme/app_colors.dart';
+import '../widgets/mini_player.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -27,6 +28,7 @@ class ProfileScreen extends StatelessWidget {
 
         return Scaffold(
           backgroundColor: const Color(0xFF0B0F19),
+          bottomNavigationBar: const MiniPlayer(),
           appBar: AppBar(
             backgroundColor: const Color(0xFF131A2A),
             elevation: 0,

@@ -147,13 +147,24 @@ class PlayerProvider extends ChangeNotifier {
   }
 
   void _init() async {
-    // 1. Listen to audio playback events
+    // 1. Listen to audio playback events with infinite-loading protection watchdog
+    Timer? bufferingWatchdog;
     _audioService.playerStateStream.listen((state) {
       final isCompleted = state.processingState == ProcessingState.completed;
       _isPlaying = state.playing && !isCompleted;
       _isBuffering = (state.processingState == ProcessingState.buffering ||
               state.processingState == ProcessingState.loading) &&
           !isCompleted;
+
+      bufferingWatchdog?.cancel();
+      if (_isBuffering) {
+        bufferingWatchdog = Timer(const Duration(seconds: 8), () {
+          if (_isBuffering) {
+            _isBuffering = false;
+            notifyListeners();
+          }
+        });
+      }
       notifyListeners();
     });
 

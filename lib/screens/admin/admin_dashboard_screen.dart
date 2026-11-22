@@ -67,6 +67,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
   bool _adminGroupByCategory = true;
   bool _isMultiSelectMode = false;
   final Set<String> _selectedSongIds = {};
+  final Set<String> _expandedCategories = {};
 
   DateTime _lastAdminPosTime = DateTime.fromMillisecondsSinceEpoch(0);
 
@@ -3899,7 +3900,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
           child: Theme(
             data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
             child: ExpansionTile(
-              initiallyExpanded: idx == 0,
+              key: PageStorageKey<String>('admin_cat_$category'),
+              initiallyExpanded: _expandedCategories.contains(category),
+              onExpansionChanged: (isOpen) {
+                setState(() {
+                  if (isOpen) {
+                    _expandedCategories.add(category);
+                  } else {
+                    _expandedCategories.remove(category);
+                  }
+                });
+              },
               tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
               leading: Container(
                 padding: const EdgeInsets.all(7),
@@ -4045,7 +4056,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                       child: Theme(
                         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
                         child: ExpansionTile(
-                          initiallyExpanded: false,
+                          key: PageStorageKey<String>('admin_subcat_${category}_$subCat'),
+                          initiallyExpanded: _expandedCategories.contains('${category}_$subCat'),
+                          onExpansionChanged: (isOpen) {
+                            setState(() {
+                              if (isOpen) {
+                                _expandedCategories.add('${category}_$subCat');
+                              } else {
+                                _expandedCategories.remove('${category}_$subCat');
+                              }
+                            });
+                          },
                           tilePadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
                           leading: Container(
                             padding: const EdgeInsets.all(5),
