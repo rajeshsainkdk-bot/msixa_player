@@ -295,78 +295,303 @@ class JioSaavnService {
   Future<List<Song>> getLofiHits({int limit = 40}) =>
       getGenreSongs('Desi Lo-Fi', limit: limit);
 
-  /// Deep multi-query search to get maximum coverage (50-100+ songs) for any genre/card
-  Future<List<Song>> getGenreSongs(String genreName, {int limit = 80}) async {
+  static final Map<String, List<Song>> _genreSongsCache = {};
+
+  /// Deep multi-query search to get maximum coverage (minimum 200+ songs guaranteed) for any genre/card
+  Future<List<Song>> getGenreSongs(String genreName, {int limit = 250, bool forceRefresh = false}) async {
     final clean = genreName.trim();
+    final cacheKey = clean.toLowerCase();
+
+    if (!forceRefresh && _genreSongsCache.containsKey(cacheKey) && _genreSongsCache[cacheKey]!.length >= 180) {
+      return _genreSongsCache[cacheKey]!;
+    }
+
     List<String> queries;
 
-    switch (clean.toLowerCase()) {
+    switch (cacheKey) {
       case 'marwadi':
-        queries = ['Marwadi DJ Song', 'New Marwadi Song', 'Rajasthani Marwadi Dhamaka', 'Prakash Mali Marwadi'];
+        queries = [
+          'Marwadi DJ Song',
+          'Rajasthani Marwadi DJ',
+          'New Marwadi Song 2024',
+          'Prakash Mali Marwadi Bhajan',
+          'Marwadi Desi Lokgeet',
+          'Marwadi Vivah DJ Geet',
+          'Veena Marwadi Hits',
+          'Marwadi Fagan Song Dhamaka',
+          'Marwadi Superhit Remix',
+        ];
         break;
       case 'rajasthani':
-        queries = ['Rajasthani DJ Song', 'Rajasthani Folk Song', 'Veena Rajasthani Hits', 'Seema Mishra Rajasthani'];
+        queries = [
+          'Rajasthani DJ Song',
+          'Rajasthani Folk Song',
+          'Veena Rajasthani Hits',
+          'Seema Mishra Rajasthani',
+          'Rajasthani Ghoomar Songs',
+          'Choudhary Song Rajasthani',
+          'Twinkal Vaishnav Rajasthani',
+          'Rajasthani Vivah DJ Dhamaka',
+          'Mame Khan Rajasthani',
+        ];
         break;
       case 'dj remix':
-        queries = ['Hindi DJ Remix Song', 'Desi Bass Booster Remix', 'Bollywood DJ Party Mix'];
+        queries = [
+          'Hindi DJ Remix Song',
+          'Desi Bass Booster Remix',
+          'Bollywood DJ Party Mix',
+          'EDM Hindi DJ',
+          'Old Hindi DJ Remix',
+          'Club DJ Remix Hindi',
+          'Bhojpuri Haryanvi DJ Mix',
+          'Bass Boosted Punjabi DJ',
+          'DJ Snake Hindi Remix',
+        ];
         break;
       case 'haryanvi':
-        queries = ['Haryanvi DJ Songs', 'New Haryanvi Hits', 'Renuka Panwar Hits', 'Gulzaar Chhaniwala'];
+        queries = [
+          'Haryanvi DJ Songs',
+          'New Haryanvi Hits 2024',
+          'Renuka Panwar Hits',
+          'Gulzaar Chhaniwala',
+          'Sapna Choudhary Dance Hits',
+          'Masoom Sharma Hits',
+          'Diler Kharkiya Haryanvi',
+          'Haryanvi Ragni Folk',
+          'KD Desi Rock Haryanvi',
+        ];
         break;
       case 'bhojpuri':
-        queries = ['Bhojpuri DJ Remix', 'Pawan Singh Superhits', 'Khesari Lal Hits', 'Shilpi Raj Bhojpuri'];
+        queries = [
+          'Bhojpuri DJ Remix',
+          'Pawan Singh Superhits',
+          'Khesari Lal Hits',
+          'Shilpi Raj Bhojpuri',
+          'Bhojpuri Arkestra Hit',
+          'Ritesh Pandey Hits',
+          'Bhojpuri Chhath & Lokgeet',
+          'Bhojpuri New Dhamaka',
+          'Arvind Akela Kallu Hits',
+        ];
         break;
       case 'punjabi':
-        queries = ['Punjabi Top Hits', 'Sidhu Moose Wala', 'Diljit Dosanjh Hits', 'Karan Aujla Hits'];
+        queries = [
+          'Punjabi Top Hits',
+          'Sidhu Moose Wala',
+          'Diljit Dosanjh Hits',
+          'Karan Aujla Hits',
+          'AP Dhillon Hits',
+          'Shubh Punjabi Songs',
+          'B Praak Melodies',
+          'Amrit Maan Hits',
+          'Jordan Sandhu Hits',
+        ];
         break;
       case '90s retro':
-        queries = ['90s Bollywood Evergreen', 'Kumar Sanu Hits', 'Alka Yagnik Romantic', 'Udit Narayan 90s'];
+        queries = [
+          '90s Bollywood Evergreen',
+          'Kumar Sanu Hits',
+          'Alka Yagnik Romantic',
+          'Udit Narayan 90s',
+          'Sonu Nigam 90s Hits',
+          'Kavita Krishnamurthy 90s',
+          '90s Superhit Jhankar Beats',
+          'Anuradha Paudwal 90s',
+          'Abhijeet Bhattacharya 90s',
+        ];
         break;
       case 'romantic':
-        queries = ['Arijit Singh Romantic Hits', 'Bollywood Love Songs', 'Shreya Ghoshal Romantic'];
+        queries = [
+          'Arijit Singh Romantic Hits',
+          'Bollywood Love Songs',
+          'Shreya Ghoshal Romantic',
+          'Atif Aslam Love Songs',
+          'Romantic Hindi Mashup',
+          'Jubin Nautiyal Hits',
+          'Soulful Bollywood Love',
+          'Armaan Malik Romantic',
+          'Mohit Chauhan Romantic',
+        ];
         break;
       case 'bhakti':
-        queries = ['Hanuman Chalisa', 'Shiv Tandav Stotram', 'Krishna Bhajan Hits', 'Mata Ke Bhajan'];
+        queries = [
+          'Hanuman Chalisa',
+          'Shiv Tandav Stotram',
+          'Krishna Bhajan Hits',
+          'Mata Ke Bhajan',
+          'Shree Ram Bhajan',
+          'Khatu Shyam Bhajan',
+          'Sai Baba Bhajan',
+          'Aarti Sangrah Hindi',
+          'Anuradha Paudwal Bhakti',
+        ];
         break;
       case 'sad songs':
-        queries = ['Sad Hindi Songs', 'Arijit Singh Broken Heart', 'Judai Sad Songs', 'Dard Bhare Nagme'];
+        queries = [
+          'Sad Hindi Songs',
+          'Arijit Singh Broken Heart',
+          'Judai Sad Songs',
+          'Dard Bhare Nagme',
+          'Emraan Hashmi Sad Hits',
+          'Bewafai Sad Song',
+          'Mohabbat Sad Songs',
+          'Attaullah Khan Sad Hits',
+          'B Praak Sad Songs',
+        ];
         break;
       case 'desi lo-fi':
-        queries = ['Hindi Lo-Fi Chill', 'Desi Lo-Fi Slowed Reverb', 'Bollywood Lo-Fi Beats'];
+        queries = [
+          'Hindi Lo-Fi Chill',
+          'Desi Lo-Fi Slowed Reverb',
+          'Bollywood Lo-Fi Beats',
+          'Midnight Hindi Lo-Fi',
+          'Late Night Drive Hindi',
+          'Acoustic Hindi Chill',
+          'Lo-Fi Desi Pop',
+          'Indie Hindi Chill',
+          'Prateek Kuhad Chill',
+        ];
         break;
       case 'gym & workout':
-        queries = ['Gym Workout Motivational Hindi', 'Desi Gym Bass Songs', 'Workout Energy Beats'];
+        queries = [
+          'Gym Workout Motivational Hindi',
+          'Desi Gym Bass Songs',
+          'Workout Energy Beats',
+          'Bodybuilding Hindi Songs',
+          'High Energy Hindi Workout',
+          'Motivational Rap Hindi',
+          'Gym Beast Mode Beats',
+          'Power Workout Songs',
+          'Dino James Workout',
+        ];
         break;
       case 'ghazal & sufi':
-        queries = ['Jagjit Singh Ghazals', 'Rahat Fateh Ali Khan Sufi', 'Nusrat Fateh Ali Khan Qawwali', 'Pankaj Udhas'];
+        queries = [
+          'Jagjit Singh Ghazals',
+          'Rahat Fateh Ali Khan Sufi',
+          'Nusrat Fateh Ali Khan Qawwali',
+          'Pankaj Udhas Ghazals',
+          'Ghulam Ali Ghazals',
+          'Chitra Singh Ghazals',
+          'Abida Parveen Sufi',
+          'Sufi Rock Hindi',
+          'Kailash Kher Sufi',
+        ];
         break;
       case 'gujarati':
-        queries = ['Gujarati Garba Songs', 'Kinjal Dave Hits', 'Geeta Rabari Songs', 'Kirtidan Gadhvi'];
+        queries = [
+          'Gujarati Garba Songs',
+          'Kinjal Dave Hits',
+          'Geeta Rabari Songs',
+          'Kirtidan Gadhvi',
+          'Jignesh Kaviraj',
+          'Falguni Pathak Garba',
+          'Gujarati Lagna Geet',
+          'Sanedo Gujarati',
+          'Aditya Gadhvi Folk',
+        ];
         break;
       case 'south special':
-        queries = ['South Hindi Dubbed Hits', 'Anirudh Ravichander Hits', 'Pushpa KGF RRR Songs', 'Deva Deva South'];
+        queries = [
+          'South Hindi Dubbed Hits',
+          'Anirudh Ravichander Hits',
+          'Pushpa KGF RRR Songs',
+          'Deva Deva South',
+          'Allu Arjun Hindi Dubbed',
+          'Vijay Thalapathy Hits',
+          'DSP Devi Sri Prasad',
+          'Thaman S Hits',
+          'Harris Jayaraj Hits',
+        ];
         break;
       case 'bollywood':
-        queries = ['Latest Bollywood Hits', 'Trending Hindi Songs 2024', 'Arijit Singh Hits'];
+        queries = [
+          'Latest Bollywood Hits',
+          'Trending Hindi Songs 2024',
+          'Arijit Singh Hits',
+          'Badshah Party Hits',
+          'Karan Aujla Bollywood',
+          'Pathaan Jawan Animal Songs',
+          'Stree 2 Songs',
+          'Ranbir Kapoor Hits',
+          'Pritam Bollywood Hits',
+        ];
+        break;
+      case 'classical':
+        queries = [
+          'Indian Classical Instrumental',
+          'Bansuri Flute Meditation Hindi',
+          'Sitar Classical Melodies',
+          'Tabla Instrumental Classical',
+          'Raga Bhairavi Classical',
+          'Santoor Classical Instrumental',
+          'Shehnai Vivah Melodies',
+          'Veena Classical Carnatic',
+          'Pandit Hariprasad Chaurasia',
+        ];
+        break;
+      case 'party dance':
+        queries = [
+          'Bollywood Party Dance',
+          'Club Anthems Hindi',
+          'Wedding Sangeet Dance Hits',
+          'Yo Yo Honey Singh Party',
+          'Mika Singh Dance Hits',
+          'Neha Kakkar Party Dance',
+          'Disco Deewane Remix',
+          'Electronic Desi Party',
+          'Sukhbir Ishq Tera Tadpave',
+        ];
         break;
       default:
-        queries = ['$clean Songs', '$clean Hits', '$clean Remix'];
+        queries = [
+          '$clean Songs',
+          '$clean Hits',
+          '$clean Remix',
+          '$clean Top 50',
+          '$clean Best Songs',
+          '$clean DJ Dhamaka',
+        ];
         break;
     }
 
-    final futures = queries.map((q) => searchSongs(q, limit: 30)).toList();
+    final List<Future<List<Song>>> futures = [];
+    for (final q in queries) {
+      futures.add(searchSongs(q, limit: 40, page: 1));
+      futures.add(searchSongs(q, limit: 40, page: 2));
+    }
     final results = await Future.wait(futures);
 
     final Set<String> seenIds = {};
+    final Set<String> seenTitles = {};
     final List<Song> combined = [];
+
     for (final list in results) {
       for (final s in list) {
-        if (seenIds.add(s.id)) {
+        final cleanTitle = s.title.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+        if (seenIds.add(s.id) && (cleanTitle.isEmpty || seenTitles.add(cleanTitle))) {
           combined.add(s.copyWith(genre: clean, subCategory: '$clean Special'));
         }
       }
     }
-    return combined.take(limit).toList();
+
+    // Safety guarantee: If under 200, fetch page 3 for top queries to ensure 200+ tracks
+    if (combined.length < 200) {
+      final extraFutures = queries.take(4).map((q) => searchSongs(q, limit: 40, page: 3)).toList();
+      final extraResults = await Future.wait(extraFutures);
+      for (final list in extraResults) {
+        for (final s in list) {
+          final cleanTitle = s.title.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+          if (seenIds.add(s.id) && (cleanTitle.isEmpty || seenTitles.add(cleanTitle))) {
+            combined.add(s.copyWith(genre: clean, subCategory: '$clean Special'));
+          }
+        }
+      }
+    }
+
+    final finalList = combined.take(limit).toList();
+    _genreSongsCache[cacheKey] = finalList;
+    return finalList;
   }
 
   /// Curated Top Artists with verified 500x500 HD official artwork

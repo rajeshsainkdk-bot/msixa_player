@@ -11,12 +11,16 @@ class SongListTile extends StatelessWidget {
   final Song song;
   final VoidCallback onTap;
   final bool isCurrent;
+  final int? playCount;
+  final int? rank;
 
   const SongListTile({
     Key? key,
     required this.song,
     required this.onTap,
     this.isCurrent = false,
+    this.playCount,
+    this.rank,
   }) : super(key: key);
 
   @override
@@ -46,6 +50,21 @@ class SongListTile extends StatelessWidget {
             padding: const EdgeInsets.all(10),
             child: Row(
               children: [
+                if (rank != null)
+                  Container(
+                    width: 26,
+                    margin: const EdgeInsets.only(right: 4),
+                    alignment: Alignment.center,
+                    child: Text(
+                      '#$rank',
+                      style: TextStyle(
+                        color: rank! <= 3 ? const Color(0xFFFFB300) : AppColors.textMuted,
+                        fontWeight: FontWeight.bold,
+                        fontSize: rank! <= 3 ? 13 : 11,
+                      ),
+                    ),
+                  ),
+
                 // Thumbnail with Play overlay or active visualizer
                 SongThumbnailWidget(
                   song: song,
@@ -101,6 +120,24 @@ class SongListTile extends StatelessWidget {
                               ),
                             ),
                           ),
+                          if (playCount != null && playCount! > 0) ...[
+                            const SizedBox(width: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(colors: [Color(0xFFFF6D00), Color(0xFFFF3D00)]),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                '🔥 $playCount plays',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
                           if (song.subCategory != null &&
                               song.subCategory!.trim().isNotEmpty &&
                               song.subCategory!.trim().toLowerCase() != song.genre.trim().toLowerCase()) ...[

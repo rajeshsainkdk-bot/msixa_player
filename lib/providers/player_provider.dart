@@ -32,6 +32,7 @@ class PlayerProvider extends ChangeNotifier {
   List<Song> _recentlyPlayed = [];
   List<Playlist> _customPlaylists = [];
   List<Song> _deviceSongs = [];
+  Map<String, int> _playCounts = {};
 
   // Online Streaming State (Ultra HD 320kbps)
   List<Song> _onlineSearchResults = [];
@@ -98,6 +99,8 @@ class PlayerProvider extends ChangeNotifier {
   List<Song> get searchResults => _searchResults;
   List<Song> get favorites => _favorites;
   List<Song> get recentlyPlayed => _recentlyPlayed;
+  Map<String, int> get playCounts => _playCounts;
+  int getPlayCount(String songId) => _playCounts[songId] ?? 0;
   List<Playlist> get customPlaylists => _customPlaylists;
   List<Song> get deviceSongs => _deviceSongs;
   List<Song> get onlineSearchResults => _onlineSearchResults;
@@ -189,6 +192,12 @@ class PlayerProvider extends ChangeNotifier {
     });
 
     _audioService.currentIndexStream.listen((index) {
+      if (index != null && index >= 0 && index < _audioService.queue.length) {
+        final s = _audioService.queue[index];
+        _playCounts[s.id] = (_playCounts[s.id] ?? 0) + 1;
+        _storageService.incrementPlayCount(s.id);
+        _addToRecentlyPlayed(s);
+      }
       notifyListeners();
     });
 
@@ -207,11 +216,13 @@ class PlayerProvider extends ChangeNotifier {
       _storageService.loadRecentlyPlayed(currentUserPhone),
       _storageService.loadCustomPlaylists(currentUserPhone),
       _storageService.loadEqualizerSettings(),
+      _storageService.loadPlayCounts(),
     ]);
     _favorites = results[0] as List<Song>;
     _recentlyPlayed = results[1] as List<Song>;
     _customPlaylists = results[2] as List<Playlist>;
     final eqData = results[3] as Map<String, dynamic>;
+    _playCounts = results[4] as Map<String, int>;
     final presetName = eqData['preset'] as String;
     _currentEqPreset = EqualizerPreset.defaultPresets.firstWhere(
       (p) => p.name == presetName,
@@ -317,6 +328,8 @@ class PlayerProvider extends ChangeNotifier {
       await _audioService.playSong(song);
     }
 
+    _playCounts[song.id] = (_playCounts[song.id] ?? 0) + 1;
+    _storageService.incrementPlayCount(song.id);
     _addToRecentlyPlayed(song);
     notifyListeners();
   }

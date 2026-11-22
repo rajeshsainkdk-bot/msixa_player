@@ -9,6 +9,7 @@ class StorageService {
   static const String _keyCustomPlaylists = 'msixa_user_playlists';
   static const String _keyEqPreset = 'msixa_eq_preset';
   static const String _keyEqGains = 'msixa_eq_gains';
+  static const String _keyPlayCounts = 'msixa_song_play_counts';
 
   static String _cleanPhone(String? p) => p == null ? '' : p.replaceAll(RegExp(r'[^0-9]'), '');
   static String _favKey([String? phone]) => _cleanPhone(phone).isNotEmpty ? 'msixa_fav_${_cleanPhone(phone)}' : 'msixa_favorites';
@@ -111,5 +112,31 @@ class StorageService {
       await prefs.setString(_keyEqPreset, presetName);
       await prefs.setStringList(_keyEqGains, gains.map((e) => e.toString()).toList());
     } catch (_) {}
+  }
+
+  Future<Map<String, int>> loadPlayCounts() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_keyPlayCounts);
+      if (raw != null && raw.isNotEmpty) {
+        final Map<String, dynamic> decoded = json.decode(raw);
+        return decoded.map((k, v) => MapEntry(k, (v as num).toInt()));
+      }
+    } catch (_) {}
+    return {};
+  }
+
+  Future<int> incrementPlayCount(String songId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_keyPlayCounts);
+      final Map<String, dynamic> map = raw != null && raw.isNotEmpty ? json.decode(raw) : {};
+      final current = (map[songId] as num? ?? 0).toInt() + 1;
+      map[songId] = current;
+      await prefs.setString(_keyPlayCounts, json.encode(map));
+      return current;
+    } catch (_) {
+      return 1;
+    }
   }
 }

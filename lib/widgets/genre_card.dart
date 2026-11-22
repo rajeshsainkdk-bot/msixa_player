@@ -7,6 +7,7 @@ class GenreCard extends StatelessWidget {
   final IconData icon;
   final LinearGradient gradient;
   final String? imageUrl;
+  final String? badge;
   final bool isSelected;
   final VoidCallback onTap;
 
@@ -16,6 +17,7 @@ class GenreCard extends StatelessWidget {
     required this.icon,
     required this.gradient,
     this.imageUrl,
+    this.badge,
     this.isSelected = false,
     required this.onTap,
   }) : super(key: key);
@@ -26,8 +28,8 @@ class GenreCard extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        width: 120,
-        height: 75,
+        width: 130,
+        height: 82,
         margin: const EdgeInsets.only(right: 12),
         decoration: BoxDecoration(
           gradient: gradient,
@@ -82,18 +84,40 @@ class GenreCard extends StatelessWidget {
 
               // Category Text & Icon
               Padding(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(10),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.35),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(icon, size: 16, color: Colors.white),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.35),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(icon, size: 15, color: Colors.white),
+                        ),
+                        if (badge != null)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.5),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: Colors.white24, width: 0.5),
+                            ),
+                            child: Text(
+                              badge!,
+                              style: const TextStyle(
+                                color: Color(0xFF00E5FF),
+                                fontSize: 8.5,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                     Text(
                       title,
@@ -101,7 +125,7 @@ class GenreCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 13,
+                        fontSize: 12.5,
                         fontWeight: FontWeight.bold,
                         shadows: [
                           Shadow(color: Colors.black87, blurRadius: 4, offset: Offset(0, 1)),

@@ -6,7 +6,7 @@ import '../services/jiosaavn_service.dart';
 import '../services/language_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/mini_player.dart';
-import '../widgets/song_list_tile.dart';
+import '../widgets/song_thumbnail_widget.dart';
 
 class GenreSectionScreen extends StatefulWidget {
   final String title;
@@ -39,7 +39,9 @@ class _GenreSectionScreenState extends State<GenreSectionScreen> {
     super.initState();
     if (widget.initialSongs != null && widget.initialSongs!.isNotEmpty) {
       _songs = List.from(widget.initialSongs!);
-      _isLoading = false;
+      if (_songs.length >= 100) {
+        _isLoading = false;
+      }
     }
     _loadGenreSongs();
   }
@@ -50,12 +52,15 @@ class _GenreSectionScreenState extends State<GenreSectionScreen> {
     super.dispose();
   }
 
-  Future<void> _loadGenreSongs() async {
+  Future<void> _loadGenreSongs({bool forceRefresh = false}) async {
     try {
-      final fetched = await _saavnService.getGenreSongs(widget.title, limit: 100);
+      final fetched = await _saavnService.getGenreSongs(
+        widget.title,
+        limit: 300,
+        forceRefresh: forceRefresh,
+      );
       if (mounted) {
         setState(() {
-          // Merge with any initial songs, deduplicating by ID
           final Set<String> seen = {};
           final List<Song> all = [];
           for (final s in [..._songs, ...fetched]) {
@@ -74,10 +79,22 @@ class _GenreSectionScreenState extends State<GenreSectionScreen> {
     }
   }
 
-  List<Song> get _filteredSongs {
-    if (_filterQuery.trim().isEmpty) return _songs;
+  List<Song> _getSortedAndFilteredSongs(PlayerProvider provider) {
+    final list = List<Song>.from(_songs);
+
+    // Automatic Smart Ranking: Songs played more often in this card float to the top
+    list.sort((a, b) {
+      final countA = provider.getPlayCount(a.id);
+      final countB = provider.getPlayCount(b.id);
+      if (countB != countA) {
+        return countB.compareTo(countA); // Highest play count on top!
+      }
+      return 0;
+    });
+
+    if (_filterQuery.trim().isEmpty) return list;
     final q = _filterQuery.toLowerCase();
-    return _songs.where((s) {
+    return list.where((s) {
       return s.title.toLowerCase().contains(q) ||
           s.artist.toLowerCase().contains(q) ||
           s.album.toLowerCase().contains(q);
@@ -88,7 +105,7 @@ class _GenreSectionScreenState extends State<GenreSectionScreen> {
   Widget build(BuildContext context) {
     final provider = Provider.of<PlayerProvider>(context);
     final lang = LanguageService();
-    final displayed = _filteredSongs;
+    final displayed = _getSortedAndFilteredSongs(provider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -100,6 +117,16 @@ class _GenreSectionScreenState extends State<GenreSectionScreen> {
           widget.title,
           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded, color: Color(0xFF00E5FF)),
+            tooltip: lang.isHindi ? 'ताज़ा करें' : 'Refresh List',
+            onPressed: () {
+              setState(() => _isLoading = true);
+              _loadGenreSongs(forceRefresh: true);
+            },
+          ),
+        ],
       ),
       bottomNavigationBar: const MiniPlayer(),
       body: CustomScrollView(
@@ -143,8 +170,8 @@ class _GenreSectionScreenState extends State<GenreSectionScreen> {
                         ),
                         child: Text(
                           lang.isHindi
-                              ? '${_songs.length} गाने उपलब्ध'
-                              : '${_songs.length} Tracks Available',
+                              ? '${_songs.length}+ गाने (टॉप प्ले पहले)'
+                              : '${_songs.length}+ Tracks (Top Played First)',
                           style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
                         ),
                       ),
@@ -163,8 +190,8 @@ class _GenreSectionScreenState extends State<GenreSectionScreen> {
                   const SizedBox(height: 4),
                   Text(
                     lang.isHindi
-                        ? 'सभी लोकप्रिय और नए ${widget.title} गाने (Ultra HD 320k)'
-                        : 'Top Trending & Classic ${widget.title} Tracks (Ultra HD 320k)',
+                        ? 'विशाल 200+ गानों का संग्रह • अधिक सुने जाने वाले गाने अपने आप ऊपर आएंगे'
+                        : 'Mega 200+ tracks collection • Most played songs automatically rank first',
                     style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 12),
                   ),
                   const SizedBox(height: 16),
@@ -178,7 +205,7 @@ class _GenreSectionScreenState extends State<GenreSectionScreen> {
                               : null,
                           icon: const Icon(Icons.play_arrow_rounded, color: Colors.black, size: 22),
                           label: Text(
-                            lang.isHindi ? 'सभी चलाएं' : 'Play All',
+                            lang.isHindi ? 'सभी चलाएं (Play All)' : 'Play All',
                             style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 13),
                           ),
                           style: ElevatedButton.styleFrom(
@@ -234,8 +261,8 @@ class _GenreSectionScreenState extends State<GenreSectionScreen> {
                   style: const TextStyle(color: Colors.white, fontSize: 13),
                   decoration: InputDecoration(
                     hintText: lang.isHindi
-                        ? '${widget.title} गानों में खोजें...'
-                        : 'Filter in ${widget.title}...',
+                        ? '${widget.title} गानों में खोजें (${_songs.length}+ गाने)...'
+                        : 'Filter in ${widget.title} (${_songs.length}+ songs)...',
                     hintStyle: const TextStyle(color: Colors.white38, fontSize: 13),
                     prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF00E5FF), size: 20),
                     suffixIcon: _filterQuery.isNotEmpty
@@ -255,7 +282,7 @@ class _GenreSectionScreenState extends State<GenreSectionScreen> {
             ),
           ),
 
-          // 3. Songs List
+          // 3. Songs List with Top Played Indicator
           if (_isLoading && _songs.isEmpty)
             const SliverFillRemaining(
               child: Center(
@@ -273,17 +300,112 @@ class _GenreSectionScreenState extends State<GenreSectionScreen> {
             )
           else
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
+              padding: const EdgeInsets.fromLTRB(0, 12, 0, 120),
               sliver: SliverList(
                 delegate: SliverChildBuilderDelegate(
                   (context, index) {
                     final song = displayed[index];
                     final isCurrent = provider.currentSong?.id == song.id;
+                    final playCount = provider.getPlayCount(song.id);
 
-                    return SongListTile(
-                      song: song,
-                      isCurrent: isCurrent,
-                      onTap: () => provider.playSong(song, queueContext: displayed),
+                    return Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: isCurrent
+                            ? AppColors.primary.withOpacity(0.18)
+                            : (playCount > 0 ? const Color(0xFF1E293B).withOpacity(0.6) : const Color(0xFF131A2A)),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: isCurrent
+                              ? AppColors.accentCyan.withOpacity(0.6)
+                              : (playCount > 0 ? const Color(0xFFFFB300).withOpacity(0.3) : Colors.white.withOpacity(0.04)),
+                        ),
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(16),
+                          onTap: () => provider.playSong(song, queueContext: displayed),
+                          child: Padding(
+                            padding: const EdgeInsets.all(10),
+                            child: Row(
+                              children: [
+                                SongThumbnailWidget(
+                                  song: song,
+                                  size: 52,
+                                  borderRadius: 12,
+                                  isPlaying: isCurrent && provider.isPlaying,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              song.title,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                color: isCurrent ? AppColors.accentCyan : Colors.white,
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                          if (playCount > 0) ...[
+                                            const SizedBox(width: 6),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFFFB300).withOpacity(0.2),
+                                                borderRadius: BorderRadius.circular(6),
+                                                border: Border.all(color: const Color(0xFFFFB300).withOpacity(0.5)),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  const Icon(Icons.local_fire_department_rounded, color: Color(0xFFFFB300), size: 12),
+                                                  const SizedBox(width: 2),
+                                                  Text(
+                                                    '#${index + 1} ($playCount)',
+                                                    style: const TextStyle(
+                                                      color: Color(0xFFFFB300),
+                                                      fontSize: 9,
+                                                      fontWeight: FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                      const SizedBox(height: 3),
+                                      Text(
+                                        '${song.artist} • ${song.album}',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(color: Colors.white54, fontSize: 11),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: Icon(
+                                    provider.isFavorite(song.id) ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                                    color: provider.isFavorite(song.id) ? Colors.redAccent : Colors.white38,
+                                    size: 20,
+                                  ),
+                                  onPressed: () => provider.toggleFavorite(song),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
                     );
                   },
                   childCount: displayed.length,

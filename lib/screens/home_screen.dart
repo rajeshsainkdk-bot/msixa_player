@@ -154,6 +154,30 @@ class _HomeScreenState extends State<HomeScreen> {
       'image': 'https://images.unsplash.com/photo-1571266028243-3716f02d2d2e?w=600&q=80',
     },
     {
+      'title': 'Shekhawati & Mewari',
+      'icon': Icons.audiotrack_rounded,
+      'gradient': LinearGradient(colors: [Color(0xFFD97706), Color(0xFFB45309)]),
+      'image': 'https://images.unsplash.com/photo-1599827552599-eeddd59551c6?w=600&q=80',
+    },
+    {
+      'title': 'Khatu Shyam Bhajan',
+      'icon': Icons.temple_hindu_rounded,
+      'gradient': LinearGradient(colors: [Color(0xFFFF9933), Color(0xFFE11D48)]),
+      'image': 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=600&q=80',
+    },
+    {
+      'title': 'Shaadi & Vivah Geet',
+      'icon': Icons.celebration_rounded,
+      'gradient': LinearGradient(colors: [Color(0xFFBE123C), Color(0xFFFF007F)]),
+      'image': 'https://images.unsplash.com/photo-1511192336575-5a79af67a629?w=600&q=80',
+    },
+    {
+      'title': 'Garhwali & Pahadi',
+      'icon': Icons.landscape_rounded,
+      'gradient': LinearGradient(colors: [Color(0xFF047857), Color(0xFF0D9488)]),
+      'image': 'https://images.unsplash.com/photo-1506157786151-b8491531f063?w=600&q=80',
+    },
+    {
       'title': 'All Indian',
       'icon': Icons.music_note_rounded,
       'gradient': LinearGradient(colors: [Color(0xFFFF9933), Color(0xFF138808)]),
@@ -358,11 +382,15 @@ class _HomeScreenState extends State<HomeScreen> {
                   },
                 ),
 
-                // Discover Quick Category Tabs: All, Artists, Albums, Playlists
-                _buildDiscoverFilterChips(lang),
+                // Discover Quick Category Tabs: All, Recent, Favorites, Artists, Albums, Playlists
+                _buildDiscoverFilterChips(lang, provider),
                 const SizedBox(height: 12),
 
-                if (_activeDiscoverTab == 'artists')
+                if (_activeDiscoverTab == 'recent')
+                  _buildAllRecentlyPlayedView(context, provider, lang)
+                else if (_activeDiscoverTab == 'favorites')
+                  _buildAllFavoritesView(context, provider, lang)
+                else if (_activeDiscoverTab == 'artists')
                   _buildAllArtistsView(context, provider, lang)
                 else if (_activeDiscoverTab == 'albums')
                   _buildAllAlbumsView(context, provider, lang)
@@ -505,150 +533,38 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
 
-                // Share APK File Quick Card
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: AppColors.card,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppColors.accentCyan.withOpacity(0.2)),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: AppColors.accentCyan.withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Icon(
-                            Icons.send_to_mobile_rounded,
-                            color: AppColors.accentCyan,
-                            size: 22,
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                lang.t('share_apk_title'),
-                                style: const TextStyle(
-                                  color: AppColors.textPrimary,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                lang.t('share_apk_desc'),
-                                style: const TextStyle(
-                                  color: AppColors.textSecondary,
-                                  fontSize: 11,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.accentCyan,
-                            foregroundColor: Colors.black,
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            minimumSize: Size.zero,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          icon: const Icon(Icons.share_rounded, size: 14),
-                          label: Text(
-                            lang.t('share_apk_btn'),
-                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                          ),
-                          onPressed: () => AppShareService.shareAppApk(),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+                // Quick Access 2x2 Grid (Liked Songs, Recently Played, Device Audio, Share APK)
+                _buildQuickAccessGrid(context, provider, lang),
 
-                // Device Storage Quick Access Banner
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: AppColors.card,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.white.withOpacity(0.06)),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: AppColors.accentGreen.withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Icon(
-                            Icons.sd_storage_rounded,
-                            color: AppColors.accentGreen,
-                            size: 22,
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                lang.t('offline_audio_title'),
-                                style: const TextStyle(
-                                  color: AppColors.textPrimary,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                provider.deviceSongs.isEmpty
-                                    ? lang.t('offline_audio_scan')
-                                    : '${provider.deviceSongs.length} ${lang.t('offline_ready')}',
-                                style: const TextStyle(
-                                  color: AppColors.textSecondary,
-                                  fontSize: 11,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: provider.deviceSongs.isEmpty
-                                ? AppColors.accentGreen
-                                : AppColors.surface,
-                            foregroundColor: provider.deviceSongs.isEmpty
-                                ? Colors.black
-                                : AppColors.accentGreen,
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            minimumSize: Size.zero,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          onPressed: () => provider.scanDeviceSongs(),
-                          child: Text(
-                            provider.deviceSongs.isEmpty ? lang.t('scan_btn') : lang.t('rescan_btn'),
-                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      ],
-                    ),
+                // ==========================================
+                // 🕒 SECTION: RECENTLY PLAYED SHELF (जब गाने सुने गए हों)
+                // ==========================================
+                if (provider.recentlyPlayed.isNotEmpty)
+                  _buildOnlineSection(
+                    context: context,
+                    title: 'Recently Played',
+                    hindiTitle: 'हाल ही में सुने गए',
+                    icon: Icons.history_rounded,
+                    iconColor: const Color(0xFF00E5FF),
+                    songs: provider.recentlyPlayed,
+                    provider: provider,
+                    lang: lang,
                   ),
-                ),
+
+                // ==========================================
+                // ❤️ SECTION: LIKED SONGS SHELF (जब पसंदीदा गाने हों)
+                // ==========================================
+                if (provider.favorites.isNotEmpty)
+                  _buildOnlineSection(
+                    context: context,
+                    title: 'Liked Songs',
+                    hindiTitle: 'पसंदीदा गाने',
+                    icon: Icons.favorite_rounded,
+                    iconColor: const Color(0xFFFF4081),
+                    songs: provider.favorites,
+                    provider: provider,
+                    lang: lang,
+                  ),
 
                 // ==========================================
                 // 🔥 SECTION 1: TRENDING NOW (India Top 50)
@@ -686,14 +602,14 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                       Text(
-                        lang.isHindi ? 'सभी कार्ड्स' : 'All Cards',
+                        lang.isHindi ? 'सभी कार्ड्स (200+ गाने)' : 'All Cards (200+ Songs)',
                         style: const TextStyle(color: AppColors.accentCyan, fontSize: 12, fontWeight: FontWeight.w600),
                       ),
                     ],
                   ),
                 ),
                 SizedBox(
-                  height: 75,
+                  height: 82,
                   child: ListView.builder(
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -707,6 +623,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         icon: g['icon'] as IconData,
                         gradient: g['gradient'] as LinearGradient,
                         imageUrl: g['image'] as String?,
+                        badge: '200+ Songs',
                         isSelected: isSelected,
                         onTap: () {
                           Navigator.push(
@@ -1383,12 +1300,161 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildDiscoverFilterChips(LanguageService lang) {
+  Widget _buildQuickAccessGrid(BuildContext context, PlayerProvider provider, LanguageService lang) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: _buildQuickActionCard(
+                  title: lang.isHindi ? 'पसंदीदा गाने' : 'Liked Songs',
+                  subtitle: '${provider.favorites.length} ${lang.isHindi ? "गाने" : "Tracks"}',
+                  icon: Icons.favorite_rounded,
+                  iconColor: const Color(0xFFFF4081),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF2E1065), Color(0xFF4C0519)],
+                  ),
+                  borderColor: const Color(0xFFFF4081).withOpacity(0.35),
+                  onTap: () => setState(() => _activeDiscoverTab = 'favorites'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildQuickActionCard(
+                  title: lang.isHindi ? 'हाल ही में सुने' : 'Recently Played',
+                  subtitle: '${provider.recentlyPlayed.length} ${lang.isHindi ? "गाने" : "Tracks"}',
+                  icon: Icons.history_rounded,
+                  iconColor: const Color(0xFF00E5FF),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF0F172A), Color(0xFF1E1B4B)],
+                  ),
+                  borderColor: const Color(0xFF00E5FF).withOpacity(0.35),
+                  onTap: () => setState(() => _activeDiscoverTab = 'recent'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _buildQuickActionCard(
+                  title: lang.t('offline_audio_title'),
+                  subtitle: provider.deviceSongs.isEmpty
+                      ? lang.t('offline_audio_scan')
+                      : '${provider.deviceSongs.length} ${lang.t('offline_ready')}',
+                  icon: Icons.sd_storage_rounded,
+                  iconColor: AppColors.accentGreen,
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF064E3B), Color(0xFF022C22)],
+                  ),
+                  borderColor: AppColors.accentGreen.withOpacity(0.35),
+                  onTap: () => provider.scanDeviceSongs(),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildQuickActionCard(
+                  title: lang.t('share_apk_title'),
+                  subtitle: lang.t('share_apk_desc'),
+                  icon: Icons.send_to_mobile_rounded,
+                  iconColor: const Color(0xFFFFB300),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF451A03), Color(0xFF1C1917)],
+                  ),
+                  borderColor: const Color(0xFFFFB300).withOpacity(0.35),
+                  onTap: () => AppShareService.shareAppApk(),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickActionCard({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color iconColor,
+    required LinearGradient gradient,
+    required Color borderColor,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        height: 64,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          gradient: gradient,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: borderColor, width: 1),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.2),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(
+                color: iconColor.withOpacity(0.18),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: iconColor, size: 18),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.7),
+                      fontSize: 10,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDiscoverFilterChips(LanguageService lang, PlayerProvider provider) {
     final chips = [
-      {'id': 'all', 'label': lang.isHindi ? 'सभी संगीत' : 'All Discover', 'icon': Icons.explore_rounded},
-      {'id': 'artists', 'label': lang.isHindi ? 'कलाकार' : 'Artists', 'icon': Icons.person_rounded},
-      {'id': 'albums', 'label': lang.isHindi ? 'एल्बम' : 'Albums', 'icon': Icons.album_rounded},
-      {'id': 'playlists', 'label': lang.isHindi ? 'प्लेलिस्ट्स' : 'Playlists', 'icon': Icons.playlist_play_rounded},
+      {'id': 'all', 'label': lang.isHindi ? 'सभी संगीत' : 'All Discover', 'icon': Icons.explore_rounded, 'count': null},
+      {'id': 'recent', 'label': lang.isHindi ? 'हाल ही में सुने' : 'Recently Played', 'icon': Icons.history_rounded, 'count': provider.recentlyPlayed.length},
+      {'id': 'favorites', 'label': lang.isHindi ? 'पसंदीदा' : 'Liked Songs', 'icon': Icons.favorite_rounded, 'count': provider.favorites.length},
+      {'id': 'artists', 'label': lang.isHindi ? 'कलाकार' : 'Artists', 'icon': Icons.person_rounded, 'count': null},
+      {'id': 'albums', 'label': lang.isHindi ? 'एल्बम' : 'Albums', 'icon': Icons.album_rounded, 'count': null},
+      {'id': 'playlists', 'label': lang.isHindi ? 'प्लेलिस्ट्स' : 'Playlists', 'icon': Icons.playlist_play_rounded, 'count': null},
     ];
 
     return SingleChildScrollView(
@@ -1397,6 +1463,9 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Row(
         children: chips.map((c) {
           final isSelected = _activeDiscoverTab == c['id'];
+          final count = c['count'] as int?;
+          final countStr = (count != null && count > 0) ? ' ($count)' : '';
+
           return Padding(
             padding: const EdgeInsets.only(right: 8),
             child: ChoiceChip(
@@ -1406,7 +1475,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: isSelected ? Colors.black : const Color(0xFF00E5FF),
               ),
               label: Text(
-                c['label'] as String,
+                '${c['label']}$countStr',
                 style: TextStyle(
                   color: isSelected ? Colors.black : Colors.white70,
                   fontWeight: FontWeight.bold,
@@ -1870,6 +1939,254 @@ class _HomeScreenState extends State<HomeScreen> {
                     }
                   },
                 ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAllRecentlyPlayedView(BuildContext context, PlayerProvider provider, LanguageService lang) {
+    final recentSongs = List<Song>.from(provider.recentlyPlayed);
+
+    // Smart auto-sort: Songs played more often float to the top
+    recentSongs.sort((a, b) {
+      final countA = provider.getPlayCount(a.id);
+      final countB = provider.getPlayCount(b.id);
+      if (countB != countA) return countB.compareTo(countA);
+      return 0;
+    });
+
+    if (recentSongs.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: AppColors.card,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white12),
+                ),
+                child: const Icon(Icons.history_rounded, size: 48, color: Color(0xFF00E5FF)),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                lang.isHindi ? 'कोई हालिया गाना नहीं' : 'No Recently Played Songs',
+                style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                lang.isHindi
+                    ? 'अपनी पसंद का कोई भी गाना चलाएं, वह यहां स्वतः आ जाएगा।'
+                    : 'Play any track from Discover or Library to build your listening history.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.accentCyan,
+                  foregroundColor: Colors.black,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+                icon: const Icon(Icons.explore_rounded, size: 18),
+                label: Text(
+                  lang.isHindi ? 'सभी संगीत एक्सप्लोर करें' : 'Explore All Songs',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                onPressed: () => setState(() => _activeDiscoverTab = 'all'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${lang.isHindi ? "हाल ही में सुने गए" : "Recently Played"} (${recentSongs.length})',
+                    style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    lang.isHindi ? 'सर्वाधिक सुने गए गाने स्वतः ऊपर' : 'Top played tracks automatically ranked first',
+                    style: const TextStyle(color: AppColors.accentCyan, fontSize: 11, fontWeight: FontWeight.w500),
+                  ),
+                ],
+              ),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.accentCyan,
+                  foregroundColor: Colors.black,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  minimumSize: Size.zero,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                ),
+                icon: const Icon(Icons.play_arrow_rounded, size: 18),
+                label: Text(
+                  lang.isHindi ? 'सभी चलाएं' : 'Play All',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                ),
+                onPressed: () => provider.playSong(recentSongs.first, queueContext: recentSongs),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: recentSongs.length,
+            itemBuilder: (context, index) {
+              final song = recentSongs[index];
+              final playCount = provider.getPlayCount(song.id);
+              final isCurrent = provider.currentSong?.id == song.id;
+
+              return SongListTile(
+                song: song,
+                isCurrent: isCurrent,
+                rank: index + 1,
+                playCount: playCount,
+                onTap: () => provider.playSong(song, queueContext: recentSongs),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAllFavoritesView(BuildContext context, PlayerProvider provider, LanguageService lang) {
+    final favSongs = List<Song>.from(provider.favorites);
+
+    // Smart auto-sort: Songs played more often float to the top
+    favSongs.sort((a, b) {
+      final countA = provider.getPlayCount(a.id);
+      final countB = provider.getPlayCount(b.id);
+      if (countB != countA) return countB.compareTo(countA);
+      return 0;
+    });
+
+    if (favSongs.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: AppColors.card,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white12),
+                ),
+                child: const Icon(Icons.favorite_rounded, size: 48, color: Color(0xFFFF4081)),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                lang.isHindi ? 'कोई पसंदीदा गाना नहीं' : 'No Liked Songs Yet',
+                style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                lang.isHindi
+                    ? 'किसी भी गाने पर दिल ❤️ के निशान को दबाकर उसे अपनी पसंद में जोड़ें।'
+                    : 'Tap the heart icon on any song to save it to your favorite tracks.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFF4081),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+                icon: const Icon(Icons.explore_rounded, size: 18),
+                label: Text(
+                  lang.isHindi ? 'सभी संगीत एक्सप्लोर करें' : 'Explore All Songs',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                onPressed: () => setState(() => _activeDiscoverTab = 'all'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${lang.isHindi ? "पसंदीदा गाने" : "Liked Songs"} (${favSongs.length})',
+                    style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    lang.isHindi ? 'सर्वाधिक सुने गए गाने स्वतः ऊपर' : 'Top played tracks automatically ranked first',
+                    style: const TextStyle(color: Color(0xFFFF4081), fontSize: 11, fontWeight: FontWeight.w500),
+                  ),
+                ],
+              ),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFF4081),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  minimumSize: Size.zero,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                ),
+                icon: const Icon(Icons.play_arrow_rounded, size: 18),
+                label: Text(
+                  lang.isHindi ? 'सभी चलाएं' : 'Play All',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                ),
+                onPressed: () => provider.playSong(favSongs.first, queueContext: favSongs),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: favSongs.length,
+            itemBuilder: (context, index) {
+              final song = favSongs[index];
+              final playCount = provider.getPlayCount(song.id);
+              final isCurrent = provider.currentSong?.id == song.id;
+
+              return SongListTile(
+                song: song,
+                isCurrent: isCurrent,
+                rank: index + 1,
+                playCount: playCount,
+                onTap: () => provider.playSong(song, queueContext: favSongs),
               );
             },
           ),
