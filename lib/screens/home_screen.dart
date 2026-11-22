@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -32,7 +33,27 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final Set<String> _expandedCategories = {};
   final Map<String, String> _selectedSubCategories = {};
-  String _activeDiscoverTab = 'all'; // 'all' | 'artists' | 'albums' | 'playlists'
+  String _activeDiscoverTab = 'all'; // 'all' | 'recent' | 'favorites' | 'artists' | 'albums' | 'playlists'
+
+  final TextEditingController _searchController = TextEditingController();
+  Timer? _searchDebounce;
+  int _searchScope = 0; // 0: Online Streaming, 1: My Library & Device
+  String _activeSearchQuery = '';
+
+  static const List<String> _searchQuickTags = [
+    'Arijit Singh',
+    'Sidhu Moose Wala',
+    'DJ Remix',
+    'Marwadi DJ',
+    'Haryanvi Hits',
+    'Bhojpuri Dhamaka',
+    'Punjabi Beats',
+    'Diljit Dosanjh',
+    '90s Retro',
+    'Desi Lo-Fi',
+    'Khatu Shyam',
+    'Bhakti Bhajan',
+  ];
 
   @override
   void initState() {
@@ -42,6 +63,31 @@ class _HomeScreenState extends State<HomeScreen> {
       provider.loadOnlineTrending();
       UpdateService.checkForUpdate(context, autoPrompt: true);
     });
+  }
+
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged(String query, PlayerProvider provider) {
+    _searchDebounce?.cancel();
+    setState(() => _activeSearchQuery = query);
+    _searchDebounce = Timer(const Duration(milliseconds: 400), () {
+      if (query.trim().isEmpty) return;
+      if (_searchScope == 0) {
+        provider.searchOnline(query.trim());
+      } else {
+        provider.search(query.trim());
+      }
+    });
+  }
+
+  void _selectQuickTag(String tag, PlayerProvider provider) {
+    _searchController.text = tag;
+    _onSearchChanged(tag, provider);
   }
 
   static const List<Map<String, dynamic>> _genres = [
@@ -382,6 +428,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   },
                 ),
 
+                // Integrated Search Bar with Scope Switcher & Device Scanner
+                _buildIntegratedSearchBar(context, provider, lang),
+
+                if (_activeSearchQuery.trim().isNotEmpty)
+                  _buildLiveSearchResultsView(context, provider, lang)
+                else ...[
                 // Discover Quick Category Tabs: All, Recent, Favorites, Artists, Albums, Playlists
                 _buildDiscoverFilterChips(lang, provider),
                 const SizedBox(height: 12),
@@ -812,6 +864,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
                 const SizedBox(height: 30),
                 ], // end of else ...[ for all
+              ], // end of else ...[ for activeSearchQuery empty
               ],
             ),
           ),
@@ -822,6 +875,322 @@ class _HomeScreenState extends State<HomeScreen> {
     ),
   );
 }
+
+  Widget _buildIntegratedSearchBar(BuildContext context, PlayerProvider provider, LanguageService lang) {
+    final isOnline = _searchScope == 0;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 1. Search Text Field
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: _activeSearchQuery.isNotEmpty
+                    ? AppColors.accentCyan
+                    : Colors.white.withOpacity(0.12),
+                width: 1.2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.25),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: TextField(
+              controller: _searchController,
+              onChanged: (val) => _onSearchChanged(val, provider),
+              style: const TextStyle(color: Colors.white, fontSize: 14),
+              decoration: InputDecoration(
+                hintText: isOnline
+                    ? (lang.isHindi
+                        ? 'लाखों गाने, गायक या एल्बम खोजें...'
+                        : 'Search millions of Hindi, Punjabi, Marwadi songs...')
+                    : (lang.isHindi
+                        ? 'माई लाइब्रेरी व फ़ोन के गाने खोजें...'
+                        : 'Search library & device songs...'),
+                hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 13),
+                prefixIcon: const Icon(
+                  Icons.search_rounded,
+                  color: AppColors.accentCyan,
+                  size: 22,
+                ),
+                suffixIcon: _activeSearchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.close_rounded, color: AppColors.textMuted, size: 20),
+                        onPressed: () {
+                          _searchController.clear();
+                          _onSearchChanged('', provider);
+                        },
+                      )
+                    : null,
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          // 2. Search Scope Switcher & Device Storage Scan Action
+          Row(
+            children: [
+              // Online Streaming Pill
+              GestureDetector(
+                onTap: () {
+                  if (_searchScope != 0) {
+                    setState(() => _searchScope = 0);
+                    if (_activeSearchQuery.isNotEmpty) {
+                      provider.searchOnline(_activeSearchQuery);
+                    }
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: isOnline ? AppColors.accentCyan.withOpacity(0.2) : AppColors.card,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isOnline ? AppColors.accentCyan : Colors.white12,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.cloud_download_rounded,
+                        size: 14,
+                        color: isOnline ? AppColors.accentCyan : Colors.white60,
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        lang.isHindi ? 'ऑनलाइन संगीत' : 'Online Music',
+                        style: TextStyle(
+                          color: isOnline ? AppColors.accentCyan : Colors.white70,
+                          fontSize: 11,
+                          fontWeight: isOnline ? FontWeight.bold : FontWeight.normal,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+
+              // My Library Pill
+              GestureDetector(
+                onTap: () {
+                  if (_searchScope != 1) {
+                    setState(() => _searchScope = 1);
+                    if (_activeSearchQuery.isNotEmpty) {
+                      provider.search(_activeSearchQuery);
+                    }
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: !isOnline ? const Color(0xFF10B981).withOpacity(0.2) : AppColors.card,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: !isOnline ? const Color(0xFF10B981) : Colors.white12,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.folder_rounded,
+                        size: 14,
+                        color: !isOnline ? const Color(0xFF10B981) : Colors.white60,
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        lang.isHindi ? 'माई लाइब्रेरी' : 'My Library',
+                        style: TextStyle(
+                          color: !isOnline ? const Color(0xFF10B981) : Colors.white70,
+                          fontSize: 11,
+                          fontWeight: !isOnline ? FontWeight.bold : FontWeight.normal,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const Spacer(),
+
+              // Scan Device Audio Button (integrated right in the search bar row!)
+              InkWell(
+                onTap: () => provider.scanDeviceSongs(),
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: AppColors.accentGreen.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.accentGreen.withOpacity(0.35)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.sd_storage_rounded, size: 14, color: AppColors.accentGreen),
+                      const SizedBox(width: 4),
+                      Text(
+                        provider.deviceSongs.isEmpty
+                            ? (lang.isHindi ? 'स्कैन करें' : 'Scan Audio')
+                            : '${provider.deviceSongs.length} ${lang.isHindi ? "गाने" : "Tracks"}',
+                        style: const TextStyle(
+                          color: AppColors.accentGreen,
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLiveSearchResultsView(BuildContext context, PlayerProvider provider, LanguageService lang) {
+    final isOnline = _searchScope == 0;
+    final results = isOnline ? provider.onlineSearchResults : provider.searchResults;
+    final isLoading = isOnline && provider.isLoadingOnlineSearch;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Quick suggestions tags row
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: _searchQuickTags.map((tag) {
+                final isSelected = _activeSearchQuery.toLowerCase() == tag.toLowerCase();
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ActionChip(
+                    label: Text(
+                      tag,
+                      style: TextStyle(
+                        color: isSelected ? Colors.black : Colors.white70,
+                        fontSize: 11,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                      ),
+                    ),
+                    backgroundColor: isSelected ? AppColors.accentCyan : AppColors.card,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      side: BorderSide(color: isSelected ? AppColors.accentCyan : Colors.white12),
+                    ),
+                    onPressed: () => _selectQuickTag(tag, provider),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // Header with results count and Play All
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '${lang.isHindi ? (isOnline ? "ऑनलाइन खोज परिणाम" : "लाइब्रेरी खोज परिणाम") : (isOnline ? "Online Search Results" : "Library Search Results")} (${results.length})',
+                style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              if (results.isNotEmpty)
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.accentCyan,
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    minimumSize: Size.zero,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                  icon: const Icon(Icons.play_arrow_rounded, size: 16),
+                  label: Text(
+                    lang.isHindi ? 'सभी चलाएं' : 'Play All',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+                  ),
+                  onPressed: () => provider.playSong(results.first, queueContext: results),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          // Search Results List
+          if (isLoading)
+            const SizedBox(
+              height: 200,
+              child: Center(child: CircularProgressIndicator(color: AppColors.accentCyan)),
+            )
+          else if (results.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(32),
+              alignment: Alignment.center,
+              child: Column(
+                children: [
+                  Icon(isOnline ? Icons.music_off_rounded : Icons.folder_off_rounded, size: 48, color: Colors.white30),
+                  const SizedBox(height: 12),
+                  Text(
+                    lang.isHindi ? 'कोई गाना नहीं मिला' : 'No songs found for "$_activeSearchQuery"',
+                    style: const TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    lang.isHindi ? 'कृपया दूसरा नाम या गायक खोजें' : 'Try searching another song or artist name',
+                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                  ),
+                  if (!isOnline) ...[
+                    const SizedBox(height: 16),
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.accentGreen,
+                        foregroundColor: Colors.black,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      icon: const Icon(Icons.sd_storage_rounded, size: 16),
+                      label: Text(lang.isHindi ? 'फ़ोन स्टोरेज स्कैन करें' : 'Scan Device Audio'),
+                      onPressed: () => provider.scanDeviceSongs(),
+                    ),
+                  ],
+                ],
+              ),
+            )
+          else
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: results.length,
+              itemBuilder: (context, index) {
+                final song = results[index];
+                final isCurrent = provider.currentSong?.id == song.id;
+                final playCount = provider.getPlayCount(song.id);
+
+                return SongListTile(
+                  song: song,
+                  isCurrent: isCurrent,
+                  rank: index + 1,
+                  playCount: playCount,
+                  onTap: () => provider.playSong(song, queueContext: results),
+                );
+              },
+            ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildCategorySection(
     BuildContext context, {

@@ -25,8 +25,18 @@ class CloudBackendService extends ChangeNotifier {
   static const String _keyCommunitySongs = 'msixa_community_songs';
   static const String _keyDeletedSongIds = 'msixa_deleted_song_ids_v1';
   static const String _keyCloudPlaylists = 'msixa_cloud_playlists_v1';
+  static const String _keyFeedbacks = 'msixa_user_feedbacks_v1';
   static const String _keyCatalogSeeded = 'msixa_catalog_seeded_v3';
   static const String _adminPin = '7777'; // Default Admin Master Key
+
+  // Shared file paths across User App and Admin App (Strictly internal app storage only)
+  static final List<String> _sharedFeedbackFilePaths = [
+    '/data/data/com.msixa.player/files/msixa_shared_feedbacks.json',
+    '/data/data/com.msixa.admin/files/msixa_shared_feedbacks.json',
+    '/data/user/0/com.msixa.player/files/msixa_shared_feedbacks.json',
+    '/data/user/0/com.msixa.admin/files/msixa_shared_feedbacks.json',
+    '/data/data/com.msixa.msixa_player/files/msixa_shared_feedbacks.json',
+  ];
 
   // Shared file paths across User App and Admin App (Strictly internal app storage only)
   static final List<String> _sharedUserFilePaths = [
@@ -66,6 +76,7 @@ class CloudBackendService extends ChangeNotifier {
   final List<Song> _communitySongs = [];
   final Set<String> _deletedSongIds = {};
   final List<Playlist> _sharedPlaylists = [];
+  final List<Map<String, dynamic>> _feedbacks = [];
 
   // Temporary Verification State
   String? _generatedPhoneOtp;
@@ -103,6 +114,7 @@ class CloudBackendService extends ChangeNotifier {
   }
   Set<String> get deletedSongIds => Set.unmodifiable(_deletedSongIds);
   List<Playlist> get cloudPlaylists => List.unmodifiable(_sharedPlaylists);
+  List<Map<String, dynamic>> get feedbacks => List.unmodifiable(_feedbacks);
 
   int get totalUsersCount => _allUsers.length;
   int get activeUsersCount {
@@ -213,6 +225,7 @@ class CloudBackendService extends ChangeNotifier {
     await _loadSharedUsers();
     await _loadSharedSongs();
     await _loadSharedPlaylists();
+    await _loadSharedFeedbacks();
 
     // 5. Seed initial curated catalog ONLY if Cloudflare R2 is NOT active and local is empty
     final isCatalogSeeded = prefs.getBool(_keyCatalogSeeded) ?? false;
@@ -1429,5 +1442,62 @@ class CloudBackendService extends ChangeNotifier {
     );
 
     return exportFile;
+  }
+
+  Future<void> submitFeedback({
+    required int rating,
+    String? message,
+    String? userPhone,
+    String? userName,
+  }) async {
+    final entry = {
+      'id': 'fb_${DateTime.now().millisecondsSinceEpoch}',
+      'rating': rating,
+      'message': message?.trim() ?? '',
+      'userPhone': userPhone ?? _currentUser?.phoneNumber ?? 'Anonymous',
+      'userName': userName ?? _currentUser?.fullName ?? 'Msixa User',
+      'createdAt': DateTime.now().toIso8601String(),
+    };
+    _feedbacks.insert(0, entry);
+    notifyListeners();
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_keyFeedbacks, jsonEncode(_feedbacks));
+      for (final p in _sharedFeedbackFilePaths) {
+        try {
+          final f = File(p);
+          if (!f.parent.existsSync()) f.parent.createSync(recursive: true);
+          f.writeAsStringSync(jsonEncode(_feedbacks));
+        } catch (_) {}
+      }
+      final r2 = R2StorageService();
+      if (r2.isConfigured) {
+        await r2.putString('db/feedbacks.json', jsonEncode(_feedbacks), contentType: 'application/json');
+      }
+    } catch (_) {}
+  }
+
+  Future<bool> _loadSharedFeedbacks() async {
+    bool hasChanges = false;
+    for (final path in _sharedFeedbackFilePaths) {
+      try {
+        final file = File(path);
+        if (await file.exists()) {
+          final content = await file.readAsString();
+          if (content.trim().isNotEmpty) {
+            final List list = jsonDecode(content);
+            for (final item in list) {
+              final map = Map<String, dynamic>.from(item);
+              if (!_feedbacks.any((fb) => fb['id'] == map['id'])) {
+                _feedbacks.add(map);
+                hasChanges = true;
+              }
+            }
+          }
+        }
+      } catch (_) {}
+    }
+    return hasChanges;
   }
 }

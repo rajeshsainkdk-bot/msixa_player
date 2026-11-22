@@ -5,9 +5,9 @@ import '../theme/app_colors.dart';
 import '../widgets/mini_player.dart';
 import '../services/update_service.dart';
 import '../services/language_service.dart';
+import '../services/feedback_service.dart';
 import 'home_screen.dart';
 import 'videos_screen.dart';
-import 'search_screen.dart';
 import 'library_screen.dart';
 import 'equalizer_screen.dart';
 import '../services/intent_service.dart';
@@ -29,11 +29,22 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
     WidgetsBinding.instance.addPostFrameCallback((_) {
       UpdateService.checkForUpdate(context, autoPrompt: true);
       IntentService.checkInitialMedia(context);
+      // Check if user has played >= 5 songs and needs to submit mandatory feedback
+      FeedbackService.checkAndPromptFeedback(context);
     });
+
+    FeedbackService.triggerPromptNotifier.addListener(_onFeedbackTriggered);
+  }
+
+  void _onFeedbackTriggered() {
+    if (mounted) {
+      FeedbackService.checkAndPromptFeedback(context);
+    }
   }
 
   @override
   void dispose() {
+    FeedbackService.triggerPromptNotifier.removeListener(_onFeedbackTriggered);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -42,13 +53,13 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && mounted) {
       UpdateService.checkForUpdate(context, autoPrompt: true);
+      FeedbackService.checkAndPromptFeedback(context);
     }
   }
 
   final List<Widget> _screens = const [
     HomeScreen(),
     VideosScreen(),
-    SearchScreen(),
     LibraryScreen(),
     EqualizerScreen(),
   ];
@@ -104,16 +115,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
                   unselectedFontSize: 11,
                   items: [
                     BottomNavigationBarItem(
-                      icon: const Icon(Icons.home_filled),
-                      label: lang.t('nav_discover'),
+                      icon: const Icon(Icons.explore_rounded),
+                      label: lang.isHindi ? 'डिस्कवर व सर्च' : 'Discover',
                     ),
                     BottomNavigationBarItem(
                       icon: const Icon(Icons.video_library_rounded),
                       label: lang.t('nav_videos'),
-                    ),
-                    BottomNavigationBarItem(
-                      icon: const Icon(Icons.search_rounded),
-                      label: lang.t('nav_search'),
                     ),
                     BottomNavigationBarItem(
                       icon: const Icon(Icons.library_music_rounded),

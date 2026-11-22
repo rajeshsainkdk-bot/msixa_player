@@ -16,6 +16,7 @@ import '../services/cloud_backend_service.dart';
 import '../services/ai_music_service.dart';
 import '../services/song_artwork_resolver.dart';
 import '../services/jiosaavn_service.dart';
+import '../services/feedback_service.dart';
 
 class PlayerProvider extends ChangeNotifier {
   final AudioPlayerService _audioService = AudioPlayerService();
@@ -152,8 +153,14 @@ class PlayerProvider extends ChangeNotifier {
   void _init() async {
     // 1. Listen to audio playback events with infinite-loading protection watchdog
     Timer? bufferingWatchdog;
-    _audioService.playerStateStream.listen((state) {
+    _audioService.playerStateStream.listen((state) async {
       final isCompleted = state.processingState == ProcessingState.completed;
+      if (isCompleted) {
+        final count = await _storageService.incrementCompletedSongsCount();
+        if (count >= 5 && !(await _storageService.hasSubmittedFeedback())) {
+          FeedbackService.triggerPromptNotifier.value = count;
+        }
+      }
       _isPlaying = state.playing && !isCompleted;
       _isBuffering = (state.processingState == ProcessingState.buffering ||
               state.processingState == ProcessingState.loading) &&

@@ -75,7 +75,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging) {
         _backend.syncSharedData();
@@ -2024,6 +2024,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
             Tab(text: '${_lang.t('tab_pending')} (${pending.length})'),
             Tab(text: '${_lang.t('tab_users')} (${users.length})'),
             Tab(text: '${_lang.t('tab_live')} (${approved.length})'),
+            Tab(text: '${_lang.isHindi ? "फ़ीडबैक" : "Feedback"} (${_backend.feedbacks.length})'),
           ],
         ),
       ),
@@ -2133,6 +2134,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
 
                 // TAB 3: Live Songs Catalog (with Add, Edit, Delete)
                 _buildLiveSongsTab(approved),
+
+                // TAB 4: User Feedbacks & Suggestions
+                _buildFeedbacksTab(_backend.feedbacks),
               ],
             ),
           ),
@@ -2142,6 +2146,119 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
             _buildStickyPreviewBottomBar(approved, pending),
         ],
       ),
+    );
+  }
+
+  Widget _buildFeedbacksTab(List<Map<String, dynamic>> feedbacks) {
+    if (feedbacks.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.rate_review_outlined, color: Colors.white24, size: 54),
+            const SizedBox(height: 12),
+            Text(
+              _lang.isHindi ? 'कोई फ़ीडबैक प्राप्त नहीं हुआ' : 'No user feedback received yet',
+              style: GoogleFonts.outfit(color: Colors.white54, fontSize: 14),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.all(16),
+      itemCount: feedbacks.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      itemBuilder: (context, index) {
+        final fb = feedbacks[index];
+        final rating = (fb['rating'] as num?)?.toInt() ?? 5;
+        final message = fb['message'] as String? ?? '';
+        final userPhone = fb['userPhone'] as String? ?? 'Anonymous';
+        final userName = fb['userName'] as String? ?? 'Msixa User';
+        final createdAt = fb['createdAt'] as String? ?? '';
+
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFF131A2A),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: rating == 5
+                  ? const Color(0xFF10B981).withOpacity(0.3)
+                  : const Color(0xFFFFB300).withOpacity(0.4),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: rating == 5
+                              ? const Color(0xFF10B981).withOpacity(0.2)
+                              : const Color(0xFFFFB300).withOpacity(0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          rating == 5 ? Icons.star_rounded : Icons.star_half_rounded,
+                          color: rating == 5 ? const Color(0xFF10B981) : const Color(0xFFFFB300),
+                          size: 18,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '$rating / 5 Stars',
+                        style: GoogleFonts.outfit(
+                          color: rating == 5 ? const Color(0xFF10B981) : const Color(0xFFFFB300),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (createdAt.isNotEmpty)
+                    Text(
+                      createdAt.split('T').first,
+                      style: GoogleFonts.outfit(color: Colors.white38, fontSize: 11),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              if (message.isNotEmpty) ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E293B),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    message,
+                    style: GoogleFonts.outfit(color: Colors.white, fontSize: 13),
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
+              Row(
+                children: [
+                  const Icon(Icons.person_outline_rounded, color: Colors.white38, size: 14),
+                  const SizedBox(width: 4),
+                  Text(
+                    '$userName ($userPhone)',
+                    style: GoogleFonts.outfit(color: Colors.white54, fontSize: 11),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 

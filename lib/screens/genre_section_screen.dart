@@ -34,6 +34,11 @@ class _GenreSectionScreenState extends State<GenreSectionScreen> {
   bool _isLoading = true;
   String _filterQuery = '';
 
+  int _searchMode = 0; // 0: In this card, 1: Global All Online Songs
+  List<Song> _globalSearchResults = [];
+  bool _isSearchingGlobal = false;
+  Timer? _globalDebounce;
+
   @override
   void initState() {
     super.initState();
@@ -48,8 +53,42 @@ class _GenreSectionScreenState extends State<GenreSectionScreen> {
 
   @override
   void dispose() {
+    _globalDebounce?.cancel();
     _filterController.dispose();
     super.dispose();
+  }
+
+  void _onSearchInputChanged(String val) {
+    setState(() => _filterQuery = val);
+    if (_searchMode == 1) {
+      _performGlobalSearch(val);
+    }
+  }
+
+  void _performGlobalSearch(String query) {
+    _globalDebounce?.cancel();
+    if (query.trim().isEmpty) {
+      setState(() {
+        _globalSearchResults = [];
+        _isSearchingGlobal = false;
+      });
+      return;
+    }
+
+    setState(() => _isSearchingGlobal = true);
+    _globalDebounce = Timer(const Duration(milliseconds: 400), () async {
+      try {
+        final res = await _saavnService.searchSongs(query.trim(), limit: 50);
+        if (mounted) {
+          setState(() {
+            _globalSearchResults = res;
+            _isSearchingGlobal = false;
+          });
+        }
+      } catch (_) {
+        if (mounted) setState(() => _isSearchingGlobal = false);
+      }
+    });
   }
 
   Future<void> _loadGenreSongs({bool forceRefresh = false}) async {
@@ -245,63 +284,277 @@ class _GenreSectionScreenState extends State<GenreSectionScreen> {
             ),
           ),
 
-          // 2. Search Filter in this Genre
+          // 2. Search Filter in this Genre with Scope Switcher
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: const Color(0xFF131A2A),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: Colors.white12),
-                ),
-                child: TextField(
-                  controller: _filterController,
-                  onChanged: (val) => setState(() => _filterQuery = val),
-                  style: const TextStyle(color: Colors.white, fontSize: 13),
-                  decoration: InputDecoration(
-                    hintText: lang.isHindi
-                        ? '${widget.title} गानों में खोजें (${_songs.length}+ गाने)...'
-                        : 'Filter in ${widget.title} (${_songs.length}+ songs)...',
-                    hintStyle: const TextStyle(color: Colors.white38, fontSize: 13),
-                    prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF00E5FF), size: 20),
-                    suffixIcon: _filterQuery.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear_rounded, color: Colors.white54, size: 18),
-                            onPressed: () {
-                              _filterController.clear();
-                              setState(() => _filterQuery = '');
-                            },
-                          )
-                        : null,
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF131A2A),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: _filterQuery.isNotEmpty ? const Color(0xFF00E5FF) : Colors.white12,
+                        width: _filterQuery.isNotEmpty ? 1.2 : 1.0,
+                      ),
+                    ),
+                    child: TextField(
+                      controller: _filterController,
+                      onChanged: _onSearchInputChanged,
+                      style: const TextStyle(color: Colors.white, fontSize: 13),
+                      decoration: InputDecoration(
+                        hintText: _searchMode == 0
+                            ? (lang.isHindi
+                                ? '${widget.title} गानों में खोजें (${_songs.length}+ गाने)...'
+                                : 'Filter in ${widget.title} (${_songs.length}+ songs)...')
+                            : (lang.isHindi
+                                ? 'ऑनलाइन सभी गानों में खोजें (करोड़ों गाने)...'
+                                : 'Search all online streaming songs...'),
+                        hintStyle: const TextStyle(color: Colors.white38, fontSize: 13),
+                        prefixIcon: Icon(
+                          _searchMode == 0 ? Icons.search_rounded : Icons.public_rounded,
+                          color: const Color(0xFF00E5FF),
+                          size: 20,
+                        ),
+                        suffixIcon: _filterQuery.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear_rounded, color: Colors.white54, size: 18),
+                                onPressed: () {
+                                  _filterController.clear();
+                                  _onSearchInputChanged('');
+                                },
+                              )
+                            : null,
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 8),
+
+                  // Search Mode Switcher: In this card vs All Online Songs
+                  Row(
+                    children: [
+                      GestureDetector(
+                        onTap: () {
+                          if (_searchMode != 0) {
+                            setState(() => _searchMode = 0);
+                          }
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: _searchMode == 0 ? const Color(0xFF00E5FF).withOpacity(0.2) : const Color(0xFF131A2A),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: _searchMode == 0 ? const Color(0xFF00E5FF) : Colors.white12,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.filter_list_rounded,
+                                size: 13,
+                                color: _searchMode == 0 ? const Color(0xFF00E5FF) : Colors.white60,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                lang.isHindi ? 'इस कार्ड में (${_songs.length}+)' : 'In Card (${_songs.length}+)',
+                                style: TextStyle(
+                                  color: _searchMode == 0 ? const Color(0xFF00E5FF) : Colors.white70,
+                                  fontSize: 11,
+                                  fontWeight: _searchMode == 0 ? FontWeight.bold : FontWeight.normal,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      GestureDetector(
+                        onTap: () {
+                          if (_searchMode != 1) {
+                            setState(() => _searchMode = 1);
+                            if (_filterQuery.trim().isNotEmpty) {
+                              _performGlobalSearch(_filterQuery);
+                            }
+                          }
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: _searchMode == 1 ? const Color(0xFFFFB300).withOpacity(0.2) : const Color(0xFF131A2A),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: _searchMode == 1 ? const Color(0xFFFFB300) : Colors.white12,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.public_rounded,
+                                size: 13,
+                                color: _searchMode == 1 ? const Color(0xFFFFB300) : Colors.white60,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                lang.isHindi ? '🌐 ऑनलाइन सभी गाने' : 'All Online Songs',
+                                style: TextStyle(
+                                  color: _searchMode == 1 ? const Color(0xFFFFB300) : Colors.white70,
+                                  fontSize: 11,
+                                  fontWeight: _searchMode == 1 ? FontWeight.bold : FontWeight.normal,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  // Quick bridge to Global Search when typing in card mode
+                  if (_searchMode == 0 && _filterQuery.trim().isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    InkWell(
+                      onTap: () {
+                        setState(() => _searchMode = 1);
+                        _performGlobalSearch(_filterQuery);
+                      },
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFB300).withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFFFFB300).withOpacity(0.35)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.travel_explore_rounded, color: Color(0xFFFFB300), size: 15),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                lang.isHindi
+                                    ? 'कार्ड में नहीं मिला? "$_filterQuery" को ऑनलाइन सभी गानों में खोजें'
+                                    : 'Not in this card? Search "$_filterQuery" across all online songs',
+                                style: const TextStyle(
+                                  color: Color(0xFFFFB300),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            const Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFFFFB300), size: 11),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
           ),
 
-          // 3. Songs List with Top Played Indicator
-          if (_isLoading && _songs.isEmpty)
-            const SliverFillRemaining(
-              child: Center(
-                child: CircularProgressIndicator(color: Color(0xFF00E5FF)),
-              ),
-            )
-          else if (displayed.isEmpty)
-            SliverFillRemaining(
-              child: Center(
-                child: Text(
-                  lang.isHindi ? 'कोई गाना नहीं मिला' : 'No songs found',
-                  style: const TextStyle(color: Colors.white54, fontSize: 14),
+          // 3. Songs List with Top Played Indicator or Global Search
+          if (_searchMode == 1) ...[
+            if (_isSearchingGlobal)
+              const SliverFillRemaining(
+                child: Center(
+                  child: CircularProgressIndicator(color: Color(0xFFFFB300)),
+                ),
+              )
+            else if (_globalSearchResults.isEmpty && _filterQuery.trim().isNotEmpty)
+              SliverFillRemaining(
+                child: Center(
+                  child: Text(
+                    lang.isHindi
+                        ? 'ऑनलाइन खोज में कोई गाना नहीं मिला'
+                        : 'No online songs found for "$_filterQuery"',
+                    style: const TextStyle(color: Colors.white54, fontSize: 14),
+                  ),
+                ),
+              )
+            else if (_globalSearchResults.isEmpty)
+              SliverFillRemaining(
+                child: Center(
+                  child: Text(
+                    lang.isHindi
+                        ? 'ऑनलाइन किसी भी गाने का नाम लिखकर खोजें'
+                        : 'Type any song or artist name to search all songs',
+                    style: const TextStyle(color: Colors.white54, fontSize: 13),
+                  ),
+                ),
+              )
+            else
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(0, 12, 0, 120),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      final song = _globalSearchResults[index];
+                      final isCurrent = provider.currentSong?.id == song.id;
+                      final playCount = provider.getPlayCount(song.id);
+
+                      return SongListTile(
+                        song: song,
+                        isCurrent: isCurrent,
+                        rank: index + 1,
+                        playCount: playCount,
+                        onTap: () => provider.playSong(song, queueContext: _globalSearchResults),
+                      );
+                    },
+                    childCount: _globalSearchResults.length,
+                  ),
                 ),
               ),
-            )
-          else
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(0, 12, 0, 120),
-              sliver: SliverList(
+          ] else ...[
+            if (_isLoading && _songs.isEmpty)
+              const SliverFillRemaining(
+                child: Center(
+                  child: CircularProgressIndicator(color: Color(0xFF00E5FF)),
+                ),
+              )
+            else if (displayed.isEmpty)
+              SliverFillRemaining(
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        lang.isHindi ? 'इस कार्ड में कोई गाना नहीं मिला' : 'No songs found in this card',
+                        style: const TextStyle(color: Colors.white54, fontSize: 14),
+                      ),
+                      if (_filterQuery.trim().isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFFFB300),
+                            foregroundColor: Colors.black,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          ),
+                          icon: const Icon(Icons.public_rounded, size: 16),
+                          label: Text(
+                            lang.isHindi ? 'ऑनलाइन सभी गानों में खोजें' : 'Search All Online Songs',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          onPressed: () {
+                            setState(() => _searchMode = 1);
+                            _performGlobalSearch(_filterQuery);
+                          },
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              )
+            else
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(0, 12, 0, 120),
+                sliver: SliverList(
                 delegate: SliverChildBuilderDelegate(
                   (context, index) {
                     final song = displayed[index];

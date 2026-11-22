@@ -10,6 +10,9 @@ class StorageService {
   static const String _keyEqPreset = 'msixa_eq_preset';
   static const String _keyEqGains = 'msixa_eq_gains';
   static const String _keyPlayCounts = 'msixa_song_play_counts';
+  static const String _keyCompletedSongsCount = 'msixa_completed_songs_count';
+  static const String _keyFeedbackSubmitted = 'msixa_feedback_submitted';
+  static const String _keyFeedbackData = 'msixa_user_feedback_data';
 
   static String _cleanPhone(String? p) => p == null ? '' : p.replaceAll(RegExp(r'[^0-9]'), '');
   static String _favKey([String? phone]) => _cleanPhone(phone).isNotEmpty ? 'msixa_fav_${_cleanPhone(phone)}' : 'msixa_favorites';
@@ -138,5 +141,49 @@ class StorageService {
     } catch (_) {
       return 1;
     }
+  }
+
+  Future<int> getCompletedSongsCount() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getInt(_keyCompletedSongsCount) ?? 0;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  Future<int> incrementCompletedSongsCount() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final current = (prefs.getInt(_keyCompletedSongsCount) ?? 0) + 1;
+      await prefs.setInt(_keyCompletedSongsCount, current);
+      return current;
+    } catch (_) {
+      return 1;
+    }
+  }
+
+  Future<bool> hasSubmittedFeedback() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getBool(_keyFeedbackSubmitted) ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> setFeedbackSubmitted(bool submitted, {int? rating, String? message}) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_keyFeedbackSubmitted, submitted);
+      if (rating != null) {
+        final data = {
+          'rating': rating,
+          'message': message ?? '',
+          'timestamp': DateTime.now().toIso8601String(),
+        };
+        await prefs.setString(_keyFeedbackData, json.encode(data));
+      }
+    } catch (_) {}
   }
 }
