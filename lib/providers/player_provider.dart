@@ -149,9 +149,11 @@ class PlayerProvider extends ChangeNotifier {
   void _init() async {
     // 1. Listen to audio playback events
     _audioService.playerStateStream.listen((state) {
-      _isPlaying = state.playing;
-      _isBuffering = state.processingState == ProcessingState.buffering ||
-          state.processingState == ProcessingState.loading;
+      final isCompleted = state.processingState == ProcessingState.completed;
+      _isPlaying = state.playing && !isCompleted;
+      _isBuffering = (state.processingState == ProcessingState.buffering ||
+              state.processingState == ProcessingState.loading) &&
+          !isCompleted;
       notifyListeners();
     });
 
@@ -326,7 +328,7 @@ class PlayerProvider extends ChangeNotifier {
   }
 
   Future<void> next() async {
-    await _audioService.next();
+    await _audioService.next(autoLoop: true);
     if (currentSong != null) {
       _addToRecentlyPlayed(currentSong!);
     }

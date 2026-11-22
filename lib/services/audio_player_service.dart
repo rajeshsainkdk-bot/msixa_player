@@ -62,7 +62,7 @@ class AudioPlayerService {
       _player.seek(Duration.zero);
       _player.play();
     } else {
-      next();
+      next(autoLoop: true);
     }
   }
 
@@ -114,8 +114,11 @@ class AudioPlayerService {
     if (_queue.isNotEmpty) {
       _currentSong = _queue[_currentIndex];
       try {
-        // ALWAYS stop previous playback completely before loading new audio
-        await _player.stop();
+        // ALWAYS pause and cleanly stop previous playback to avoid native channel deadlock
+        try {
+          await _player.pause();
+          await _player.stop();
+        } catch (_) {}
         if (currentToken != _sessionToken) return;
 
         final playlist = ConcatenatingAudioSource(
@@ -123,11 +126,15 @@ class AudioPlayerService {
           children: _queue.map((s) => _createAudioSource(s)).toList(),
         );
 
-        await _player.setAudioSource(playlist, initialIndex: _currentIndex);
+        await _player.setAudioSource(playlist, initialIndex: _currentIndex).timeout(
+          const Duration(seconds: 12),
+          onTimeout: () => throw TimeoutException('Playlist load timed out'),
+        );
         if (currentToken != _sessionToken) return;
 
         await _player.play();
-      } catch (_) {
+      } catch (e) {
+        debugPrint('setQueue error: $e, falling back to direct playSong');
         if (currentToken == _sessionToken) {
           await playSong(_queue[_currentIndex]);
         }
@@ -149,16 +156,24 @@ class AudioPlayerService {
         _currentIndex = _queue.length - 1;
       }
 
-      // Stop previous playback to ensure strictly ONE song plays
-      await _player.stop();
+      // Stop previous playback to ensure strictly ONE song plays without collision
+      try {
+        await _player.pause();
+        await _player.stop();
+      } catch (_) {}
       if (currentToken != _sessionToken) return;
 
       final source = _createAudioSource(song);
-      await _player.setAudioSource(source);
+      await _player.setAudioSource(source).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () => throw TimeoutException('Single song load timed out'),
+      );
       if (currentToken != _sessionToken) return;
 
       await _player.play();
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('playSong error: $e');
+    }
   }
 
   Future<void> togglePlayPause() async {
@@ -191,7 +206,7 @@ class AudioPlayerService {
     await _player.seek(position);
   }
 
-  Future<void> next() async {
+  Future<void> next({bool autoLoop = false}) async {
     if (_player.hasNext) {
       await _player.seekToNext();
       return;
@@ -201,22 +216,47 @@ class AudioPlayerService {
 
     if (_isShuffle && _shuffleIndices.isNotEmpty) {
       final currentPosInShuffle = _shuffleIndices.indexOf(_currentIndex);
-      if (currentPosInShuffle < _shuffleIndices.length - 1) {
+      if (currentPosInShuffle >= 0 && currentPosInShuffle < _shuffleIndices.length - 1) {
         _currentIndex = _shuffleIndices[currentPosInShuffle + 1];
-        await playSong(_queue[_currentIndex]);
-      } else if (_repeatMode == RepeatMode.all) {
+        if (_player.audioSource is ConcatenatingAudioSource) {
+          await _player.seek(Duration.zero, index: _currentIndex);
+          await _player.play();
+        } else {
+          await playSong(_queue[_currentIndex]);
+        }
+      } else if (_repeatMode == RepeatMode.all || autoLoop) {
         _currentIndex = _shuffleIndices.first;
-        await playSong(_queue[_currentIndex]);
+        if (_player.audioSource is ConcatenatingAudioSource) {
+          await _player.seek(Duration.zero, index: _currentIndex);
+          await _player.play();
+        } else {
+          await playSong(_queue[_currentIndex]);
+        }
+      } else {
+        await _handleEndOfQueue();
       }
       return;
     }
 
     if (_currentIndex < _queue.length - 1) {
       _currentIndex++;
-      await playSong(_queue[_currentIndex]);
-    } else if (_repeatMode == RepeatMode.all) {
+      if (_player.audioSource is ConcatenatingAudioSource) {
+        await _player.seek(Duration.zero, index: _currentIndex);
+        await _player.play();
+      } else {
+        await playSong(_queue[_currentIndex]);
+      }
+    } else if (_repeatMode == RepeatMode.all || autoLoop) {
+      // End of card/queue reached: wrap around to first song so music never stops!
       _currentIndex = 0;
-      await playSong(_queue[_currentIndex]);
+      if (_player.audioSource is ConcatenatingAudioSource) {
+        await _player.seek(Duration.zero, index: 0);
+        await _player.play();
+      } else {
+        await playSong(_queue[0]);
+      }
+    } else {
+      await _handleEndOfQueue();
     }
   }
 
@@ -237,18 +277,49 @@ class AudioPlayerService {
       final currentPosInShuffle = _shuffleIndices.indexOf(_currentIndex);
       if (currentPosInShuffle > 0) {
         _currentIndex = _shuffleIndices[currentPosInShuffle - 1];
-        await playSong(_queue[_currentIndex]);
+        if (_player.audioSource is ConcatenatingAudioSource) {
+          await _player.seek(Duration.zero, index: _currentIndex);
+          await _player.play();
+        } else {
+          await playSong(_queue[_currentIndex]);
+        }
+      } else {
+        _currentIndex = _shuffleIndices.last;
+        if (_player.audioSource is ConcatenatingAudioSource) {
+          await _player.seek(Duration.zero, index: _currentIndex);
+          await _player.play();
+        } else {
+          await playSong(_queue[_currentIndex]);
+        }
       }
       return;
     }
 
     if (_currentIndex > 0) {
       _currentIndex--;
-      await playSong(_queue[_currentIndex]);
-    } else if (_repeatMode == RepeatMode.all) {
+      if (_player.audioSource is ConcatenatingAudioSource) {
+        await _player.seek(Duration.zero, index: _currentIndex);
+        await _player.play();
+      } else {
+        await playSong(_queue[_currentIndex]);
+      }
+    } else {
+      // Wrap to the last song
       _currentIndex = _queue.length - 1;
-      await playSong(_queue[_currentIndex]);
+      if (_player.audioSource is ConcatenatingAudioSource) {
+        await _player.seek(Duration.zero, index: _currentIndex);
+        await _player.play();
+      } else {
+        await playSong(_queue[_currentIndex]);
+      }
     }
+  }
+
+  Future<void> _handleEndOfQueue() async {
+    try {
+      await _player.pause();
+      await _player.seek(Duration.zero);
+    } catch (_) {}
   }
 
   void toggleRepeatMode() {

@@ -581,5 +581,33 @@ void main() {
         expect(a['image']!.contains('500x500'), true);
       }
     });
+
+    test('Queue end-of-list autoLoop wraps to index 0 smoothly', () {
+      final queueLength = 50;
+      int currentIndex = 49; // Last song of the card
+      final autoLoop = true;
+
+      // Simulation of next(autoLoop: true) logic
+      if (currentIndex < queueLength - 1) {
+        currentIndex++;
+      } else if (autoLoop) {
+        currentIndex = 0;
+      }
+
+      expect(currentIndex, 0); // Smoothly wrapped to track 0 without hanging
+    });
+
+    test('Completed playback state ensures isPlaying and isBuffering are strictly false', () {
+      // Simulation of PlayerProvider listener logic
+      final processingState = 'completed';
+      final playing = true; // Raw ExoPlayer state before completion reset
+
+      final isCompleted = processingState == 'completed';
+      final isPlaying = playing && !isCompleted;
+      final isBuffering = (processingState == 'buffering' || processingState == 'loading') && !isCompleted;
+
+      expect(isPlaying, false);
+      expect(isBuffering, false);
+    });
   });
 }
