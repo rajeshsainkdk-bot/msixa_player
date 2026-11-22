@@ -1,13 +1,17 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:video_player/video_player.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 import '../models/short_video_item.dart';
 import '../services/app_share_service.dart';
 import '../services/language_service.dart';
-import '../services/shorts_service.dart';
+import '../services/shorts_feed_service.dart';
+import '../services/shorts_player_controller.dart';
 import '../theme/app_colors.dart';
 
+/// Production-ready YouTube Shorts Feed View (Sections 1-7)
+/// Integrates official YouTube Data API v3 discovery with official
+/// YouTube IFrame Player API embedded vertical playback.
 class ShortsFeedView extends StatefulWidget {
   final VoidCallback? onBackToDeviceVideos;
   const ShortsFeedView({Key? key, this.onBackToDeviceVideos}) : super(key: key);
@@ -17,7 +21,8 @@ class ShortsFeedView extends StatefulWidget {
 }
 
 class _ShortsFeedViewState extends State<ShortsFeedView> {
-  final ShortsService _shortsService = ShortsService();
+  final ShortsFeedService _feedService = ShortsFeedService();
+  final ShortsPlayerController _playbackController = ShortsPlayerController();
   final PageController _pageController = PageController();
   final TextEditingController _searchController = TextEditingController();
 
@@ -25,313 +30,113 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
   bool _isLoading = true;
   String _activeCategory = 'Trending';
   bool _isSearching = false;
-  int _currentIndex = 0;
-
-  // Session-wide seen video IDs tracking: NEVER repeat a video during the session
-  final Set<String> _seenVideoIds = {};
-  int _currentPage = 0;
   bool _isLoadingMore = false;
-
-  // Multi-Controller Preloading Pool for 0-Second Instant Playback
-  final Map<int, VideoPlayerController> _controllers = {};
-  final Set<int> _loadingIndices = {};
-
-  final List<Map<String, String>> _categories = [
-    {'id': 'Trending', 'hi': '🔥 ट्रेंडिंग', 'en': '🔥 Trending'},
-    {'id': 'Marwadi', 'hi': '🐪 मारवाड़ी व राजस्थानी', 'en': '🐪 Rajasthani'},
-    {'id': 'DJ Remix', 'hi': '🎧 डीजे रीमिक्स', 'en': '🎧 DJ Remix'},
-    {'id': 'Haryanvi', 'hi': '🚜 हरियाणवी', 'en': '🚜 Haryanvi'},
-    {'id': 'Bhakti', 'hi': '🕉️ भक्ति व महाकाल', 'en': '🕉️ Bhakti'},
-    {'id': 'Romantic', 'hi': '❤️ रोमांटिक लव', 'en': '❤️ Romantic'},
-  ];
 
   @override
   void initState() {
     super.initState();
     AppShareService.keepScreenOn(true);
-    _loadShortsForCategory(_activeCategory);
+    _loadInitialFeed(_activeCategory);
   }
 
   @override
   void dispose() {
     AppShareService.keepScreenOn(false);
-    _disposeAllControllers();
+    _playbackController.dispose();
     _pageController.dispose();
     _searchController.dispose();
     super.dispose();
   }
 
-  void _disposeAllControllers() {
-    for (final ctrl in _controllers.values) {
-      try {
-        ctrl.pause();
-        ctrl.dispose();
-      } catch (_) {}
-    }
-    _controllers.clear();
-    _loadingIndices.clear();
-  }
-
-  Future<void> _loadShortsForCategory(String category) async {
-    _disposeAllControllers();
-    _currentPage = 0;
-
-    // Filter initial list through session-wide seen IDs so videos never repeat
-    final initialList = _shortsService.getInitialShorts(category, _seenVideoIds);
+  Future<void> _loadInitialFeed(String categoryId) async {
+    final immediateList = _feedService.getInitialShorts(categoryId);
     setState(() {
-      _shorts = initialList;
-      _isLoading = initialList.isEmpty;
-      _currentIndex = 0;
+      _shorts = immediateList;
+      _isLoading = immediateList.isEmpty;
     });
 
-    for (final s in initialList) {
-      _seenVideoIds.add(s.id);
-    }
-
-    if (initialList.isNotEmpty) {
-      _preloadAroundIndex(0);
+    if (immediateList.isNotEmpty) {
+      _playbackController.onPageChanged(newIndex: 0, items: _shorts);
     }
 
     try {
-      final onlineList = await _shortsService.getNextShortsBatch(
-        category: category,
-        page: _currentPage,
-        excludeIds: _seenVideoIds,
-      );
-      if (mounted && onlineList.isNotEmpty) {
+      final freshList = await _feedService.fetchFeedPage(categoryId: categoryId, isRefresh: true);
+      if (mounted && freshList.isNotEmpty) {
         setState(() {
-          for (final item in onlineList) {
-            if (!_seenVideoIds.contains(item.id)) {
-              _seenVideoIds.add(item.id);
-              _shorts.add(item);
-            }
-          }
+          final existingIds = _shorts.map((e) => e.id).toSet();
+          final uniqueNew = freshList.where((e) => !existingIds.contains(e.id)).toList();
+          _shorts.addAll(uniqueNew);
           _isLoading = false;
         });
-        _preloadAroundIndex(_currentIndex);
+        _playbackController.onPageChanged(newIndex: _playbackController.activeIndex, items: _shorts);
       }
     } catch (_) {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  /// Infinite pagination: Automatically called before the user reaches the end of the feed
-  Future<void> _fetchNextBatch() async {
+  Future<void> _loadMoreShorts() async {
     if (_isLoadingMore) return;
     _isLoadingMore = true;
-    _currentPage++;
 
     try {
-      final newBatch = await _shortsService.getNextShortsBatch(
-        category: _activeCategory,
-        page: _currentPage,
-        excludeIds: _seenVideoIds,
-      );
-
-      if (mounted && newBatch.isNotEmpty) {
-        final uniqueItems = <ShortVideoItem>[];
-        for (final item in newBatch) {
-          if (!_seenVideoIds.contains(item.id)) {
-            _seenVideoIds.add(item.id);
-            uniqueItems.add(item);
-          }
-        }
-        if (uniqueItems.isNotEmpty) {
-          setState(() {
-            _shorts.addAll(uniqueItems);
-          });
-          _preloadAroundIndex(_currentIndex);
-        }
+      final nextBatch = await _feedService.fetchFeedPage(categoryId: _activeCategory);
+      if (mounted && nextBatch.isNotEmpty) {
+        setState(() {
+          _shorts.addAll(nextBatch);
+        });
       }
     } catch (_) {
     } finally {
-      if (mounted) {
-        setState(() => _isLoadingMore = false);
-      }
+      if (mounted) setState(() => _isLoadingMore = false);
     }
   }
 
   Future<void> _performSearch(String query) async {
     if (query.trim().isEmpty) return;
     setState(() => _isLoading = true);
-    _disposeAllControllers();
     try {
-      final results = await _shortsService.searchShorts(query.trim());
+      final results = await _feedService.searchShorts(query.trim());
       if (mounted) {
         setState(() {
-          _shorts = results.isNotEmpty ? results : _shortsService.getInitialShorts('Trending');
-          _isLoading = false;
-          _currentIndex = 0;
-        });
-        for (final s in _shorts) {
-          _seenVideoIds.add(s.id);
-        }
-        _preloadAroundIndex(0);
-      }
-    } catch (_) {
-      if (mounted) {
-        setState(() {
-          _shorts = _shortsService.getInitialShorts('Trending');
+          _shorts = results.isNotEmpty ? results : _feedService.getInitialShorts('Trending');
           _isLoading = false;
         });
-        _preloadAroundIndex(0);
-      }
-    }
-  }
-
-  void _preloadAroundIndex(int center) {
-    if (_shorts.isEmpty) return;
-    // Pre-warm URLs in background
-    final idsToPrewarm = <String>[];
-    for (int i = center; i <= center + 3; i++) {
-      if (i >= 0 && i < _shorts.length) {
-        idsToPrewarm.add(_shorts[i].id);
-      }
-    }
-    _shortsService.prewarmStreamUrls(idsToPrewarm);
-
-    // Priority 1: Current active video gets 100% bandwidth immediately
-    _initControllerForIndex(center);
-
-    // Priority 2: Preload next video smoothly after short delay so active video never stutters
-    Future.delayed(const Duration(milliseconds: 1200), () {
-      if (mounted && _currentIndex == center) {
-        if (center + 1 < _shorts.length) {
-          _initControllerForIndex(center + 1);
+        if (_shorts.isNotEmpty) {
+          _playbackController.onPageChanged(newIndex: 0, items: _shorts);
         }
-      }
-    });
-
-    // Clean up distant controllers: keep strictly [center - 1, center, center + 1] in memory
-    final staleKeys = _controllers.keys.where((k) => (k - center).abs() > 1).toList();
-    for (final k in staleKeys) {
-      try {
-        _controllers[k]?.pause();
-        _controllers[k]?.dispose();
-      } catch (_) {}
-      _controllers.remove(k);
-    }
-  }
-
-  Future<void> _initControllerForIndex(int index) async {
-    if (index < 0 || index >= _shorts.length) return;
-    if (_controllers.containsKey(index) || _loadingIndices.contains(index)) return;
-
-    _loadingIndices.add(index);
-    try {
-      final item = _shorts[index];
-      String? streamUrl = item.streamUrl;
-      if (streamUrl == null || streamUrl.isEmpty) {
-        streamUrl = await _shortsService.resolveStreamUrl(item.id, item.category);
-      }
-
-      if (streamUrl != null && streamUrl.isNotEmpty && mounted) {
-        final ctrl = VideoPlayerController.networkUrl(
-          Uri.parse(streamUrl),
-          httpHeaders: const {
-            'User-Agent': 'Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
-          },
-          videoPlayerOptions: VideoPlayerOptions(mixWithOthers: false),
-        );
-        await ctrl.initialize();
-        ctrl.setLooping(false);
-
-        if (mounted) {
-          setState(() {
-            _controllers[index] = ctrl;
-            _loadingIndices.remove(index);
-          });
-          // If this index is currently visible, play immediately!
-          if (index == _currentIndex) {
-            ctrl.play();
-          }
-        } else {
-          ctrl.dispose();
-        }
-      } else {
-        _loadingIndices.remove(index);
       }
     } catch (_) {
-      _loadingIndices.remove(index);
-      // Fallback resilience: ensure video controller initializes with verified stream
-      if (mounted && !_controllers.containsKey(index)) {
-        try {
-          final fallbackUrl = _shortsService.getFallbackStreamUrl(_shorts[index].category);
-          final ctrl = VideoPlayerController.networkUrl(
-            Uri.parse(fallbackUrl),
-            httpHeaders: const {
-              'User-Agent': 'Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
-            },
-            videoPlayerOptions: VideoPlayerOptions(mixWithOthers: false),
-          );
-          await ctrl.initialize();
-          ctrl.setLooping(false);
-          if (mounted) {
-            setState(() {
-              _controllers[index] = ctrl;
-            });
-            if (index == _currentIndex) {
-              ctrl.play();
-            }
-          } else {
-            ctrl.dispose();
-          }
-        } catch (_) {}
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  void _onPageChanged(int newIndex) {
-    final oldIndex = _currentIndex;
-    _currentIndex = newIndex;
+  void _onPageChanged(int index) {
+    _playbackController.onPageChanged(newIndex: index, items: _shorts);
 
-    // Pause old video immediately - single player active rule
-    if (_controllers.containsKey(oldIndex)) {
-      _controllers[oldIndex]?.pause();
+    // Infinite Feed Pagination trigger: when within 3 videos from the end
+    if (index >= _shorts.length - 3 && !_isLoadingMore) {
+      _loadMoreShorts();
     }
-
-    // Play new video immediately (already preloaded in 0ms!)
-    if (_controllers.containsKey(newIndex)) {
-      final ctrl = _controllers[newIndex]!;
-      ctrl.seekTo(Duration.zero);
-      ctrl.play();
-    } else {
-      // In case of rapid multi-swipe
-      _initControllerForIndex(newIndex);
-    }
-
-    // Preload next videos ahead
-    _preloadAroundIndex(newIndex);
-
-    // Infinite Pagination: Trigger next batch prefetch when 3 videos from the end!
-    if (newIndex >= _shorts.length - 3 && !_isLoadingMore) {
-      _fetchNextBatch();
-    }
-
-    setState(() {});
   }
 
   void _onVideoCompleted(int index) {
     if (!mounted) return;
-    // Auto-scroll hands-free to next video upon completion
     if (index < _shorts.length - 1) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 350),
         curve: Curves.easeInOutCubic,
       );
     } else {
-      // Reached the end of loaded videos: DO NOT loop back to index 0!
-      // Fetch fresh new batch immediately and scroll forward to the brand new video
-      if (!_isLoadingMore) {
-        _fetchNextBatch().then((_) {
-          if (mounted && _shorts.length > index + 1) {
-            _pageController.nextPage(
-              duration: const Duration(milliseconds: 350),
-              curve: Curves.easeInOutCubic,
-            );
-          }
-        });
-      }
+      // Reached the end: fetch next batch immediately and advance without repeating
+      _loadMoreShorts().then((_) {
+        if (mounted && _shorts.length > index + 1) {
+          _pageController.nextPage(
+            duration: const Duration(milliseconds: 350),
+            curve: Curves.easeInOutCubic,
+          );
+        }
+      });
     }
   }
 
@@ -343,7 +148,7 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // 1. Fullscreen Vertical Swipeable PageView Feed
+          // 1. Full-Height Vertical Swipeable PageView Feed (Section 3)
           if (_isLoading)
             const Center(
               child: CircularProgressIndicator(color: AppColors.accentCyan),
@@ -361,7 +166,7 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
                   ),
                   const SizedBox(height: 12),
                   ElevatedButton(
-                    onPressed: () => _loadShortsForCategory('Trending'),
+                    onPressed: () => _loadInitialFeed(_activeCategory),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.accentCyan,
                       foregroundColor: Colors.black,
@@ -376,26 +181,32 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
               color: AppColors.accentCyan,
               backgroundColor: const Color(0xFF131A2A),
               onRefresh: () async {
-                await _loadShortsForCategory(_activeCategory);
+                await _loadInitialFeed(_activeCategory);
               },
               child: PageView.builder(
                 controller: _pageController,
                 scrollDirection: Axis.vertical,
+                physics: const PageScrollPhysics(),
                 itemCount: _shorts.length,
                 onPageChanged: _onPageChanged,
                 itemBuilder: (context, index) {
-                  final isCurrent = index == _currentIndex;
-                  final controller = _controllers[index];
+                  final isCurrent = index == _playbackController.activeIndex;
+                  final item = _shorts[index];
+                  final controller = _playbackController.getOrCreateController(
+                    index: index,
+                    item: item,
+                    autoPlay: isCurrent,
+                  );
 
-                  return _ShortVideoPlayerCard(
-                    key: ValueKey(_shorts[index].id),
-                    short: _shorts[index],
+                  return _OfficialShortVideoCard(
+                    key: ValueKey(item.id),
+                    short: item,
                     isActive: isCurrent,
                     controller: controller,
+                    playbackController: _playbackController,
                     onVideoCompleted: () => _onVideoCompleted(index),
                     onLikeToggle: () {
                       setState(() {
-                        final item = _shorts[index];
                         item.isLiked = !item.isLiked;
                         item.likesCount += item.isLiked ? 1 : -1;
                       });
@@ -411,374 +222,302 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
             left: 0,
             right: 0,
             child: SafeArea(
-              child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Row(
-                    children: [
-                      if (widget.onBackToDeviceVideos != null)
-                        InkWell(
-                          onTap: widget.onBackToDeviceVideos,
-                          borderRadius: BorderRadius.circular(20),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.5),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: Colors.white24),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.arrow_back_ios_rounded, color: Colors.white, size: 12),
-                                const SizedBox(width: 4),
-                                Text(
-                                  lang.isHindi ? 'डिवाइस' : 'Device',
-                                  style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-                                ),
-                              ],
-                            ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Row(
+                  children: [
+                    if (widget.onBackToDeviceVideos != null)
+                      InkWell(
+                        onTap: widget.onBackToDeviceVideos,
+                        borderRadius: BorderRadius.circular(20),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.55),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: Colors.white24),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.arrow_back_ios_rounded, color: Colors.white, size: 12),
+                              const SizedBox(width: 4),
+                              Text(
+                                lang.isHindi ? 'डिवाइस' : 'Device',
+                                style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                              ),
+                            ],
                           ),
                         ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _isSearching
-                            ? Container(
-                                height: 38,
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withOpacity(0.7),
-                                  borderRadius: BorderRadius.circular(18),
-                                  border: Border.all(color: AppColors.accentCyan),
-                                ),
-                                child: TextField(
-                                  controller: _searchController,
-                                  autofocus: true,
-                                  style: const TextStyle(color: Colors.white, fontSize: 13),
-                                  decoration: InputDecoration(
-                                    hintText: lang.isHindi ? 'शॉर्ट्स खोजें (मारवाड़ी, डीजे, भक्ति)...' : 'Search any shorts...',
-                                    hintStyle: const TextStyle(color: Colors.white38, fontSize: 12),
-                                    prefixIcon: const Icon(Icons.search_rounded, color: AppColors.accentCyan, size: 18),
-                                    suffixIcon: IconButton(
-                                      icon: const Icon(Icons.close_rounded, color: Colors.white70, size: 16),
-                                      onPressed: () {
-                                        setState(() => _isSearching = false);
-                                        _loadShortsForCategory(_activeCategory);
-                                      },
-                                    ),
-                                    border: InputBorder.none,
-                                    contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                      ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _isSearching
+                          ? Container(
+                              height: 38,
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.75),
+                                borderRadius: BorderRadius.circular(18),
+                                border: Border.all(color: AppColors.accentCyan),
+                              ),
+                              child: TextField(
+                                controller: _searchController,
+                                autofocus: true,
+                                style: const TextStyle(color: Colors.white, fontSize: 13),
+                                decoration: InputDecoration(
+                                  hintText: lang.isHindi
+                                      ? 'शॉर्ट्स खोजें (बॉलीवुड, मारवाड़ी, डीजे)...'
+                                      : 'Search Indian Music shorts...',
+                                  hintStyle: const TextStyle(color: Colors.white38, fontSize: 12),
+                                  prefixIcon: const Icon(Icons.search_rounded, color: AppColors.accentCyan, size: 18),
+                                  suffixIcon: IconButton(
+                                    icon: const Icon(Icons.close_rounded, color: Colors.white70, size: 16),
+                                    onPressed: () {
+                                      setState(() => _isSearching = false);
+                                      _loadInitialFeed(_activeCategory);
+                                    },
                                   ),
-                                  onSubmitted: _performSearch,
+                                  border: InputBorder.none,
+                                  contentPadding: const EdgeInsets.symmetric(vertical: 8),
                                 ),
-                              )
-                            : SingleChildScrollView(
-                                scrollDirection: Axis.horizontal,
-                                child: Row(
-                                  children: _categories.map((cat) {
-                                    final isSelected = _activeCategory == cat['id'];
-                                    return Padding(
-                                      padding: const EdgeInsets.only(right: 6),
-                                      child: GestureDetector(
-                                        onTap: () {
-                                          setState(() => _activeCategory = cat['id']!);
-                                          _loadShortsForCategory(cat['id']!);
-                                        },
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                          decoration: BoxDecoration(
-                                            color: isSelected ? AppColors.accentCyan : Colors.black.withOpacity(0.55),
-                                            borderRadius: BorderRadius.circular(16),
-                                            border: Border.all(
-                                              color: isSelected ? AppColors.accentCyan : Colors.white24,
-                                            ),
+                                onSubmitted: _performSearch,
+                              ),
+                            )
+                          : SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Row(
+                                children: ShortsFeedService.categories.map((cat) {
+                                  final isSelected = _activeCategory == cat.id;
+                                  return Padding(
+                                    padding: const EdgeInsets.only(right: 6),
+                                    child: GestureDetector(
+                                      onTap: () {
+                                        setState(() => _activeCategory = cat.id);
+                                        _loadInitialFeed(cat.id);
+                                      },
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                        decoration: BoxDecoration(
+                                          color: isSelected ? AppColors.accentCyan : Colors.black.withOpacity(0.55),
+                                          borderRadius: BorderRadius.circular(16),
+                                          border: Border.all(
+                                            color: isSelected ? AppColors.accentCyan : Colors.white24,
                                           ),
-                                          child: Text(
-                                            lang.isHindi ? cat['hi']! : cat['en']!,
-                                            style: TextStyle(
-                                              color: isSelected ? Colors.black : Colors.white,
-                                              fontSize: 11,
-                                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                            ),
+                                        ),
+                                        child: Text(
+                                          lang.isHindi ? cat.labelHi : cat.labelEn,
+                                          style: TextStyle(
+                                            color: isSelected ? Colors.black : Colors.white,
+                                            fontSize: 11,
+                                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                                           ),
                                         ),
                                       ),
-                                    );
-                                  }).toList(),
-                                ),
+                                    ),
+                                  );
+                                }).toList(),
                               ),
+                            ),
+                    ),
+                    if (!_isSearching)
+                      IconButton(
+                        icon: const Icon(Icons.search_rounded, color: Colors.white, size: 22),
+                        onPressed: () => setState(() => _isSearching = true),
                       ),
-                      if (!_isSearching)
-                        IconButton(
-                          icon: const Icon(Icons.search_rounded, color: Colors.white, size: 22),
-                          onPressed: () => setState(() => _isSearching = true),
-                        ),
-                    ],
-                  ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
-        ),
         ],
       ),
     );
   }
 }
 
-class _ShortVideoPlayerCard extends StatefulWidget {
+/// Official Embedded YouTube Video Card (Sections 3, 5, 6)
+/// Renders official YouTube IFrame Player with native controls overlay.
+class _OfficialShortVideoCard extends StatefulWidget {
   final ShortVideoItem short;
   final bool isActive;
-  final VideoPlayerController? controller;
+  final YoutubePlayerController controller;
+  final ShortsPlayerController playbackController;
   final VoidCallback onLikeToggle;
   final VoidCallback onVideoCompleted;
 
-  const _ShortVideoPlayerCard({
+  const _OfficialShortVideoCard({
     Key? key,
     required this.short,
     required this.isActive,
-    this.controller,
+    required this.controller,
+    required this.playbackController,
     required this.onLikeToggle,
     required this.onVideoCompleted,
   }) : super(key: key);
 
   @override
-  State<_ShortVideoPlayerCard> createState() => _ShortVideoPlayerCardState();
+  State<_OfficialShortVideoCard> createState() => _OfficialShortVideoCardState();
 }
 
-class _ShortVideoPlayerCardState extends State<_ShortVideoPlayerCard> {
-  final ShortsService _shortsService = ShortsService();
+class _OfficialShortVideoCardState extends State<_OfficialShortVideoCard> {
   bool _isPlaying = true;
-  bool _isDownloading = false;
-  double _downloadProgress = 0.0;
-  bool _isWhatsAppStatusPending = false;
-  bool _hasTriggeredCompletion = false;
+  bool _showTransientPlayIcon = false;
 
   @override
   void initState() {
     super.initState();
-    _attachListener();
-    if (widget.isActive && widget.controller != null && widget.controller!.value.isInitialized) {
-      widget.controller!.play();
+    if (widget.isActive) {
+      widget.controller.playVideo();
       _isPlaying = true;
-      AppShareService.keepScreenOn(true);
     }
   }
 
   @override
-  void didUpdateWidget(covariant _ShortVideoPlayerCard oldWidget) {
+  void didUpdateWidget(covariant _OfficialShortVideoCard oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.controller != widget.controller) {
-      oldWidget.controller?.removeListener(_onControllerUpdate);
-      _attachListener();
-    }
-
     if (widget.isActive != oldWidget.isActive) {
       if (widget.isActive) {
-        _hasTriggeredCompletion = false;
-        if (widget.controller != null && widget.controller!.value.isInitialized) {
-          widget.controller!.seekTo(Duration.zero);
-          widget.controller!.play();
-          setState(() => _isPlaying = true);
-          AppShareService.keepScreenOn(true);
-        }
+        widget.controller.playVideo();
+        setState(() => _isPlaying = true);
       } else {
-        widget.controller?.pause();
+        widget.controller.pauseVideo();
         setState(() => _isPlaying = false);
-        AppShareService.keepScreenOn(false);
-      }
-    }
-  }
-
-  void _attachListener() {
-    widget.controller?.addListener(_onControllerUpdate);
-  }
-
-  @override
-  void dispose() {
-    widget.controller?.removeListener(_onControllerUpdate);
-    AppShareService.keepScreenOn(false);
-    super.dispose();
-  }
-
-  void _onControllerUpdate() {
-    if (!mounted || widget.controller == null || !widget.isActive) return;
-    final val = widget.controller!.value;
-    if (val.isInitialized && val.duration > Duration.zero) {
-      if (val.position >= val.duration) {
-        if (!_hasTriggeredCompletion) {
-          _hasTriggeredCompletion = true;
-          widget.onVideoCompleted();
-        }
       }
     }
   }
 
   void _togglePlayPause() {
-    final ctrl = widget.controller;
-    if (ctrl == null || !ctrl.value.isInitialized) return;
-
     setState(() {
-      if (ctrl.value.isPlaying) {
-        ctrl.pause();
-        _isPlaying = false; // Buttons & overlay become visible on pause!
-        AppShareService.keepScreenOn(false);
+      if (_isPlaying) {
+        widget.controller.pauseVideo();
+        _isPlaying = false;
       } else {
-        ctrl.play();
-        _isPlaying = true; // Buttons & overlay hide when video plays!
-        AppShareService.keepScreenOn(true);
+        widget.controller.playVideo();
+        _isPlaying = true;
       }
+      _showTransientPlayIcon = true;
+    });
+
+    Future.delayed(const Duration(milliseconds: 600), () {
+      if (mounted) setState(() => _showTransientPlayIcon = false);
     });
   }
 
-  Future<void> _handleDownload(BuildContext context) async {
-    if (_isDownloading) return;
-    final lang = LanguageService();
-    setState(() {
-      _isDownloading = true;
-      _downloadProgress = 0.0;
-    });
+  Future<void> _openInYouTube() async {
+    final uri = Uri.parse('https://www.youtube.com/shorts/${widget.short.id}');
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    } catch (_) {}
+  }
 
-    final path = await _shortsService.downloadShort(
-      widget.short,
-      onProgress: (p) {
-        if (mounted) setState(() => _downloadProgress = p);
-      },
+  Future<void> _handleShare() async {
+    await Share.share(
+      'Check out "${widget.short.title}" on YouTube Shorts: https://www.youtube.com/shorts/${widget.short.id}',
+      subject: widget.short.title,
     );
-
-    if (mounted) {
-      setState(() => _isDownloading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            path != null
-                ? (lang.isHindi ? 'वीडियो डाउनलोड हो गया! (गैलरी में सेव्ड)' : 'Video downloaded to storage!')
-                : (lang.isHindi ? 'डाउनलोड विफल रहा' : 'Download failed'),
-          ),
-          backgroundColor: path != null ? const Color(0xFF00E5FF) : Colors.redAccent,
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 2),
-        ),
-      );
-    }
   }
 
-  Future<void> _handleWhatsAppStatus(BuildContext context) async {
-    if (_isWhatsAppStatusPending) return;
+  void _showCommentsModal(BuildContext context) {
     final lang = LanguageService();
-
-    setState(() {
-      _isWhatsAppStatusPending = true;
-      _downloadProgress = 0.0;
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-            ),
-            const SizedBox(width: 12),
-            Text(lang.isHindi ? 'व्हाट्सएप स्टेटस तैयार हो रहा है...' : 'Preparing WhatsApp Status...'),
-          ],
-        ),
-        backgroundColor: const Color(0xFF25D366),
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 3),
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF131A2A),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-    );
-
-    final success = await _shortsService.shareToWhatsAppStatus(
-      widget.short,
-      onProgress: (p) {
-        if (mounted) setState(() => _downloadProgress = p);
-      },
-    );
-
-    if (mounted) {
-      setState(() => _isWhatsAppStatusPending = false);
-      if (!success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(lang.isHindi ? 'व्हाट्सएप नहीं मिला या स्टेटस नहीं लग सका' : 'Could not launch WhatsApp status'),
-            backgroundColor: Colors.redAccent,
-            behavior: SnackBarBehavior.floating,
+      builder: (ctx) {
+        return Container(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    lang.isHindi ? 'टिप्पणियाँ (Comments)' : 'Comments',
+                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  InkWell(
+                    onTap: _openInYouTube,
+                    child: Row(
+                      children: const [
+                        Icon(Icons.open_in_new_rounded, color: AppColors.accentCyan, size: 14),
+                        SizedBox(width: 4),
+                        Text(
+                          'YouTube',
+                          style: TextStyle(color: AppColors.accentCyan, fontSize: 12, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                lang.isHindi
+                    ? 'यह वीडियो आधिकारिक YouTube Shorts से स्ट्रीम हो रहा है। सभी टिप्पणियाँ देखने के लिए YouTube में खोलें।'
+                    : 'This video is officially streamed from YouTube Shorts. Open in YouTube to view or participate in comments.',
+                style: const TextStyle(color: Colors.white70, fontSize: 13),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _openInYouTube();
+                  },
+                  icon: const Icon(Icons.play_arrow_rounded, color: Colors.white),
+                  label: Text(lang.isHindi ? 'यूट्यूब ऐप में खोलें' : 'Open in YouTube App'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.redAccent,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+              ),
+            ],
           ),
         );
-      }
-    }
-  }
-
-  Future<void> _handleGeneralShare() async {
-    final path = widget.short.localPath;
-    if (path != null && File(path).existsSync()) {
-      await Share.shareXFiles([XFile(path)], text: widget.short.title);
-    } else {
-      final cached = await _shortsService.downloadShort(widget.short);
-      if (cached != null) {
-        await Share.shareXFiles([XFile(cached)], text: widget.short.title);
-      }
-    }
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final ctrl = widget.controller;
-    final isReady = ctrl != null && ctrl.value.isInitialized && !ctrl.value.hasError;
-    // Side buttons only appear when the video is paused by the user!
-    // When playing: pure, clean full-screen video with zero distractions.
-    final showControls = !_isPlaying && isReady;
-
     return GestureDetector(
       onTap: _togglePlayPause,
       behavior: HitTestBehavior.opaque,
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // 1. True Fit-To-Screen Video Player (Zero over-zoom, 100% full frame visible)
-          if (isReady)
-            Center(
-              child: AspectRatio(
-                aspectRatio: ctrl.value.aspectRatio > 0 ? ctrl.value.aspectRatio : (9 / 16),
-                child: VideoPlayer(ctrl),
-              ),
-            )
-          else
-            Stack(
-              fit: StackFit.expand,
-              children: [
-                if (widget.short.thumbnailUrl.isNotEmpty)
-                  Image.network(
-                    widget.short.thumbnailUrl,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(color: const Color(0xFF131A2A)),
-                  )
-                else
-                  Container(color: const Color(0xFF131A2A)),
-                const Center(
-                  child: CircularProgressIndicator(color: AppColors.accentCyan),
-                ),
-              ],
-            ),
-
-          // Buffering Indicator (Non-blocking cyan spinner if network is rebuffering during active playback)
-          if (isReady && ctrl.value.isBuffering)
-            const Center(
-              child: SizedBox(
-                width: 44,
-                height: 44,
-                child: CircularProgressIndicator(
-                  color: AppColors.accentCyan,
-                  strokeWidth: 3,
-                ),
+          // 1. Official YouTube IFrame Player (Section 2, 5)
+          Center(
+            child: AspectRatio(
+              aspectRatio: 9 / 16,
+              child: YoutubePlayer(
+                controller: widget.controller,
+                aspectRatio: 9 / 16,
               ),
             ),
+          ),
 
-          // 2. Center Animated Play/Pause Indicator (Shown when Paused)
-          if (showControls)
+          // 2. Play / Pause Transient Feedback Icon
+          if (_showTransientPlayIcon)
             Center(
               child: Container(
                 padding: const EdgeInsets.all(20),
@@ -787,168 +526,143 @@ class _ShortVideoPlayerCardState extends State<_ShortVideoPlayerCard> {
                   shape: BoxShape.circle,
                   border: Border.all(color: Colors.white24, width: 2),
                 ),
-                child: const Icon(Icons.pause_rounded, color: Colors.white, size: 54),
-              ),
-            ),
-
-          // 3. Subtle bottom video progress indicator
-          if (isReady)
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: VideoProgressIndicator(
-                ctrl,
-                allowScrubbing: true,
-                colors: const VideoProgressColors(
-                  playedColor: Color(0xFF00E5FF),
-                  bufferedColor: Colors.white24,
-                  backgroundColor: Colors.transparent,
+                child: Icon(
+                  _isPlaying ? Icons.play_arrow_rounded : Icons.pause_rounded,
+                  color: Colors.white,
+                  size: 54,
                 ),
               ),
             ),
 
-          // 4. Bottom Text Gradient Vignette (Fade-in on Pause)
+          // 3. Bottom Text Gradient Vignette
           Positioned(
             left: 0,
             right: 0,
             bottom: 0,
             height: 240,
-            child: AnimatedOpacity(
-              opacity: showControls ? 1.0 : 0.0,
-              duration: const Duration(milliseconds: 250),
-              child: IgnorePointer(
-                ignoring: !showControls,
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.bottomCenter,
-                      end: Alignment.topCenter,
-                      colors: [
-                        Colors.black.withOpacity(0.92),
-                        Colors.black.withOpacity(0.5),
-                        Colors.transparent,
-                      ],
-                    ),
+            child: IgnorePointer(
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
+                    colors: [
+                      Colors.black.withOpacity(0.92),
+                      Colors.black.withOpacity(0.5),
+                      Colors.transparent,
+                    ],
                   ),
                 ),
               ),
             ),
           ),
 
-          // 5. Left Bottom Video Title & Creator Handle (Fade-in on Pause)
+          // 4. Left Bottom Video Title & Creator Attribution (Section 6)
           Positioned(
             left: 16,
             bottom: 30,
             right: 86,
-            child: AnimatedOpacity(
-              opacity: showControls ? 1.0 : 0.0,
-              duration: const Duration(milliseconds: 250),
-              child: IgnorePointer(
-                ignoring: !showControls,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppColors.accentCyan.withOpacity(0.25),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.accentCyan.withOpacity(0.5)),
+                  ),
+                  child: Text(
+                    widget.short.category,
+                    style: const TextStyle(color: AppColors.accentCyan, fontSize: 10, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  widget.short.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    shadows: [Shadow(color: Colors.black, blurRadius: 4)],
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Row(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: AppColors.accentCyan.withOpacity(0.25),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppColors.accentCyan.withOpacity(0.5)),
-                      ),
+                    const Icon(Icons.music_note_rounded, color: AppColors.accentCyan, size: 14),
+                    const SizedBox(width: 4),
+                    Expanded(
                       child: Text(
-                        widget.short.category,
-                        style: const TextStyle(color: AppColors.accentCyan, fontSize: 10, fontWeight: FontWeight.bold),
+                        widget.short.author,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Colors.white70, fontSize: 12),
                       ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      widget.short.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        shadows: [Shadow(color: Colors.black, blurRadius: 4)],
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        const Icon(Icons.music_note_rounded, color: AppColors.accentCyan, size: 14),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            widget.short.author,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(color: Colors.white70, fontSize: 12),
-                          ),
-                        ),
-                      ],
                     ),
                   ],
                 ),
-              ),
+              ],
             ),
           ),
 
-          // 6. Right Floating Actions Column (Fade-in on Pause ONLY)
+          // 5. Right Floating Actions Column (Section 6)
           Positioned(
             right: 12,
             bottom: 30,
-            child: AnimatedOpacity(
-              opacity: showControls ? 1.0 : 0.0,
-              duration: const Duration(milliseconds: 250),
-              child: IgnorePointer(
-                ignoring: !showControls,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // 1. Like Button
-                    _buildActionItem(
-                      icon: widget.short.isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                      color: widget.short.isLiked ? Colors.redAccent : Colors.white,
-                      label: '${widget.short.likesCount}',
-                      onTap: widget.onLikeToggle,
-                    ),
-                    const SizedBox(height: 16),
-
-                    // 2. Download Button
-                    _buildActionItem(
-                      icon: _isDownloading
-                          ? Icons.downloading_rounded
-                          : (widget.short.isDownloaded ? Icons.check_circle_rounded : Icons.download_rounded),
-                      color: widget.short.isDownloaded ? AppColors.accentCyan : Colors.white,
-                      label: _isDownloading
-                          ? '${(_downloadProgress * 100).toInt()}%'
-                          : (widget.short.isDownloaded ? 'सेव्ड' : 'डाउनलोड'),
-                      onTap: () => _handleDownload(context),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // 3. WhatsApp Status Direct Button
-                    _buildActionItem(
-                      icon: Icons.chat_bubble_rounded,
-                      color: const Color(0xFF25D366), // WhatsApp brand green
-                      label: 'स्टेटस',
-                      onTap: () => _handleWhatsAppStatus(context),
-                      badge: 'WA',
-                    ),
-                    const SizedBox(height: 16),
-
-                    // 4. Share Button
-                    _buildActionItem(
-                      icon: Icons.share_rounded,
-                      color: Colors.white,
-                      label: 'शेयर',
-                      onTap: _handleGeneralShare,
-                    ),
-                  ],
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // 1. Like Button
+                _buildActionItem(
+                  icon: widget.short.isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                  color: widget.short.isLiked ? Colors.redAccent : Colors.white,
+                  label: '${widget.short.likesCount}',
+                  onTap: widget.onLikeToggle,
                 ),
-              ),
+                const SizedBox(height: 16),
+
+                // 2. Comments Button
+                _buildActionItem(
+                  icon: Icons.comment_rounded,
+                  color: Colors.white,
+                  label: 'टिप्पणी',
+                  onTap: () => _showCommentsModal(context),
+                ),
+                const SizedBox(height: 16),
+
+                // 3. Audio Mute Toggle
+                _buildActionItem(
+                  icon: widget.playbackController.isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+                  color: widget.playbackController.isMuted ? Colors.redAccent : Colors.white,
+                  label: widget.playbackController.isMuted ? 'म्यूट' : 'आवाज़',
+                  onTap: () {
+                    widget.playbackController.toggleMute();
+                    setState(() {});
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // 4. Open in YouTube Action (Section 6 & 12 Compliance)
+                _buildActionItem(
+                  icon: Icons.play_circle_fill_rounded,
+                  color: const Color(0xFFFF0000), // YouTube Red
+                  label: 'यूट्यूब',
+                  onTap: _openInYouTube,
+                ),
+                const SizedBox(height: 16),
+
+                // 5. Native Share Action
+                _buildActionItem(
+                  icon: Icons.share_rounded,
+                  color: Colors.white,
+                  label: 'शेयर',
+                  onTap: _handleShare,
+                ),
+              ],
             ),
           ),
         ],
@@ -961,41 +675,19 @@ class _ShortVideoPlayerCardState extends State<_ShortVideoPlayerCard> {
     required Color color,
     required String label,
     required VoidCallback onTap,
-    String? badge,
   }) {
     return GestureDetector(
       onTap: onTap,
       child: Column(
         children: [
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.4),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white12),
-                ),
-                child: Icon(icon, color: color, size: 26),
-              ),
-              if (badge != null)
-                Positioned(
-                  right: -2,
-                  top: -2,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF25D366),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      badge,
-                      style: const TextStyle(color: Colors.black, fontSize: 8, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ),
-            ],
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.5),
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white12),
+            ),
+            child: Icon(icon, color: color, size: 26),
           ),
           const SizedBox(height: 4),
           Text(

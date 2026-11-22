@@ -16,6 +16,9 @@ import 'package:msixa_player/screens/admin/admin_dashboard_screen.dart';
 import 'package:msixa_player/services/jiosaavn_service.dart';
 import 'package:msixa_player/models/short_video_item.dart';
 import 'package:msixa_player/services/shorts_service.dart';
+import 'package:msixa_player/services/shorts_feed_service.dart';
+import 'package:msixa_player/services/youtube_api_service.dart';
+import 'package:msixa_player/services/shorts_player_controller.dart';
 import 'package:msixa_player/services/app_share_service.dart';
 
 void main() {
@@ -669,6 +672,37 @@ void main() {
       await AppShareService.keepScreenOn(true);
       await AppShareService.keepScreenOn(false);
       expect(true, isTrue);
+    });
+
+    test('YouTubeApiService manages API keys and quota fallback state properly', () async {
+      final api = YouTubeApiService();
+      await api.setApiKey('test_yt_api_key_123');
+      final activeKey = await api.getApiKey();
+      expect(activeKey, 'test_yt_api_key_123');
+      expect(api.isQuotaExceeded, isFalse);
+    });
+
+    test('ShortsFeedService provides Indian music categories and deduplicated initial catalog', () {
+      final feedService = ShortsFeedService();
+      expect(ShortsFeedService.categories.length, greaterThanOrEqualTo(10));
+      expect(ShortsFeedService.categories.any((c) => c.id == 'Rajasthani'), isTrue);
+      expect(ShortsFeedService.categories.any((c) => c.id == 'Bollywood'), isTrue);
+      expect(ShortsFeedService.categories.any((c) => c.id == 'Punjabi'), isTrue);
+
+      final initial = feedService.getInitialShorts('Rajasthani');
+      expect(initial.isNotEmpty, isTrue);
+      expect(initial.first.id.isNotEmpty, isTrue);
+    });
+
+    test('ShortsPlayerController state model and mute toggle', () {
+      final controller = ShortsPlayerController();
+      expect(controller.activeIndex, 0);
+      expect(controller.isMuted, isFalse);
+      controller.toggleMute();
+      expect(controller.isMuted, isTrue);
+      controller.toggleMute();
+      expect(controller.isMuted, isFalse);
+      controller.dispose();
     });
   });
 
