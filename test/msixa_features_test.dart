@@ -724,6 +724,11 @@ void main() {
       instance.mute();
       instance.unMute();
       instance.dispose();
+
+      controller.clearAll();
+      expect(controller.activeIndex, 0);
+      expect(controller.activeController, isNull);
+
       controller.dispose();
     });
 

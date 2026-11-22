@@ -80,7 +80,7 @@ class ShortsPlaybackInstance {
 typedef ShortsIFrameInstance = ShortsPlaybackInstance;
 
 /// Controller managing native VideoPlayerController instances,
-/// bounded 3-player sliding-window pooling, active video transitions, and lifecycle cleanup.
+/// sliding-window pre-buffering pipeline, zero-latency transitions, and lifecycle cleanup.
 class ShortsPlayerController extends ChangeNotifier {
   final ShortsService _shortsService = ShortsService();
   final Map<int, ShortsPlaybackInstance> _controllers = {};
@@ -219,7 +219,7 @@ class ShortsPlayerController extends ChangeNotifier {
     }
   }
 
-  /// Single Active Player Transition on Swipe
+  /// Single Active Player Transition on Swipe with Dual Pre-Buffering Pipeline
   void onPageChanged({
     required int newIndex,
     required List<ShortVideoItem> items,
@@ -237,7 +237,7 @@ class ShortsPlayerController extends ChangeNotifier {
       } catch (_) {}
     }
 
-    // 2. Play the active video immediately
+    // 2. Play active video immediately
     if (newIndex >= 0 && newIndex < items.length) {
       final ctrl = getOrCreateController(
         index: newIndex,
@@ -250,17 +250,37 @@ class ShortsPlayerController extends ChangeNotifier {
       } catch (_) {}
     }
 
-    // 3. Pre-warm the NEXT video (+1) for zero startup delay on swipe
-    final nextIndex = newIndex + 1;
-    if (nextIndex < items.length) {
+    // 3. Pre-warm NEXT 2 videos (+1, +2) for INSTANT zero-buffering playback on swipe
+    final nextIndex1 = newIndex + 1;
+    if (nextIndex1 < items.length) {
       getOrCreateController(
-        index: nextIndex,
-        item: items[nextIndex],
+        index: nextIndex1,
+        item: items[nextIndex1],
+        autoPlay: false,
+      );
+    }
+    final nextIndex2 = newIndex + 2;
+    if (nextIndex2 < items.length) {
+      getOrCreateController(
+        index: nextIndex2,
+        item: items[nextIndex2],
         autoPlay: false,
       );
     }
 
-    // 4. Memory Cleanup: Strictly keep only [newIndex - 1, newIndex, newIndex + 1]
+    // 4. Background Stream URL Pre-resolution for upcoming items
+    final prewarmIds = <String>[];
+    for (int i = 1; i <= 3; i++) {
+      final idx = newIndex + i;
+      if (idx < items.length) {
+        prewarmIds.add(items[idx].id);
+      }
+    }
+    if (prewarmIds.isNotEmpty) {
+      _shortsService.prewarmStreamUrls(prewarmIds);
+    }
+
+    // 5. Memory Cleanup: Keep window [newIndex - 1, newIndex, newIndex + 1, newIndex + 2]
     _cleanupDistantControllers(newIndex);
 
     notifyListeners();
@@ -268,7 +288,7 @@ class ShortsPlayerController extends ChangeNotifier {
 
   /// Disposes controllers out of the sliding window to prevent hardware decoder exhaustion
   void _cleanupDistantControllers(int centerIndex) {
-    final keysToRemove = _controllers.keys.where((k) => (k - centerIndex).abs() > 1).toList();
+    final keysToRemove = _controllers.keys.where((k) => (k - centerIndex).abs() > 2).toList();
     for (final k in keysToRemove) {
       try {
         _controllers[k]?.dispose();
@@ -276,6 +296,20 @@ class ShortsPlayerController extends ChangeNotifier {
         _states.remove(k);
       } catch (_) {}
     }
+  }
+
+  /// Clears all player instances on pull-to-refresh or category switch
+  void clearAll() {
+    for (final ctrl in _controllers.values) {
+      try {
+        ctrl.dispose();
+      } catch (_) {}
+    }
+    _controllers.clear();
+    _states.clear();
+    _loadingIndices.clear();
+    _activeIndex = 0;
+    notifyListeners();
   }
 
   /// Toggles play / pause on the active video

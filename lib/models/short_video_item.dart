@@ -12,11 +12,14 @@ class ShortVideoItem {
   bool isDownloaded;
   String? localPath;
 
+  String? get videoUrl => streamUrl;
+
   ShortVideoItem({
     required this.id,
     required this.title,
     required this.author,
-    this.streamUrl,
+    String? streamUrl,
+    String? videoUrl,
     required this.thumbnailUrl,
     this.duration = const Duration(seconds: 30),
     this.category = 'Trending',
@@ -25,13 +28,14 @@ class ShortVideoItem {
     this.shareCount = 350,
     this.isDownloaded = false,
     this.localPath,
-  });
+  }) : streamUrl = streamUrl ?? videoUrl;
 
   ShortVideoItem copyWith({
     String? id,
     String? title,
     String? author,
     String? streamUrl,
+    String? videoUrl,
     String? thumbnailUrl,
     Duration? duration,
     String? category,
@@ -45,7 +49,7 @@ class ShortVideoItem {
       id: id ?? this.id,
       title: title ?? this.title,
       author: author ?? this.author,
-      streamUrl: streamUrl ?? this.streamUrl,
+      streamUrl: streamUrl ?? videoUrl ?? this.streamUrl,
       thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
       duration: duration ?? this.duration,
       category: category ?? this.category,
@@ -77,7 +81,7 @@ class ShortVideoItem {
       id: json['id'] as String? ?? '',
       title: json['title'] as String? ?? 'Shorts Video',
       author: json['author'] as String? ?? 'Msixa Creator',
-      streamUrl: json['streamUrl'] as String?,
+      streamUrl: (json['streamUrl'] ?? json['videoUrl']) as String?,
       thumbnailUrl: json['thumbnailUrl'] as String? ?? '',
       duration: Duration(milliseconds: json['durationMs'] as int? ?? 30000),
       category: json['category'] as String? ?? 'Trending',

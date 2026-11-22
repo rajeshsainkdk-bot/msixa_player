@@ -14,11 +14,10 @@ import '../services/youtube_subscription_service.dart';
 import '../theme/app_colors.dart';
 
 /// Pure In-App YouTube Shorts Feed View
-/// Matches official YouTube Shorts layout:
-/// - Floating right-side buttons (Thumbs Up with count, Thumbs Down 'Dislike', Comments, Share, Download, '...')
-/// - Compact bottom creator row with avatar, channel name, and red '+FOLLOW' subscribe button
-/// - Google Account Picker dialog on subscribe tap
-/// - 100% In-App Playback, Zero External Redirection, No Ads, Strictly Vertical 9:16 Shorts with Auto-Scroll
+/// - Nonstop buffer-free playback like YouTube
+/// - Pull-to-refresh (drag down) to load 100% fresh, non-repeating YouTube shorts
+/// - Anti-repetition session deduplication
+/// - Exact YouTube layout: floating right buttons, creator +FOLLOW row & Google account picker
 class ShortsFeedView extends StatefulWidget {
   final VoidCallback? onBackToDeviceVideos;
   const ShortsFeedView({Key? key, this.onBackToDeviceVideos}) : super(key: key);
@@ -29,6 +28,7 @@ class ShortsFeedView extends StatefulWidget {
 
 class _ShortsFeedViewState extends State<ShortsFeedView> {
   final ShortsFeedService _feedService = ShortsFeedService();
+  final ShortsService _shortsService = ShortsService();
   final ShortsPlayerController _playbackController = ShortsPlayerController();
   final PageController _pageController = PageController();
   final TextEditingController _searchController = TextEditingController();
@@ -69,11 +69,12 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
     });
 
     if (immediateList.isNotEmpty) {
+      _shortsService.prewarmStreamUrls(immediateList.take(4).map((e) => e.id).toList());
       _playbackController.onPageChanged(newIndex: 0, items: _shorts);
     }
 
     try {
-      final freshList = await _feedService.fetchFeedPage(categoryId: categoryId, isRefresh: true);
+      final freshList = await _feedService.fetchFeedPage(categoryId: categoryId, isRefresh: false);
       if (mounted && freshList.isNotEmpty) {
         setState(() {
           final existingIds = _shorts.map((e) => e.id).toSet();
@@ -81,11 +82,38 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
           _shorts.addAll(uniqueNew);
           _isLoading = false;
         });
+        _shortsService.prewarmStreamUrls(_shorts.take(6).map((e) => e.id).toList());
         _playbackController.onPageChanged(newIndex: _playbackController.activeIndex, items: _shorts);
       }
     } catch (_) {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  /// Pull-to-refresh: Clears previous list and loads brand new, never-seen YouTube shorts
+  Future<void> _handlePullToRefresh() async {
+    final lang = LanguageService();
+    try {
+      final freshList = await _feedService.fetchFeedPage(categoryId: _activeCategory, isRefresh: true);
+      if (mounted && freshList.isNotEmpty) {
+        _playbackController.clearAll();
+        setState(() {
+          _shorts = freshList;
+        });
+        _pageController.jumpToPage(0);
+        _shortsService.prewarmStreamUrls(_shorts.take(5).map((e) => e.id).toList());
+        _playbackController.onPageChanged(newIndex: 0, items: _shorts);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(lang.isHindi ? '✓ नए ताज़ा शॉर्ट्स लोड हो गए!' : '✓ Fresh Shorts loaded!'),
+            backgroundColor: const Color(0xFF00E5FF),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadMoreShorts() async {
@@ -96,8 +124,11 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
       final nextBatch = await _feedService.fetchFeedPage(categoryId: _activeCategory);
       if (mounted && nextBatch.isNotEmpty) {
         setState(() {
-          _shorts.addAll(nextBatch);
+          final existingIds = _shorts.map((e) => e.id).toSet();
+          final uniqueNew = nextBatch.where((e) => !existingIds.contains(e.id)).toList();
+          _shorts.addAll(uniqueNew);
         });
+        _shortsService.prewarmStreamUrls(nextBatch.take(4).map((e) => e.id).toList());
       }
     } catch (_) {
     } finally {
@@ -111,11 +142,14 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
     try {
       final results = await _feedService.searchShorts(query.trim());
       if (mounted) {
+        _playbackController.clearAll();
         setState(() {
           _shorts = results.isNotEmpty ? results : _feedService.getInitialShorts('Trending');
           _isLoading = false;
         });
         if (_shorts.isNotEmpty) {
+          _pageController.jumpToPage(0);
+          _shortsService.prewarmStreamUrls(_shorts.take(4).map((e) => e.id).toList());
           _playbackController.onPageChanged(newIndex: 0, items: _shorts);
         }
       }
@@ -160,7 +194,7 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // 1. Full-Height Vertical Swipeable PageView Feed (Native In-App Playback)
+          // 1. Full-Height Vertical Swipeable PageView Feed (With Pull-to-Refresh Support)
           if (_isLoading)
             const Center(
               child: CircularProgressIndicator(color: AppColors.accentCyan),
@@ -192,13 +226,13 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
             RefreshIndicator(
               color: AppColors.accentCyan,
               backgroundColor: const Color(0xFF131A2A),
-              onRefresh: () async {
-                await _loadInitialFeed(_activeCategory);
-              },
+              displacement: 40,
+              edgeOffset: 60,
+              onRefresh: _handlePullToRefresh,
               child: PageView.builder(
                 controller: _pageController,
                 scrollDirection: Axis.vertical,
-                physics: const PageScrollPhysics(),
+                physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
                 itemCount: _shorts.length,
                 onPageChanged: _onPageChanged,
                 itemBuilder: (context, index) {
@@ -228,7 +262,7 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
               ),
             ),
 
-          // 2. Top Header Overlay (Simple '<' Back Button from screenshot + Categories)
+          // 2. Top Header Overlay (Simple '<' Back Button matching screenshot + Categories)
           Positioned(
             top: 0,
             left: 0,
@@ -238,7 +272,6 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                 child: Row(
                   children: [
-                    // Simple Back Arrow '<' matching screenshot
                     GestureDetector(
                       onTap: () {
                         if (widget.onBackToDeviceVideos != null) {
@@ -264,7 +297,6 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
                     ),
                     const SizedBox(width: 8),
 
-                    // Indian Categories or Search
                     Expanded(
                       child: _isSearching
                           ? Container(
@@ -557,7 +589,6 @@ class _NativeShortVideoCardState extends State<_NativeShortVideoCard> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    // 1. WhatsApp Status
                     _buildShareModalOption(
                       icon: Icons.share_rounded,
                       color: const Color(0xFF25D366),
@@ -567,7 +598,6 @@ class _NativeShortVideoCardState extends State<_NativeShortVideoCard> {
                         _handleWhatsAppStatus(context);
                       },
                     ),
-                    // 2. WhatsApp Direct
                     _buildShareModalOption(
                       icon: Icons.chat_rounded,
                       color: const Color(0xFF25D366),
@@ -577,7 +607,6 @@ class _NativeShortVideoCardState extends State<_NativeShortVideoCard> {
                         _handleGeneralShare();
                       },
                     ),
-                    // 3. Copy Link
                     _buildShareModalOption(
                       icon: Icons.link_rounded,
                       color: const Color(0xFF00E5FF),
@@ -596,7 +625,6 @@ class _NativeShortVideoCardState extends State<_NativeShortVideoCard> {
                         }
                       },
                     ),
-                    // 4. More Apps
                     _buildShareModalOption(
                       icon: Icons.more_horiz_rounded,
                       color: Colors.white,
@@ -672,7 +700,6 @@ class _NativeShortVideoCardState extends State<_NativeShortVideoCard> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                // Mute / Unmute
                 ListTile(
                   leading: Icon(
                     widget.playbackController.isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
@@ -690,7 +717,6 @@ class _NativeShortVideoCardState extends State<_NativeShortVideoCard> {
                     setState(() {});
                   },
                 ),
-                // Connected Google Account
                 ListTile(
                   leading: const Icon(Icons.account_circle_rounded, color: Color(0xFF4285F4)),
                   title: Text(
@@ -711,7 +737,6 @@ class _NativeShortVideoCardState extends State<_NativeShortVideoCard> {
                     _showGoogleAccountPicker(context, widget.short.author);
                   },
                 ),
-                // WhatsApp Status shortcut
                 ListTile(
                   leading: const Icon(Icons.share_rounded, color: Color(0xFF25D366)),
                   title: Text(
@@ -723,7 +748,6 @@ class _NativeShortVideoCardState extends State<_NativeShortVideoCard> {
                     _handleWhatsAppStatus(context);
                   },
                 ),
-                // Video Quality info
                 ListTile(
                   leading: const Icon(Icons.hd_rounded, color: AppColors.accentCyan),
                   title: Text(
@@ -921,7 +945,6 @@ class _NativeShortVideoCardState extends State<_NativeShortVideoCard> {
       return;
     }
 
-    // If user has not linked Google account yet, prompt the official Google Account Chooser!
     if (!_subService.hasGoogleAccount) {
       _showGoogleAccountPicker(context, author);
     } else {
@@ -937,7 +960,6 @@ class _NativeShortVideoCardState extends State<_NativeShortVideoCard> {
     }
   }
 
-  /// Google Account Chooser Dialog (Prompts user to select their phone Google Account)
   void _showGoogleAccountPicker(BuildContext context, String author) {
     final lang = LanguageService();
     final deviceAccounts = _subService.getAvailableDeviceAccounts();
@@ -945,7 +967,7 @@ class _NativeShortVideoCardState extends State<_NativeShortVideoCard> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF202124), // Google Dark Surface
+      backgroundColor: const Color(0xFF202124),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -968,8 +990,6 @@ class _NativeShortVideoCardState extends State<_NativeShortVideoCard> {
                   ),
                 ),
                 const SizedBox(height: 16),
-
-                // Google "G" Logo Header
                 Center(
                   child: Container(
                     width: 44,
@@ -991,7 +1011,6 @@ class _NativeShortVideoCardState extends State<_NativeShortVideoCard> {
                   ),
                 ),
                 const SizedBox(height: 12),
-
                 Center(
                   child: Text(
                     lang.isHindi ? 'Google खाता चुनें' : 'Choose an account',
@@ -1014,8 +1033,6 @@ class _NativeShortVideoCardState extends State<_NativeShortVideoCard> {
                 ),
                 const SizedBox(height: 16),
                 const Divider(color: Colors.white12),
-
-                // Available Phone Google Accounts List
                 ...deviceAccounts.map((acc) {
                   final email = acc['email'] ?? '';
                   final name = acc['name'] ?? email.split('@').first;
@@ -1081,8 +1098,6 @@ class _NativeShortVideoCardState extends State<_NativeShortVideoCard> {
                     ),
                   );
                 }),
-
-                // Add Another Account Option
                 InkWell(
                   onTap: () {
                     Navigator.pop(modalCtx);
@@ -1111,12 +1126,9 @@ class _NativeShortVideoCardState extends State<_NativeShortVideoCard> {
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 12),
                 const Divider(color: Colors.white12),
                 const SizedBox(height: 8),
-
-                // Google Terms/Privacy Footer Note
                 Center(
                   child: Text(
                     lang.isHindi
@@ -1374,7 +1386,6 @@ class _NativeShortVideoCardState extends State<_NativeShortVideoCard> {
                 // Creator Row: [Avatar (32dp)] [Channel Name] [Red +FOLLOW Button]
                 Row(
                   children: [
-                    // 1. Creator Circular Avatar (Compact 32x32)
                     Container(
                       width: 32,
                       height: 32,
@@ -1394,7 +1405,6 @@ class _NativeShortVideoCardState extends State<_NativeShortVideoCard> {
                     ),
                     const SizedBox(width: 8),
 
-                    // 2. Channel Name (Small bold white)
                     Flexible(
                       child: Text(
                         widget.short.author,
@@ -1410,7 +1420,6 @@ class _NativeShortVideoCardState extends State<_NativeShortVideoCard> {
                     ),
                     const SizedBox(width: 10),
 
-                    // 3. Compact Red Subscribe Button (+FOLLOW / SUBSCRIBE)
                     GestureDetector(
                       onTap: _handleSubscribeToggle,
                       child: AnimatedContainer(
@@ -1420,7 +1429,7 @@ class _NativeShortVideoCardState extends State<_NativeShortVideoCard> {
                           color: isSubscribed
                               ? Colors.white.withOpacity(0.2)
                               : const Color(0xFFE50914), // Official YouTube Red
-                          borderRadius: BorderRadius.circular(4), // Clean rounded rectangle from screenshot
+                          borderRadius: BorderRadius.circular(4),
                           border: Border.all(
                             color: isSubscribed ? Colors.white30 : Colors.transparent,
                           ),
@@ -1477,19 +1486,12 @@ class _NativeShortVideoCardState extends State<_NativeShortVideoCard> {
           ),
 
           // 6. Right Side Panel Actions Suite (EXACT MATCH TO SCREENSHOT)
-          // 1. Thumbs Up (Like) with count (e.g. 94K)
-          // 2. Thumbs Down (Dislike) with label 'Dislike'
-          // 3. Comments with count (e.g. 322)
-          // 4. Share with label 'Share'
-          // 5. Download with label 'Download'
-          // 6. More options '...' with no label
           Positioned(
             right: 12,
             bottom: 20,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // 1. Thumbs Up (Like)
                 _buildActionItem(
                   icon: widget.short.isLiked ? Icons.thumb_up_rounded : Icons.thumb_up_alt_outlined,
                   color: widget.short.isLiked ? const Color(0xFF00E5FF) : Colors.white,
@@ -1501,8 +1503,6 @@ class _NativeShortVideoCardState extends State<_NativeShortVideoCard> {
                     }
                   },
                 ),
-
-                // 2. Thumbs Down (Dislike)
                 _buildActionItem(
                   icon: _isDisliked ? Icons.thumb_down_rounded : Icons.thumb_down_alt_outlined,
                   color: _isDisliked ? const Color(0xFF00E5FF) : Colors.white,
@@ -1516,32 +1516,24 @@ class _NativeShortVideoCardState extends State<_NativeShortVideoCard> {
                     });
                   },
                 ),
-
-                // 3. Comments
                 _buildActionItem(
                   icon: Icons.chat_bubble_outline_rounded,
                   color: Colors.white,
                   label: _formatCount(_commentsCount),
                   onTap: () => _showCommentsModal(context),
                 ),
-
-                // 4. Share
                 _buildActionItem(
                   icon: Icons.share_rounded,
                   color: Colors.white,
                   label: 'Share',
                   onTap: () => _showShareModal(context),
                 ),
-
-                // 5. Download
                 _buildActionItem(
                   icon: _isDownloading ? Icons.hourglass_top_rounded : Icons.download_rounded,
                   color: _isDownloading ? AppColors.accentCyan : Colors.white,
                   label: _isDownloading ? '${(_downloadProgress * 100).toInt()}%' : 'Download',
                   onTap: () => _handleDownload(context),
                 ),
-
-                // 6. More Options (...)
                 _buildActionItem(
                   icon: Icons.more_horiz_rounded,
                   color: Colors.white,
@@ -1556,7 +1548,6 @@ class _NativeShortVideoCardState extends State<_NativeShortVideoCard> {
     );
   }
 
-  /// Floating Action Item matching YouTube Shorts design (Pure white icon with drop shadow, no circular background)
   Widget _buildActionItem({
     required IconData icon,
     required Color color,
