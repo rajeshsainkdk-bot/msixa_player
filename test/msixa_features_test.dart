@@ -704,6 +704,27 @@ void main() {
       expect(controller.isMuted, isFalse);
       controller.dispose();
     });
+
+    test('ShortsPlayerController getOrCreateController gracefully creates safe instance in headless tests', () {
+      final controller = ShortsPlayerController();
+      final item = ShortVideoItem(
+        id: 'dQw4w9WgXcQ',
+        title: 'Test Short',
+        author: 'Artist',
+        videoUrl: 'https://example.com/video.mp4',
+        thumbnailUrl: 'https://example.com/thumb.jpg',
+        category: 'Bollywood',
+      );
+      final instance = controller.getOrCreateController(index: 0, item: item, autoPlay: false);
+      expect(instance.index, 0);
+      expect(instance.item.id, 'dQw4w9WgXcQ');
+      instance.playVideo();
+      instance.pauseVideo();
+      instance.mute();
+      instance.unMute();
+      instance.dispose();
+      controller.dispose();
+    });
   });
 
   group('17. App Instant Startup & Blink-Free Transition Tests', () {

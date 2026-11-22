@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:youtube_player_iframe/youtube_player_iframe.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 import '../models/short_video_item.dart';
 import '../services/app_share_service.dart';
 import '../services/language_service.dart';
@@ -36,6 +36,9 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
   void initState() {
     super.initState();
     AppShareService.keepScreenOn(true);
+    _playbackController.onVideoEnded = (index) {
+      _onVideoCompleted(index);
+    };
     _loadInitialFeed(_activeCategory);
   }
 
@@ -339,7 +342,7 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
 class _OfficialShortVideoCard extends StatefulWidget {
   final ShortVideoItem short;
   final bool isActive;
-  final YoutubePlayerController controller;
+  final ShortsIFrameInstance controller;
   final ShortsPlayerController playbackController;
   final VoidCallback onLikeToggle;
   final VoidCallback onVideoCompleted;
@@ -509,12 +512,55 @@ class _OfficialShortVideoCardState extends State<_OfficialShortVideoCard> {
           Center(
             child: AspectRatio(
               aspectRatio: 9 / 16,
-              child: YoutubePlayer(
-                controller: widget.controller,
-                aspectRatio: 9 / 16,
-              ),
+              child: widget.controller.webViewController != null
+                  ? IgnorePointer(
+                      ignoring: true,
+                      child: WebViewWidget(
+                        controller: widget.controller.webViewController!,
+                      ),
+                    )
+                  : Container(color: Colors.black),
             ),
           ),
+
+          // Buffering Indicator
+          if (widget.controller.state == ShortsPlaybackState.buffering ||
+              widget.controller.state == ShortsPlaybackState.initializing)
+            const Center(
+              child: CircularProgressIndicator(
+                color: AppColors.accentCyan,
+                strokeWidth: 2.5,
+              ),
+            ),
+
+          // Error and Retry State
+          if (widget.controller.state == ShortsPlaybackState.error)
+            Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.error_outline_rounded, color: Colors.white54, size: 40),
+                  const SizedBox(height: 8),
+                  Text(
+                    LanguageService().isHindi
+                        ? 'वीडियो लोड करने में समस्या हुई'
+                        : 'Unable to load video',
+                    style: const TextStyle(color: Colors.white70, fontSize: 13),
+                  ),
+                  const SizedBox(height: 12),
+                  ElevatedButton.icon(
+                    onPressed: _openInYouTube,
+                    icon: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 16),
+                    label: Text(LanguageService().isHindi ? 'यूट्यूब पर देखें' : 'Watch on YouTube'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.redAccent,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    ),
+                  ),
+                ],
+              ),
+            ),
 
           // 2. Play / Pause Transient Feedback Icon
           if (_showTransientPlayIcon)
