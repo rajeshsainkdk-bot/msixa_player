@@ -163,24 +163,10 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
     _controller.loadRequest(Uri.parse(freshUrl));
   }
 
-  /// Re-click on bottom nav Shorts icon: smoothly scrolls to next short or reloads fresh session
+  /// Re-click on bottom nav Shorts icon: directly reloads fresh shorts link
   void _handleReclickRefresh() {
     if (!mounted) return;
-
-    // Trigger next short scroll in YouTube Shorts carousel
-    _controller.runJavaScript('''
-      (function() {
-        try {
-          window.scrollBy({ top: window.innerHeight, behavior: 'smooth' });
-          var nextBtn = document.querySelector('button[aria-label*="Next"]') ||
-                        document.querySelector('button[aria-label*="next"]') ||
-                        document.querySelector('.ytp-next-button');
-          if (nextBtn) nextBtn.click();
-        } catch(e) {}
-      })();
-    ''').catchError((_) {
-      _loadFreshShorts();
-    });
+    _loadFreshShorts();
   }
 
   /// Pull-down to refresh: reloads fresh online shorts link
