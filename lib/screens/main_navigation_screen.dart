@@ -152,75 +152,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
                       icon: const Icon(Icons.video_library_rounded),
                       label: lang.t('nav_videos'),
                     ),
-                    // Center Highlighted Unique Neon Shorts Button
+                    // Center Highlighted Round Circular Shorts Button with Continuous Running Rainbow Neon Border Lighting
                     BottomNavigationBarItem(
-                      icon: Container(
-                        margin: const EdgeInsets.only(top: 2),
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFFFF007A), Color(0xFFFF8C00)], // Neon Magenta to Amber Glow
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFFFF007A).withOpacity(0.55),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.bolt_rounded, color: Colors.white, size: 16),
-                            SizedBox(width: 2),
-                            Text(
-                              'SHORTS',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      activeIcon: Container(
-                        margin: const EdgeInsets.only(top: 2),
-                        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 4),
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFFFF007A), Color(0xFFFF8C00)],
-                          ),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: Colors.white, width: 1.5),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFFFF007A).withOpacity(0.85),
-                              blurRadius: 12,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.bolt_rounded, color: Colors.white, size: 17),
-                            SizedBox(width: 2),
-                            Text(
-                              'SHORTS',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                      icon: const _RainbowGlowingCircularShortsButton(isSelected: false),
+                      activeIcon: const _RainbowGlowingCircularShortsButton(isSelected: true),
                       label: '',
                     ),
                     BottomNavigationBarItem(
@@ -238,4 +173,107 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
           },
         );
       }
+}
+
+/// Circular Round Shorts Nav Button with Continuous Rotating Colorful Rainbow Neon Lighting Border
+class _RainbowGlowingCircularShortsButton extends StatefulWidget {
+  final bool isSelected;
+  const _RainbowGlowingCircularShortsButton({Key? key, required this.isSelected}) : super(key: key);
+
+  @override
+  State<_RainbowGlowingCircularShortsButton> createState() => _RainbowGlowingCircularShortsButtonState();
+}
+
+class _RainbowGlowingCircularShortsButtonState extends State<_RainbowGlowingCircularShortsButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 3),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        final angle = _controller.value * 2 * 3.1415926535;
+        return Container(
+          width: 46,
+          height: 46,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFFF007A).withOpacity(widget.isSelected ? 0.65 : 0.35),
+                blurRadius: widget.isSelected ? 14 : 8,
+                spreadRadius: widget.isSelected ? 2 : 1,
+              ),
+              BoxShadow(
+                color: const Color(0xFF00E5FF).withOpacity(widget.isSelected ? 0.45 : 0.25),
+                blurRadius: widget.isSelected ? 12 : 6,
+                spreadRadius: 1,
+              ),
+            ],
+            gradient: SweepGradient(
+              startAngle: 0.0,
+              endAngle: 6.2831853,
+              transform: GradientRotation(angle),
+              colors: const [
+                Color(0xFFFF007A), // Hot Pink
+                Color(0xFFFF8C00), // Amber Orange
+                Color(0xFFFFD700), // Gold
+                Color(0xFF00E5FF), // Cyan
+                Color(0xFF7C3AED), // Purple
+                Color(0xFFFF007A), // Back to Pink
+              ],
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(2.5), // Rotating colorful border width
+            child: Container(
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Color(0xFF0B0F19), // Dark core
+              ),
+              child: Center(
+                child: Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: widget.isSelected
+                          ? [const Color(0xFFFF007A), const Color(0xFFFF8C00)]
+                          : [const Color(0xFF2A1535), const Color(0xFF16253D)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.bolt_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 }

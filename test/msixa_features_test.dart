@@ -20,6 +20,7 @@ import 'package:msixa_player/services/shorts_feed_service.dart';
 import 'package:msixa_player/services/youtube_api_service.dart';
 import 'package:msixa_player/services/shorts_player_controller.dart';
 import 'package:msixa_player/services/app_share_service.dart';
+import 'package:msixa_player/services/youtube_subscription_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -724,6 +725,19 @@ void main() {
       instance.unMute();
       instance.dispose();
       controller.dispose();
+    });
+
+    test('YouTubeSubscriptionService handles Google account and subscription toggles', () async {
+      final sub = YouTubeSubscriptionService();
+      await sub.init();
+      expect(sub.isSubscribed('UnknownArtist'), isFalse);
+      final subscribed = await sub.toggleSubscribe('MarwadiFolk', defaultEmail: 'user@gmail.com');
+      expect(subscribed, isTrue);
+      expect(sub.isSubscribed('MarwadiFolk'), isTrue);
+      expect(sub.hasGoogleAccount, isTrue);
+      final unsubscribed = await sub.toggleSubscribe('MarwadiFolk');
+      expect(unsubscribed, isFalse);
+      expect(sub.isSubscribed('MarwadiFolk'), isFalse);
     });
   });
 

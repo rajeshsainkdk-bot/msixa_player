@@ -1,11 +1,10 @@
-import 'dart:convert';
+import 'dart:async';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
-import 'package:webview_flutter/webview_flutter.dart';
-import 'package:webview_flutter_android/webview_flutter_android.dart';
+import 'package:video_player/video_player.dart';
 import '../models/short_video_item.dart';
+import 'shorts_service.dart';
 
-/// Official Player Lifecycle State Model (Section 9)
+/// Official Player Lifecycle State Model
 enum ShortsPlaybackState {
   idle,
   initializing,
@@ -18,69 +17,75 @@ enum ShortsPlaybackState {
   autoplayBlocked,
 }
 
-/// Represents an individual official YouTube IFrame Player instance
-class ShortsIFrameInstance {
+/// Represents an individual native in-app Short Video Player instance
+class ShortsPlaybackInstance {
   final int index;
   final ShortVideoItem item;
-  final WebViewController? webViewController;
+  VideoPlayerController? videoPlayerController;
   ShortsPlaybackState state;
 
-  ShortsIFrameInstance({
+  ShortsPlaybackInstance({
     required this.index,
     required this.item,
-    this.webViewController,
+    this.videoPlayerController,
     this.state = ShortsPlaybackState.initializing,
   });
 
-  factory ShortsIFrameInstance.dummy({
+  factory ShortsPlaybackInstance.dummy({
     required int index,
     required ShortVideoItem item,
   }) {
-    return ShortsIFrameInstance(
+    return ShortsPlaybackInstance(
       index: index,
       item: item,
-      webViewController: null,
+      videoPlayerController: null,
       state: ShortsPlaybackState.ready,
     );
   }
 
   void playVideo() {
     try {
-      webViewController?.runJavaScript('if(window.playVideo) playVideo();');
+      videoPlayerController?.play();
     } catch (_) {}
   }
 
   void pauseVideo() {
     try {
-      webViewController?.runJavaScript('if(window.pauseVideo) pauseVideo();');
+      videoPlayerController?.pause();
     } catch (_) {}
   }
 
   void mute() {
     try {
-      webViewController?.runJavaScript('if(window.mute) mute();');
+      videoPlayerController?.setVolume(0.0);
     } catch (_) {}
   }
 
   void unMute() {
     try {
-      webViewController?.runJavaScript('if(window.unMute) unMute();');
+      videoPlayerController?.setVolume(1.0);
     } catch (_) {}
   }
 
   void dispose() {
     try {
-      pauseVideo();
-      webViewController?.loadHtmlString('<html><body style="background:#000;"></body></html>');
+      videoPlayerController?.pause();
+      videoPlayerController?.dispose();
     } catch (_) {}
+    videoPlayerController = null;
   }
 }
 
-/// Controller managing official YouTube IFrame Player instances,
-/// bounded sliding-window pooling, active video transitions, and lifecycle cleanup.
+// Backwards-compatible alias for existing tests and references
+typedef ShortsIFrameInstance = ShortsPlaybackInstance;
+
+/// Controller managing native VideoPlayerController instances,
+/// bounded 3-player sliding-window pooling, active video transitions, and lifecycle cleanup.
 class ShortsPlayerController extends ChangeNotifier {
-  final Map<int, ShortsIFrameInstance> _controllers = {};
+  final ShortsService _shortsService = ShortsService();
+  final Map<int, ShortsPlaybackInstance> _controllers = {};
   final Map<int, ShortsPlaybackState> _states = {};
+  final Set<int> _loadingIndices = {};
 
   int _activeIndex = 0;
   bool _isMuted = false;
@@ -91,14 +96,14 @@ class ShortsPlayerController extends ChangeNotifier {
   int get activeIndex => _activeIndex;
   bool get isMuted => _isMuted;
 
-  ShortsIFrameInstance? get activeController => _controllers[_activeIndex];
+  ShortsPlaybackInstance? get activeController => _controllers[_activeIndex];
   ShortsPlaybackState get activeState => _states[_activeIndex] ?? ShortsPlaybackState.idle;
 
   ShortsPlaybackState getStateForIndex(int index) => _states[index] ?? ShortsPlaybackState.idle;
-  ShortsIFrameInstance? getControllerForIndex(int index) => _controllers[index];
+  ShortsPlaybackInstance? getControllerForIndex(int index) => _controllers[index];
 
-  /// Initializes or retrieves an official IFrame controller for a given feed item
-  ShortsIFrameInstance getOrCreateController({
+  /// Initializes or retrieves an in-app player controller for a given feed item
+  ShortsPlaybackInstance getOrCreateController({
     required int index,
     required ShortVideoItem item,
     bool autoPlay = false,
@@ -107,250 +112,114 @@ class ShortsPlayerController extends ChangeNotifier {
       return _controllers[index]!;
     }
 
-    try {
-      final instance = _createIFrameInstance(
-        index: index,
-        item: item,
-        autoPlay: autoPlay,
-      );
-      _controllers[index] = instance;
-      _states[index] = ShortsPlaybackState.initializing;
-      return instance;
-    } catch (_) {
-      // Safe fallback for testing or environments where WebViewPlatform is uninitialized
-      final dummy = ShortsIFrameInstance.dummy(index: index, item: item);
-      _controllers[index] = dummy;
-      _states[index] = ShortsPlaybackState.ready;
-      return dummy;
-    }
-  }
-
-  ShortsIFrameInstance _createIFrameInstance({
-    required int index,
-    required ShortVideoItem item,
-    required bool autoPlay,
-  }) {
-    final controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(const Color(0xFF000000))
-      ..setNavigationDelegate(
-        NavigationDelegate(
-          onNavigationRequest: (NavigationRequest request) {
-            final url = request.url;
-            if (url.startsWith('https://www.youtube.com') ||
-                url.startsWith('https://youtube.com') ||
-                url.startsWith('https://www.youtube-nocookie.com') ||
-                url.startsWith('about:blank') ||
-                url.startsWith('data:')) {
-              return NavigationDecision.navigate;
-            }
-            return NavigationDecision.prevent;
-          },
-        ),
-      );
-
-    if (controller.platform is AndroidWebViewController) {
-      try {
-        (controller.platform as AndroidWebViewController).setMediaPlaybackRequiresUserGesture(false);
-      } catch (_) {}
-    }
-
-    controller.addJavaScriptChannel(
-      'ShortsBridge',
-      onMessageReceived: (JavaScriptMessage message) {
-        _handleJsMessage(index, message.message);
-      },
-    );
-
-    final html = _buildIFrameHtml(
-      videoId: item.id,
-      autoPlay: autoPlay,
-      isMuted: _isMuted,
-    );
-    controller.loadHtmlString(html, baseUrl: 'https://www.youtube.com');
-
-    return ShortsIFrameInstance(
+    final instance = ShortsPlaybackInstance(
       index: index,
       item: item,
-      webViewController: controller,
+      videoPlayerController: null,
       state: ShortsPlaybackState.initializing,
     );
+    _controllers[index] = instance;
+    _states[index] = ShortsPlaybackState.initializing;
+
+    _initControllerAsync(index, item, autoPlay);
+
+    return instance;
   }
 
-  static String _buildIFrameHtml({
-    required String videoId,
-    required bool autoPlay,
-    required bool isMuted,
-  }) {
-    return '''
-<!DOCTYPE html>
-<html>
-<head>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <style>
-    * { margin:0; padding:0; box-sizing:border-box; background-color:#000000; overflow:hidden; }
-    html, body { width:100%; height:100%; background:#000000; }
-    #player-wrap { width:100%; height:100%; position:relative; overflow:hidden; }
-    #player { width:100%; height:100%; border:none; pointer-events:none; }
-  </style>
-</head>
-<body>
-  <div id="player-wrap">
-    <div id="player"></div>
-  </div>
-  <script>
-    var tag = document.createElement('script');
-    tag.src = "https://www.youtube.com/iframe_api";
-    var firstScriptTag = document.getElementsByTagName('script')[0];
-    firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+  Future<void> _initControllerAsync(int index, ShortVideoItem item, bool autoPlay) async {
+    if (_isDisposed || _loadingIndices.contains(index)) return;
+    _loadingIndices.add(index);
 
-    var player;
-    var isReady = false;
-    var pendingPlay = false;
-
-    function onYouTubeIframeAPIReady() {
-      player = new YT.Player('player', {
-        height: '100%',
-        width: '100%',
-        videoId: '$videoId',
-        playerVars: {
-          'autoplay': ${autoPlay ? 1 : 0},
-          'controls': 0,
-          'disablekb': 1,
-          'fs': 0,
-          'playsinline': 1,
-          'rel': 0,
-          'modestbranding': 1,
-          'iv_load_policy': 3,
-          'loop': 1,
-          'playlist': '$videoId',
-          'enablejsapi': 1,
-          'origin': 'https://www.youtube.com'
-        },
-        events: {
-          'onReady': onPlayerReady,
-          'onStateChange': onPlayerStateChange,
-          'onError': onPlayerError
-        }
-      });
-    }
-
-    function onPlayerReady(event) {
-      isReady = true;
-      if (${isMuted}) {
-        player.mute();
-      } else {
-        player.unMute();
-      }
-      if (${autoPlay} || pendingPlay) {
-        player.playVideo();
-      }
-      if (window.ShortsBridge) {
-        window.ShortsBridge.postMessage(JSON.stringify({type: 'ready'}));
-      }
-    }
-
-    function onPlayerStateChange(event) {
-      if (window.ShortsBridge) {
-        window.ShortsBridge.postMessage(JSON.stringify({type: 'state', code: event.data}));
-      }
-    }
-
-    function onPlayerError(event) {
-      if (window.ShortsBridge) {
-        window.ShortsBridge.postMessage(JSON.stringify({type: 'error', code: event.data}));
-      }
-    }
-
-    function playVideo() {
-      if (player && player.playVideo) {
-        player.playVideo();
-      } else {
-        pendingPlay = true;
-      }
-    }
-
-    function pauseVideo() {
-      pendingPlay = false;
-      if (player && player.pauseVideo) {
-        player.pauseVideo();
-      }
-    }
-
-    function mute() {
-      if (player && player.mute) {
-        player.mute();
-      }
-    }
-
-    function unMute() {
-      if (player && player.unMute) {
-        player.unMute();
-      }
-    }
-  </script>
-</body>
-</html>
-''';
-  }
-
-  void _handleJsMessage(int index, String rawMessage) {
-    if (_isDisposed) return;
     try {
-      final map = jsonDecode(rawMessage) as Map<String, dynamic>;
-      final type = map['type'] as String?;
-
-      if (type == 'state') {
-        final code = map['code'] as int?;
-        ShortsPlaybackState newState = _states[index] ?? ShortsPlaybackState.ready;
-        switch (code) {
-          case 1: // PLAYING
-            newState = ShortsPlaybackState.playing;
-            break;
-          case 2: // PAUSED
-            newState = ShortsPlaybackState.paused;
-            break;
-          case 3: // BUFFERING
-            newState = ShortsPlaybackState.buffering;
-            break;
-          case 0: // ENDED
-            newState = ShortsPlaybackState.ended;
-            if (index == _activeIndex) {
-              onVideoEnded?.call(index);
-            }
-            break;
-          case 5: // CUED
-            newState = ShortsPlaybackState.ready;
-            break;
-        }
-        _states[index] = newState;
-        if (_controllers.containsKey(index)) {
-          _controllers[index]?.state = newState;
-        }
-        if (index == _activeIndex) {
-          notifyListeners();
-        }
-      } else if (type == 'ready') {
-        _states[index] = ShortsPlaybackState.ready;
-        if (_controllers.containsKey(index)) {
-          _controllers[index]?.state = ShortsPlaybackState.ready;
-        }
-        if (index == _activeIndex) {
-          notifyListeners();
-        }
-      } else if (type == 'error') {
-        _states[index] = ShortsPlaybackState.error;
-        if (_controllers.containsKey(index)) {
-          _controllers[index]?.state = ShortsPlaybackState.error;
-        }
-        if (index == _activeIndex) {
-          notifyListeners();
-        }
+      String? streamUrl = item.streamUrl;
+      if (streamUrl == null || streamUrl.isEmpty) {
+        streamUrl = await _shortsService.resolveStreamUrl(item.id, item.category);
       }
-    } catch (_) {}
+
+      if (_isDisposed) {
+        _loadingIndices.remove(index);
+        return;
+      }
+
+      final url = (streamUrl != null && streamUrl.isNotEmpty)
+          ? streamUrl
+          : _shortsService.getFallbackStreamUrl(item.category);
+
+      final ctrl = VideoPlayerController.networkUrl(
+        Uri.parse(url),
+        httpHeaders: const {
+          'User-Agent': 'Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+        },
+        videoPlayerOptions: VideoPlayerOptions(mixWithOthers: false),
+      );
+
+      await ctrl.initialize();
+      ctrl.setLooping(false);
+      ctrl.setVolume(_isMuted ? 0.0 : 1.0);
+
+      if (_isDisposed) {
+        ctrl.dispose();
+        _loadingIndices.remove(index);
+        return;
+      }
+
+      final instance = _controllers[index];
+      if (instance != null) {
+        instance.videoPlayerController = ctrl;
+        instance.state = ShortsPlaybackState.ready;
+        _states[index] = ShortsPlaybackState.ready;
+
+        // Attach listener for playback completion and buffering
+        bool hasEnded = false;
+        ctrl.addListener(() {
+          if (_isDisposed) return;
+          final val = ctrl.value;
+          if (val.isInitialized && val.duration > Duration.zero) {
+            if (val.position >= val.duration) {
+              if (!hasEnded) {
+                hasEnded = true;
+                _states[index] = ShortsPlaybackState.ended;
+                instance.state = ShortsPlaybackState.ended;
+                if (index == _activeIndex) {
+                  onVideoEnded?.call(index);
+                  notifyListeners();
+                }
+              }
+            } else {
+              hasEnded = false;
+              final newState = val.isPlaying
+                  ? (val.isBuffering ? ShortsPlaybackState.buffering : ShortsPlaybackState.playing)
+                  : ShortsPlaybackState.paused;
+              if (_states[index] != newState) {
+                _states[index] = newState;
+                instance.state = newState;
+                if (index == _activeIndex) notifyListeners();
+              }
+            }
+          }
+        });
+
+        if (autoPlay && index == _activeIndex) {
+          ctrl.play();
+          instance.state = ShortsPlaybackState.playing;
+          _states[index] = ShortsPlaybackState.playing;
+        }
+
+        notifyListeners();
+      } else {
+        ctrl.dispose();
+      }
+    } catch (_) {
+      if (_controllers.containsKey(index)) {
+        _controllers[index]!.state = ShortsPlaybackState.ready;
+        _states[index] = ShortsPlaybackState.ready;
+      }
+    } finally {
+      _loadingIndices.remove(index);
+    }
   }
 
-  /// Single Active Player Transition on Swipe (Section 9)
+  /// Single Active Player Transition on Swipe
   void onPageChanged({
     required int newIndex,
     required List<ShortVideoItem> items,
@@ -376,11 +245,12 @@ class ShortsPlayerController extends ChangeNotifier {
         autoPlay: true,
       );
       try {
+        ctrl.videoPlayerController?.seekTo(Duration.zero);
         ctrl.playVideo();
       } catch (_) {}
     }
 
-    // 3. Pre-warm / Cue the NEXT video (+1) for zero startup delay on swipe
+    // 3. Pre-warm the NEXT video (+1) for zero startup delay on swipe
     final nextIndex = newIndex + 1;
     if (nextIndex < items.length) {
       getOrCreateController(
@@ -413,12 +283,17 @@ class ShortsPlayerController extends ChangeNotifier {
     final ctrl = activeController;
     if (ctrl == null) return;
 
-    if (activeState == ShortsPlaybackState.playing) {
-      ctrl.pauseVideo();
-      _states[_activeIndex] = ShortsPlaybackState.paused;
-    } else {
-      ctrl.playVideo();
-      _states[_activeIndex] = ShortsPlaybackState.playing;
+    final vCtrl = ctrl.videoPlayerController;
+    if (vCtrl != null && vCtrl.value.isInitialized) {
+      if (vCtrl.value.isPlaying) {
+        vCtrl.pause();
+        _states[_activeIndex] = ShortsPlaybackState.paused;
+        ctrl.state = ShortsPlaybackState.paused;
+      } else {
+        vCtrl.play();
+        _states[_activeIndex] = ShortsPlaybackState.playing;
+        ctrl.state = ShortsPlaybackState.playing;
+      }
     }
     notifyListeners();
   }

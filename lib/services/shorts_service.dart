@@ -240,7 +240,12 @@ class ShortsService {
       );
 
       final List<ShortVideoItem> items = [];
-      for (final v in results.take(25)) {
+      for (final v in results.take(35)) {
+        // Strict vertical short-form filter: duration must be <= 60 seconds (strictly YouTube Shorts!)
+        // Long landscape/horizontal videos (>60s) are excluded immediately
+        if (v.duration != null && v.duration!.inSeconds > 60) {
+          continue;
+        }
         items.add(
           ShortVideoItem(
             id: v.id.value,
