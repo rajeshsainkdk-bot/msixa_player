@@ -8,23 +8,41 @@ import '../services/language_service.dart';
 import '../theme/app_colors.dart';
 
 /// Direct Online YouTube Shorts Module
-/// - Directly loads official online Shorts link (https://m.youtube.com/shorts)
-/// - All custom app overlay buttons removed (uses genuine native YouTube Shorts buttons directly)
-/// - Re-click on bottom nav Shorts button: instantly refreshes / scrolls to next fresh short
-/// - Up-to-down drag (pull-to-refresh): directly reloads fresh Shorts link
-/// - Floating Back '<' icon at top-left for seamless return to MSIXA
+/// - Directly loads official online Shorts link (https://www.youtube.com/shorts)
+/// - Starts unmuted with full audio on click & refresh
+/// - Sits cleanly below system status bar (no overlap with network/battery)
+/// - Full-screen when playing (hides bottom nav), shows nav when paused
+/// - Completely hides YouTube logo & top-left header icons
+/// - Top-left back button seamlessly returns to Discover/Home tab
 class ShortsFeedView extends StatefulWidget {
   final VoidCallback? onBackToDeviceVideos;
+  final VoidCallback? onBackToHome;
 
   /// Global refresh trigger: Tapping the bottom nav Shorts icon triggers instant refresh
   static final ValueNotifier<int> refreshNotifier = ValueNotifier<int>(0);
+
+  /// Global playback state: true = playing (hide bottom nav), false = paused (show bottom nav)
+  static final ValueNotifier<bool> isPlayingNotifier = ValueNotifier<bool>(false);
+
+  /// Global pause request trigger: used when user switches away from the Shorts tab
+  static final ValueNotifier<int> pauseRequestNotifier = ValueNotifier<int>(0);
 
   /// Trigger instant refresh to a fresh, unrepeated short video
   static void refreshFeed() {
     refreshNotifier.value++;
   }
 
-  const ShortsFeedView({Key? key, this.onBackToDeviceVideos}) : super(key: key);
+  /// Pause shorts playback
+  static void pausePlayback() {
+    pauseRequestNotifier.value++;
+    isPlayingNotifier.value = false;
+  }
+
+  const ShortsFeedView({
+    Key? key,
+    this.onBackToDeviceVideos,
+    this.onBackToHome,
+  }) : super(key: key);
 
   @override
   State<ShortsFeedView> createState() => _ShortsFeedViewState();
@@ -41,20 +59,41 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
 
   static const String _shortsUrl = 'https://www.youtube.com/shorts';
 
-  /// Minimal CSS: Only hides YouTube website header/bottom navbar & 'Open in app' popups.
-  /// ALL Shorts native buttons (Like, Dislike, Comment, Share, Creator avatar, Subscribe) remain 100% visible & interactive!
+  /// Minimal CSS:
+  /// 1. Completely hides YouTube website header/logo/icons.
+  /// 2. Hides YouTube website bottom pivot bar & external app promos.
+  /// 3. ALL native Shorts buttons (Like, Dislike, Comment, Share, Channel Avatar, Subscribe) remain 100% visible & interactive!
   static const String _minimalCleanupCss = '''
-    /* 1. Hide YouTube website top header bar */
+    /* 1. Hide YouTube website top header bar, logo, and top-left branding */
     ytm-mobile-topbar-renderer,
     .mobile-topbar-header,
     #header-bar,
     .topbar-header,
-    header.mobile-topbar-header {
+    header,
+    header.mobile-topbar-header,
+    #logo,
+    .ytm-logo,
+    ytm-home-logo,
+    .topbar-logo,
+    ytd-topbar-logo-renderer,
+    .mobile-topbar-header-endpoint,
+    yt-icon.topbar-logo,
+    yt-icon[type="brand"],
+    .yt-spec-icon-badge-shape--type-brand,
+    a[href="/"][id*="logo"],
+    a[aria-label="YouTube"],
+    a[aria-label="YouTube Home"],
+    .header-bar-logo,
+    yt-icon.mobile-topbar-header-endpoint,
+    button[aria-label*="YouTube" i] {
       display: none !important;
       visibility: hidden !important;
+      opacity: 0 !important;
       height: 0px !important;
       max-height: 0px !important;
+      width: 0px !important;
       overflow: hidden !important;
+      pointer-events: none !important;
     }
 
     /* 2. Hide YouTube website bottom tab bar (Home, Subscriptions, etc.) since MSIXA has its own */
@@ -98,13 +137,25 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
   void initState() {
     super.initState();
     AppShareService.keepScreenOn(true);
+    ShortsFeedView.isPlayingNotifier.value = false;
     ShortsFeedView.refreshNotifier.addListener(_handleReclickRefresh);
+    ShortsFeedView.pauseRequestNotifier.addListener(_handlePauseRequest);
 
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(Colors.black)
       ..setUserAgent(
         'Mozilla/5.0 (Linux; Android 13; SM-G998B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+      )
+      ..addJavaScriptChannel(
+        'MsixaPlaybackChannel',
+        onMessageReceived: (JavaScriptMessage message) {
+          if (message.message == 'playing') {
+            if (mounted) ShortsFeedView.isPlayingNotifier.value = true;
+          } else if (message.message == 'paused') {
+            if (mounted) ShortsFeedView.isPlayingNotifier.value = false;
+          }
+        },
       )
       ..setNavigationDelegate(
         NavigationDelegate(
@@ -128,10 +179,11 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
           },
           onPageStarted: (String url) {
             if (mounted) setState(() => _isLoading = true);
+            ShortsFeedView.isPlayingNotifier.value = false;
             _injectCleanupScript();
           },
           onProgress: (int progress) {
-            if (progress > 30) {
+            if (progress > 25) {
               _injectCleanupScript();
             }
           },
@@ -153,12 +205,26 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
   @override
   void dispose() {
     ShortsFeedView.refreshNotifier.removeListener(_handleReclickRefresh);
+    ShortsFeedView.pauseRequestNotifier.removeListener(_handlePauseRequest);
+    ShortsFeedView.isPlayingNotifier.value = false;
     AppShareService.keepScreenOn(false);
     super.dispose();
   }
 
+  void _handlePauseRequest() {
+    _controller.runJavaScript('''
+      (function() {
+        var videos = document.querySelectorAll('video');
+        for (var i = 0; i < videos.length; i++) {
+          videos[i].pause();
+        }
+      })();
+    ''').catchError((_) {});
+  }
+
   /// Initial load or fresh load with timestamp
   void _loadFreshShorts() {
+    ShortsFeedView.isPlayingNotifier.value = false;
     final freshUrl = '$_shortsUrl?t=${DateTime.now().millisecondsSinceEpoch}';
     _controller.loadRequest(Uri.parse(freshUrl));
   }
@@ -190,6 +256,7 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
   void _injectCleanupScript() {
     final script = '''
       (function() {
+        // 1. Inject CSS to hide website headers and logos
         function injectCss() {
           var style = document.getElementById('msixa-minimal-cleanup');
           if (!style) {
@@ -201,13 +268,60 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
         }
         injectCss();
 
+        // 2. Unmute and force max audio volume
+        function forceUnmute() {
+          try {
+            var volData = JSON.stringify({ volume: 100, muted: false });
+            localStorage.setItem('yt-player-volume', JSON.stringify({ data: volData }));
+            sessionStorage.setItem('yt-player-volume', JSON.stringify({ data: volData }));
+          } catch(e) {}
+
+          var videos = document.querySelectorAll('video');
+          for (var i = 0; i < videos.length; i++) {
+            var v = videos[i];
+            if (v.muted) v.muted = false;
+            if (v.volume < 1.0) v.volume = 1.0;
+            if (v.hasAttribute('muted')) v.removeAttribute('muted');
+          }
+
+          var muteButtons = document.querySelectorAll(
+            'button[aria-label*="unmute" i], ' +
+            'button[aria-label*="Unmute" i], ' +
+            '.ytp-mute-button[aria-pressed="true"], ' +
+            'ytm-mute-button, ' +
+            '[aria-label*="Unmute" i]'
+          );
+          for (var j = 0; j < muteButtons.length; j++) {
+            var btn = muteButtons[j];
+            var aria = (btn.getAttribute('aria-label') || '').toLowerCase();
+            if (aria.indexOf('unmute') !== -1 || btn.getAttribute('aria-pressed') === 'true') {
+              btn.click();
+            }
+          }
+        }
+        forceUnmute();
+
+        // 3. Purge clutter and logos
         function purgeClutter() {
           injectCss();
+          forceUnmute();
           var clutterSelectors = [
             'ytm-mobile-topbar-renderer',
             '.mobile-topbar-header',
             '#header-bar',
             '.topbar-header',
+            'header',
+            '#logo',
+            '.ytm-logo',
+            'ytm-home-logo',
+            '.topbar-logo',
+            'ytd-topbar-logo-renderer',
+            '.mobile-topbar-header-endpoint',
+            'yt-icon.topbar-logo',
+            'yt-icon[type="brand"]',
+            '.yt-spec-icon-badge-shape--type-brand',
+            'a[aria-label="YouTube"]',
+            'a[aria-label="YouTube Home"]',
             'ytm-pivot-bar-renderer',
             '.pivot-bar',
             '#app-banner',
@@ -221,10 +335,36 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
               els[j].style.setProperty('display', 'none', 'important');
               els[j].style.setProperty('visibility', 'hidden', 'important');
               els[j].style.setProperty('height', '0px', 'important');
+              els[j].style.setProperty('width', '0px', 'important');
+              els[j].style.setProperty('opacity', '0', 'important');
             }
           }
         }
         purgeClutter();
+
+        // 4. Hook video events for play/pause state communication
+        ['play', 'playing'].forEach(function(evt) {
+          document.addEventListener(evt, function(e) {
+            if (e.target && e.target.tagName === 'VIDEO') {
+              e.target.muted = false;
+              e.target.volume = 1.0;
+              forceUnmute();
+              if (window.MsixaPlaybackChannel) {
+                window.MsixaPlaybackChannel.postMessage('playing');
+              }
+            }
+          }, true);
+        });
+
+        ['pause', 'ended'].forEach(function(evt) {
+          document.addEventListener(evt, function(e) {
+            if (e.target && e.target.tagName === 'VIDEO') {
+              if (window.MsixaPlaybackChannel) {
+                window.MsixaPlaybackChannel.postMessage('paused');
+              }
+            }
+          }, true);
+        });
 
         var observer = new MutationObserver(function() {
           purgeClutter();
@@ -265,139 +405,159 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
           widget.onBackToDeviceVideos!();
           return;
         }
+        if (widget.onBackToHome != null) {
+          widget.onBackToHome!();
+          return;
+        }
         if (Navigator.canPop(context)) {
           Navigator.pop(context);
         }
       },
       child: Scaffold(
         backgroundColor: Colors.black,
-        body: Listener(
-          behavior: HitTestBehavior.translucent,
-          onPointerDown: (event) {
-            _dragStartY = event.position.dy;
-            _currentPullDelta = 0.0;
-          },
-          onPointerMove: (event) {
-            final deltaY = event.position.dy - _dragStartY;
-            // Detect pull down to refresh from upper 50% of screen
-            if (_dragStartY < MediaQuery.of(context).size.height * 0.50 && deltaY > 0) {
-              if (mounted) {
-                setState(() {
-                  _currentPullDelta = deltaY.clamp(0.0, 120.0);
-                });
+        // Sits cleanly below system status bar (network, wifi, battery icons preserved)
+        body: SafeArea(
+          top: true,
+          bottom: false,
+          child: Listener(
+            behavior: HitTestBehavior.translucent,
+            onPointerDown: (event) {
+              _dragStartY = event.position.dy;
+              _currentPullDelta = 0.0;
+            },
+            onPointerMove: (event) {
+              final deltaY = event.position.dy - _dragStartY;
+              // Detect pull down to refresh from upper 50% of screen
+              if (_dragStartY < MediaQuery.of(context).size.height * 0.50 && deltaY > 0) {
+                if (mounted) {
+                  setState(() {
+                    _currentPullDelta = deltaY.clamp(0.0, 120.0);
+                  });
+                }
               }
-            }
-          },
-          onPointerUp: (event) {
-            if (_currentPullDelta > 50.0 && !_isPullRefreshing) {
-              _handlePullRefresh();
-            } else {
+            },
+            onPointerUp: (event) {
+              if (_currentPullDelta > 50.0 && !_isPullRefreshing) {
+                _handlePullRefresh();
+              } else {
+                if (mounted && _currentPullDelta > 0.0) {
+                  setState(() => _currentPullDelta = 0.0);
+                }
+              }
+            },
+            onPointerCancel: (_) {
               if (mounted && _currentPullDelta > 0.0) {
                 setState(() => _currentPullDelta = 0.0);
               }
-            }
-          },
-          onPointerCancel: (_) {
-            if (mounted && _currentPullDelta > 0.0) {
-              setState(() => _currentPullDelta = 0.0);
-            }
-          },
-          child: Stack(
-            children: [
-              // 1. Official Online YouTube Shorts Engine (Direct Link, Native Shorts Buttons Only)
-              WebViewWidget(controller: _controller),
-
-              // Loading Spinner while initial request is fetching
-              if (_isLoading)
-                Container(
-                  color: Colors.black,
-                  child: const Center(
-                    child: CircularProgressIndicator(color: AppColors.accentCyan),
-                  ),
+            },
+            child: Stack(
+              children: [
+                // 1. Official Online YouTube Shorts Engine (Direct Link, Native Shorts Buttons Only)
+                Positioned.fill(
+                  child: WebViewWidget(controller: _controller),
                 ),
 
-              // 2. Pull-down Drag to Refresh Indicator Badge
-              if (_currentPullDelta > 15.0 || _isPullRefreshing)
-                Positioned(
-                  top: 50 + (_currentPullDelta * 0.35),
-                  left: 0,
-                  right: 0,
-                  child: Center(
+                // Loading Spinner while initial request is fetching
+                if (_isLoading)
+                  Positioned.fill(
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      color: Colors.black,
+                      child: const Center(
+                        child: CircularProgressIndicator(color: AppColors.accentCyan),
+                      ),
+                    ),
+                  ),
+
+                // 2. Pull-down Drag to Refresh Indicator Badge
+                if (_currentPullDelta > 15.0 || _isPullRefreshing)
+                  Positioned(
+                    top: 20 + (_currentPullDelta * 0.35),
+                    left: 0,
+                    right: 0,
+                    child: Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF131A2A).withOpacity(0.95),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: AppColors.accentCyan, width: 1.2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.accentCyan.withOpacity(0.35),
+                              blurRadius: 10,
+                              spreadRadius: 2,
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppColors.accentCyan,
+                                value: _isPullRefreshing ? null : (_currentPullDelta / 50.0).clamp(0.0, 1.0),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              _isPullRefreshing
+                                  ? (lang.isHindi ? 'नया शॉर्ट्स लोड हो रहा है...' : 'Refreshing Shorts...')
+                                  : (_currentPullDelta > 50.0
+                                      ? (lang.isHindi ? 'छोड़ें (रिफ्रेश होगा)' : 'Release to refresh')
+                                      : (lang.isHindi ? 'नीचे खींचें रिफ्रेश के लिए' : 'Pull down to refresh')),
+                              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+
+                // 3. Floating Minimal Back '<' Icon at Top-Left to Return to MSIXA Discover
+                Positioned(
+                  top: 10,
+                  left: 10,
+                  child: GestureDetector(
+                    onTap: () {
+                      if (widget.onBackToDeviceVideos != null) {
+                        widget.onBackToDeviceVideos!();
+                      } else if (widget.onBackToHome != null) {
+                        widget.onBackToHome!();
+                      } else if (Navigator.canPop(context)) {
+                        Navigator.pop(context);
+                      }
+                    },
+                    behavior: HitTestBehavior.opaque,
+                    child: Container(
+                      width: 40,
+                      height: 40,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF131A2A).withOpacity(0.95),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: AppColors.accentCyan, width: 1.2),
+                        color: Colors.black.withOpacity(0.55),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white24, width: 1),
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.accentCyan.withOpacity(0.35),
-                            blurRadius: 10,
-                            spreadRadius: 2,
+                            color: Colors.black.withOpacity(0.4),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
                           ),
                         ],
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: AppColors.accentCyan,
-                              value: _isPullRefreshing ? null : (_currentPullDelta / 50.0).clamp(0.0, 1.0),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            _isPullRefreshing
-                                ? (lang.isHindi ? 'नया शॉर्ट्स लोड हो रहा है...' : 'Refreshing Shorts...')
-                                : (_currentPullDelta > 50.0
-                                    ? (lang.isHindi ? 'छोड़ें (रिफ्रेश होगा)' : 'Release to refresh')
-                                    : (lang.isHindi ? 'नीचे खींचें रिफ्रेश के लिए' : 'Pull down to refresh')),
-                            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-
-              // 3. Floating Minimal Back '<' Icon at Top-Left to Return to MSIXA
-              Positioned(
-                top: 0,
-                left: 0,
-                child: SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: GestureDetector(
-                      onTap: () {
-                        if (widget.onBackToDeviceVideos != null) {
-                          widget.onBackToDeviceVideos!();
-                        } else if (Navigator.canPop(context)) {
-                          Navigator.pop(context);
-                        }
-                      },
-                      behavior: HitTestBehavior.opaque,
-                      child: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.4),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
+                      child: const Center(
+                        child: Icon(
                           Icons.arrow_back_ios_new_rounded,
                           color: Colors.white,
-                          size: 20,
-                          shadows: [Shadow(color: Colors.black87, blurRadius: 6, offset: Offset(0, 1))],
+                          size: 18,
                         ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

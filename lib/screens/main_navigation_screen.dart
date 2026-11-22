@@ -70,7 +70,13 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
       case 1:
         return const VideosScreen();
       case 2:
-        return const ShortsFeedView();
+        return ShortsFeedView(
+          onBackToHome: () {
+            setState(() {
+              _currentIndex = 0;
+            });
+          },
+        );
       case 3:
         return const LibraryScreen();
       case 4:
@@ -83,9 +89,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: LanguageService(),
+      listenable: Listenable.merge([LanguageService(), ShortsFeedView.isPlayingNotifier]),
       builder: (context, _) {
         final lang = LanguageService();
+        final hideBottomNav = (_currentIndex == 2 && ShortsFeedView.isPlayingNotifier.value);
         return Scaffold(
           backgroundColor: AppColors.background,
           body: Stack(
@@ -112,32 +119,37 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
                 ),
             ],
           ),
-          bottomNavigationBar: Container(
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  border: Border(
-                    top: BorderSide(
-                      color: Colors.white.withOpacity(0.06),
-                      width: 1,
+          bottomNavigationBar: hideBottomNav
+              ? null
+              : Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    border: Border(
+                      top: BorderSide(
+                        color: Colors.white.withOpacity(0.06),
+                        width: 1,
+                      ),
                     ),
                   ),
-                ),
-                child: BottomNavigationBar(
-                  currentIndex: _currentIndex,
-                  onTap: (index) {
-                    if (index == 2) {
-                      // Pause music player so Shorts video sound plays with 100% clarity
-                      try {
-                        Provider.of<PlayerProvider>(context, listen: false).pause();
-                      } catch (_) {}
-                      // Direct refresh to fresh, non-repeated short link every time Shorts button is tapped
-                      ShortsFeedView.refreshFeed();
-                    }
-                    setState(() {
-                      _loadedTabs.add(index);
-                      _currentIndex = index;
-                    });
-                  },
+                  child: BottomNavigationBar(
+                    currentIndex: _currentIndex,
+                    onTap: (index) {
+                      if (_currentIndex == 2 && index != 2) {
+                        ShortsFeedView.pausePlayback();
+                      }
+                      if (index == 2) {
+                        // Pause music player so Shorts video sound plays with 100% clarity
+                        try {
+                          Provider.of<PlayerProvider>(context, listen: false).pause();
+                        } catch (_) {}
+                        // Direct refresh to fresh, non-repeated short link every time Shorts button is tapped
+                        ShortsFeedView.refreshFeed();
+                      }
+                      setState(() {
+                        _loadedTabs.add(index);
+                        _currentIndex = index;
+                      });
+                    },
                   backgroundColor: Colors.transparent,
                   elevation: 0,
                   type: BottomNavigationBarType.fixed,
