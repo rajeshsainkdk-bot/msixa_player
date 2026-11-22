@@ -939,120 +939,92 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 8),
 
-          // 2. Search Scope Switcher & Device Storage Scan Action
+          // 2. Search Scope Switcher: Online Music & Device Music
           Row(
             children: [
-              // Online Streaming Pill
-              GestureDetector(
-                onTap: () {
-                  if (_searchScope != 0) {
-                    setState(() => _searchScope = 0);
-                    if (_activeSearchQuery.isNotEmpty) {
-                      provider.searchOnline(_activeSearchQuery);
+              // Online Music Button
+              Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    if (_searchScope != 0) {
+                      setState(() => _searchScope = 0);
+                      if (_activeSearchQuery.isNotEmpty) {
+                        provider.searchOnline(_activeSearchQuery);
+                      }
                     }
-                  }
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: isOnline ? AppColors.accentCyan.withOpacity(0.2) : AppColors.card,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: isOnline ? AppColors.accentCyan : Colors.white12,
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    decoration: BoxDecoration(
+                      color: isOnline ? AppColors.accentCyan.withOpacity(0.2) : AppColors.card,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isOnline ? AppColors.accentCyan : Colors.white12,
+                      ),
                     ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.cloud_download_rounded,
-                        size: 14,
-                        color: isOnline ? AppColors.accentCyan : Colors.white60,
-                      ),
-                      const SizedBox(width: 5),
-                      Text(
-                        lang.isHindi ? 'ऑनलाइन संगीत' : 'Online Music',
-                        style: TextStyle(
-                          color: isOnline ? AppColors.accentCyan : Colors.white70,
-                          fontSize: 11,
-                          fontWeight: isOnline ? FontWeight.bold : FontWeight.normal,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.cloud_download_rounded,
+                          size: 15,
+                          color: isOnline ? AppColors.accentCyan : Colors.white60,
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 6),
+                        Text(
+                          lang.isHindi ? 'ऑनलाइन संगीत' : 'Online Music',
+                          style: TextStyle(
+                            color: isOnline ? AppColors.accentCyan : Colors.white70,
+                            fontSize: 12,
+                            fontWeight: isOnline ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 10),
 
-              // My Library Pill
-              GestureDetector(
-                onTap: () {
-                  if (_searchScope != 1) {
-                    setState(() => _searchScope = 1);
-                    if (_activeSearchQuery.isNotEmpty) {
-                      provider.search(_activeSearchQuery);
+              // Device Music Button
+              Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    if (_searchScope != 1) {
+                      setState(() => _searchScope = 1);
+                      if (_activeSearchQuery.isNotEmpty) {
+                        provider.search(_activeSearchQuery);
+                      }
                     }
-                  }
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: !isOnline ? const Color(0xFF10B981).withOpacity(0.2) : AppColors.card,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: !isOnline ? const Color(0xFF10B981) : Colors.white12,
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    decoration: BoxDecoration(
+                      color: !isOnline ? const Color(0xFF10B981).withOpacity(0.2) : AppColors.card,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: !isOnline ? const Color(0xFF10B981) : Colors.white12,
+                      ),
                     ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.folder_rounded,
-                        size: 14,
-                        color: !isOnline ? const Color(0xFF10B981) : Colors.white60,
-                      ),
-                      const SizedBox(width: 5),
-                      Text(
-                        lang.isHindi ? 'माई लाइब्रेरी' : 'My Library',
-                        style: TextStyle(
-                          color: !isOnline ? const Color(0xFF10B981) : Colors.white70,
-                          fontSize: 11,
-                          fontWeight: !isOnline ? FontWeight.bold : FontWeight.normal,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.phone_android_rounded,
+                          size: 15,
+                          color: !isOnline ? const Color(0xFF10B981) : Colors.white60,
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const Spacer(),
-
-              // Scan Device Audio Button (integrated right in the search bar row!)
-              InkWell(
-                onTap: () => provider.scanDeviceSongs(),
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: AppColors.accentGreen.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.accentGreen.withOpacity(0.35)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.sd_storage_rounded, size: 14, color: AppColors.accentGreen),
-                      const SizedBox(width: 4),
-                      Text(
-                        provider.deviceSongs.isEmpty
-                            ? (lang.isHindi ? 'स्कैन करें' : 'Scan Audio')
-                            : '${provider.deviceSongs.length} ${lang.isHindi ? "गाने" : "Tracks"}',
-                        style: const TextStyle(
-                          color: AppColors.accentGreen,
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.bold,
+                        const SizedBox(width: 6),
+                        Text(
+                          lang.isHindi ? 'डिवाइस संगीत' : 'Device Music',
+                          style: TextStyle(
+                            color: !isOnline ? const Color(0xFF10B981) : Colors.white70,
+                            fontSize: 12,
+                            fontWeight: !isOnline ? FontWeight.bold : FontWeight.normal,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -1776,79 +1748,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          // Trending Shorts & WhatsApp Status Quick Access Card
-          InkWell(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ShortsFeedView()),
-              );
-            },
-            borderRadius: BorderRadius.circular(16),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF1E1B4B), Color(0xFF0F172A)],
-                ),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFFFB300).withOpacity(0.4)),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFB300).withOpacity(0.15),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.bolt_rounded, color: Color(0xFFFFB300), size: 24),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Text(
-                              lang.isHindi ? 'ट्रेंडिंग शॉर्ट्स व रील्स' : 'Trending Shorts & Reels',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF25D366),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: const Text(
-                                'STATUS',
-                                style: TextStyle(color: Colors.black, fontSize: 8, fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          lang.isHindi
-                              ? 'बिना लॉगिन देखें • 1-क्लिक में डाउनलोड व व्हाट्सएप स्टेटस लगाएं'
-                              : 'Watch without login • 1-tap download & WhatsApp Status',
-                          style: const TextStyle(color: Colors.white54, fontSize: 11),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFFFFB300), size: 14),
-                ],
-              ),
-            ),
-          ),
         ],
       ),
     );
@@ -1928,53 +1827,57 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildDiscoverFilterChips(LanguageService lang, PlayerProvider provider) {
     final chips = [
-      {'id': 'all', 'label': lang.isHindi ? 'सभी संगीत' : 'All Discover', 'icon': Icons.explore_rounded, 'count': null},
-      {'id': 'recent', 'label': lang.isHindi ? 'हाल ही में सुने' : 'Recently Played', 'icon': Icons.history_rounded, 'count': provider.recentlyPlayed.length},
-      {'id': 'favorites', 'label': lang.isHindi ? 'पसंदीदा' : 'Liked Songs', 'icon': Icons.favorite_rounded, 'count': provider.favorites.length},
-      {'id': 'artists', 'label': lang.isHindi ? 'कलाकार' : 'Artists', 'icon': Icons.person_rounded, 'count': null},
-      {'id': 'albums', 'label': lang.isHindi ? 'एल्बम' : 'Albums', 'icon': Icons.album_rounded, 'count': null},
-      {'id': 'playlists', 'label': lang.isHindi ? 'प्लेलिस्ट्स' : 'Playlists', 'icon': Icons.playlist_play_rounded, 'count': null},
+      {'id': 'all', 'label': lang.isHindi ? 'ऑल डिस्कवर' : 'All Discover', 'icon': Icons.explore_rounded},
+      {'id': 'playlists', 'label': lang.isHindi ? 'प्लेलिस्ट' : 'Playlist', 'icon': Icons.playlist_play_rounded},
     ];
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
+    return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
         children: chips.map((c) {
           final isSelected = _activeDiscoverTab == c['id'];
-          final count = c['count'] as int?;
-          final countStr = (count != null && count > 0) ? ' ($count)' : '';
+          final isFirst = c['id'] == 'all';
 
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: ChoiceChip(
-              avatar: Icon(
-                c['icon'] as IconData,
-                size: 16,
-                color: isSelected ? Colors.black : const Color(0xFF00E5FF),
+          return Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(
+                right: isFirst ? 5 : 0,
+                left: isFirst ? 0 : 5,
               ),
-              label: Text(
-                '${c['label']}$countStr',
-                style: TextStyle(
-                  color: isSelected ? Colors.black : Colors.white70,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                ),
-              ),
-              selected: isSelected,
-              selectedColor: AppColors.accentCyan,
-              backgroundColor: AppColors.card,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-                side: BorderSide(
-                  color: isSelected ? AppColors.accentCyan : Colors.white12,
-                ),
-              ),
-              onSelected: (val) {
-                if (val) {
+              child: GestureDetector(
+                onTap: () {
                   setState(() => _activeDiscoverTab = c['id'] as String);
-                }
-              },
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isSelected ? AppColors.accentCyan.withOpacity(0.2) : AppColors.card,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isSelected ? AppColors.accentCyan : Colors.white12,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        c['icon'] as IconData,
+                        size: 15,
+                        color: isSelected ? AppColors.accentCyan : Colors.white60,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        c['label'] as String,
+                        style: TextStyle(
+                          color: isSelected ? AppColors.accentCyan : Colors.white70,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
           );
         }).toList(),
