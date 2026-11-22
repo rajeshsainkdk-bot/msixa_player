@@ -15,6 +15,7 @@ import 'package:msixa_player/screens/home_screen.dart';
 import 'package:msixa_player/screens/admin/admin_dashboard_screen.dart';
 import 'package:msixa_player/services/jiosaavn_service.dart';
 import 'package:msixa_player/models/short_video_item.dart';
+import 'package:msixa_player/services/shorts_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -637,6 +638,20 @@ void main() {
       final updated = item.copyWith(isLiked: true, likesCount: 1501);
       expect(updated.isLiked, true);
       expect(updated.likesCount, 1501);
+    });
+
+    test('ShortsService provides instant initial curated items and fallback streams', () {
+      final service = ShortsService();
+      final initial = service.getInitialShorts('Trending');
+      expect(initial.isNotEmpty, true);
+      expect(initial.any((s) => s.category == 'Marwadi'), true);
+
+      final marwadiList = service.getInitialShorts('Marwadi');
+      expect(marwadiList.isNotEmpty, true);
+      expect(marwadiList.first.category, 'Marwadi');
+
+      final fallback = service.getFallbackStreamUrl('DJ Remix');
+      expect(fallback.contains('.mp4'), true);
     });
   });
 }

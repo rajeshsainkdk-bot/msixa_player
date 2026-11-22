@@ -65,17 +65,31 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
   }
 
   Future<void> _loadShortsForCategory(String category) async {
-    setState(() => _isLoading = true);
     _disposeAllControllers();
-    final list = await _shortsService.getShortsByCategory(category);
-    if (mounted) {
-      setState(() {
-        _shorts = list;
-        _isLoading = false;
-        _currentIndex = 0;
-      });
-      // Pre-warm and preload the first 3 videos into memory immediately!
+    final initialList = _shortsService.getInitialShorts(category);
+    setState(() {
+      _shorts = initialList;
+      _isLoading = initialList.isEmpty;
+      _currentIndex = 0;
+    });
+
+    if (initialList.isNotEmpty) {
       _preloadAroundIndex(0);
+    }
+
+    try {
+      final onlineList = await _shortsService.getShortsByCategory(category);
+      if (mounted && onlineList.isNotEmpty) {
+        setState(() {
+          final existingIds = _shorts.map((e) => e.id).toSet();
+          final newItems = onlineList.where((e) => !existingIds.contains(e.id)).toList();
+          _shorts.addAll(newItems);
+          _isLoading = false;
+        });
+        _preloadAroundIndex(_currentIndex);
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -83,14 +97,24 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
     if (query.trim().isEmpty) return;
     setState(() => _isLoading = true);
     _disposeAllControllers();
-    final results = await _shortsService.searchShorts(query.trim());
-    if (mounted) {
-      setState(() {
-        _shorts = results;
-        _isLoading = false;
-        _currentIndex = 0;
-      });
-      _preloadAroundIndex(0);
+    try {
+      final results = await _shortsService.searchShorts(query.trim());
+      if (mounted) {
+        setState(() {
+          _shorts = results.isNotEmpty ? results : _shortsService.getInitialShorts('Trending');
+          _isLoading = false;
+          _currentIndex = 0;
+        });
+        _preloadAroundIndex(0);
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _shorts = _shortsService.getInitialShorts('Trending');
+          _isLoading = false;
+        });
+        _preloadAroundIndex(0);
+      }
     }
   }
 
@@ -132,7 +156,7 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
       final item = _shorts[index];
       String? streamUrl = item.streamUrl;
       if (streamUrl == null || streamUrl.isEmpty) {
-        streamUrl = await _shortsService.resolveStreamUrl(item.id);
+        streamUrl = await _shortsService.resolveStreamUrl(item.id, item.category);
       }
 
       if (streamUrl != null && streamUrl.isNotEmpty && mounted) {
@@ -155,9 +179,33 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
         } else {
           ctrl.dispose();
         }
+      } else {
+        _loadingIndices.remove(index);
       }
     } catch (_) {
       _loadingIndices.remove(index);
+      // Fallback resilience: ensure video controller initializes with verified stream
+      if (mounted && !_controllers.containsKey(index)) {
+        try {
+          final fallbackUrl = _shortsService.getFallbackStreamUrl(_shorts[index].category);
+          final ctrl = VideoPlayerController.networkUrl(
+            Uri.parse(fallbackUrl),
+            videoPlayerOptions: VideoPlayerOptions(mixWithOthers: false),
+          );
+          await ctrl.initialize();
+          ctrl.setLooping(false);
+          if (mounted) {
+            setState(() {
+              _controllers[index] = ctrl;
+            });
+            if (index == _currentIndex) {
+              ctrl.play();
+            }
+          } else {
+            ctrl.dispose();
+          }
+        } catch (_) {}
+      }
     }
   }
 
@@ -267,8 +315,12 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
             ),
 
           // 2. Top Header Overlay (Category Chips & Search)
-          SafeArea(
-            child: Column(
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: SafeArea(
+              child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Padding(
@@ -376,6 +428,7 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
               ],
             ),
           ),
+        ),
         ],
       ),
     );
@@ -577,7 +630,7 @@ class _ShortVideoPlayerCardState extends State<_ShortVideoPlayerCard> {
   @override
   Widget build(BuildContext context) {
     final ctrl = widget.controller;
-    final isReady = ctrl != null && ctrl.value.isInitialized;
+    final isReady = ctrl != null && ctrl.value.isInitialized && !ctrl.value.hasError;
     // Side buttons only appear when the video is paused by the user!
     // When playing: pure, clean full-screen video with zero distractions.
     final showControls = !_isPlaying && isReady;
@@ -650,16 +703,16 @@ class _ShortVideoPlayerCardState extends State<_ShortVideoPlayerCard> {
             ),
 
           // 4. Bottom Text Gradient Vignette (Fade-in on Pause)
-          AnimatedOpacity(
-            opacity: showControls ? 1.0 : 0.0,
-            duration: const Duration(milliseconds: 250),
-            child: IgnorePointer(
-              ignoring: !showControls,
-              child: Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                height: 240,
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: 240,
+            child: AnimatedOpacity(
+              opacity: showControls ? 1.0 : 0.0,
+              duration: const Duration(milliseconds: 250),
+              child: IgnorePointer(
+                ignoring: !showControls,
                 child: Container(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
@@ -678,15 +731,15 @@ class _ShortVideoPlayerCardState extends State<_ShortVideoPlayerCard> {
           ),
 
           // 5. Left Bottom Video Title & Creator Handle (Fade-in on Pause)
-          AnimatedOpacity(
-            opacity: showControls ? 1.0 : 0.0,
-            duration: const Duration(milliseconds: 250),
-            child: IgnorePointer(
-              ignoring: !showControls,
-              child: Positioned(
-                left: 16,
-                bottom: 30,
-                right: 86,
+          Positioned(
+            left: 16,
+            bottom: 30,
+            right: 86,
+            child: AnimatedOpacity(
+              opacity: showControls ? 1.0 : 0.0,
+              duration: const Duration(milliseconds: 250),
+              child: IgnorePointer(
+                ignoring: !showControls,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
@@ -737,14 +790,14 @@ class _ShortVideoPlayerCardState extends State<_ShortVideoPlayerCard> {
           ),
 
           // 6. Right Floating Actions Column (Fade-in on Pause ONLY)
-          AnimatedOpacity(
-            opacity: showControls ? 1.0 : 0.0,
-            duration: const Duration(milliseconds: 250),
-            child: IgnorePointer(
-              ignoring: !showControls,
-              child: Positioned(
-                right: 12,
-                bottom: 30,
+          Positioned(
+            right: 12,
+            bottom: 30,
+            child: AnimatedOpacity(
+              opacity: showControls ? 1.0 : 0.0,
+              duration: const Duration(milliseconds: 250),
+              child: IgnorePointer(
+                ignoring: !showControls,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
