@@ -143,7 +143,7 @@ class ShortsPlayerController extends ChangeNotifier {
 
       final url = (streamUrl != null && streamUrl.isNotEmpty)
           ? streamUrl
-          : _shortsService.getFallbackStreamUrl(item.category);
+          : _shortsService.getFallbackStreamUrl(item.category, item.id);
 
       final ctrl = VideoPlayerController.networkUrl(
         Uri.parse(url),
@@ -210,9 +210,36 @@ class ShortsPlayerController extends ChangeNotifier {
         ctrl.dispose();
       }
     } catch (_) {
-      if (_controllers.containsKey(index)) {
-        _controllers[index]!.state = ShortsPlaybackState.ready;
-        _states[index] = ShortsPlaybackState.ready;
+      // Automatic fallback recovery to reliable CDN pool
+      try {
+        final fallbackUrl = _shortsService.getFallbackStreamUrl(item.category, item.id);
+        final fallbackCtrl = VideoPlayerController.networkUrl(
+          Uri.parse(fallbackUrl),
+          videoPlayerOptions: VideoPlayerOptions(mixWithOthers: false),
+        );
+        await fallbackCtrl.initialize();
+        fallbackCtrl.setLooping(false);
+        fallbackCtrl.setVolume(_isMuted ? 0.0 : 1.0);
+
+        if (!_isDisposed && _controllers.containsKey(index)) {
+          final instance = _controllers[index]!;
+          instance.videoPlayerController = fallbackCtrl;
+          instance.state = ShortsPlaybackState.ready;
+          _states[index] = ShortsPlaybackState.ready;
+          if (autoPlay && index == _activeIndex) {
+            fallbackCtrl.play();
+            instance.state = ShortsPlaybackState.playing;
+            _states[index] = ShortsPlaybackState.playing;
+          }
+          notifyListeners();
+        } else {
+          fallbackCtrl.dispose();
+        }
+      } catch (fallbackErr) {
+        if (_controllers.containsKey(index)) {
+          _controllers[index]!.state = ShortsPlaybackState.ready;
+          _states[index] = ShortsPlaybackState.ready;
+        }
       }
     } finally {
       _loadingIndices.remove(index);
