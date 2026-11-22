@@ -72,6 +72,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
       case 2:
         return ShortsFeedView(
           onBackToHome: () {
+            ShortsFeedView.pausePlayback();
             setState(() {
               _currentIndex = 0;
             });

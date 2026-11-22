@@ -9,11 +9,11 @@ import '../theme/app_colors.dart';
 
 /// Direct Online YouTube Shorts Module
 /// - Directly loads official online Shorts link (https://www.youtube.com/shorts)
-/// - Starts unmuted with full audio on click & refresh
+/// - Starts unmuted with full audio immediately on click & refresh
 /// - Sits cleanly below system status bar (no overlap with network/battery)
 /// - Full-screen when playing (hides bottom nav), shows nav when paused
-/// - Completely hides YouTube logo & top-left header icons
-/// - Top-left back button seamlessly returns to Discover/Home tab
+/// - Hides YouTube top-left logo and "Open in App" popups, keeps Sign In visible
+/// - Top-left back button & Android back button seamlessly return to Discover and stop audio
 class ShortsFeedView extends StatefulWidget {
   final VoidCallback? onBackToDeviceVideos;
   final VoidCallback? onBackToHome;
@@ -24,7 +24,7 @@ class ShortsFeedView extends StatefulWidget {
   /// Global playback state: true = playing (hide bottom nav), false = paused (show bottom nav)
   static final ValueNotifier<bool> isPlayingNotifier = ValueNotifier<bool>(false);
 
-  /// Global pause request trigger: used when user switches away from the Shorts tab
+  /// Global pause request trigger: used when user leaves or pauses the Shorts tab
   static final ValueNotifier<int> pauseRequestNotifier = ValueNotifier<int>(0);
 
   /// Trigger instant refresh to a fresh, unrepeated short video
@@ -32,10 +32,10 @@ class ShortsFeedView extends StatefulWidget {
     refreshNotifier.value++;
   }
 
-  /// Pause shorts playback
+  /// Pause shorts playback and stop audio completely
   static void pausePlayback() {
-    pauseRequestNotifier.value++;
     isPlayingNotifier.value = false;
+    pauseRequestNotifier.value++;
   }
 
   const ShortsFeedView({
@@ -48,7 +48,7 @@ class ShortsFeedView extends StatefulWidget {
   State<ShortsFeedView> createState() => _ShortsFeedViewState();
 }
 
-class _ShortsFeedViewState extends State<ShortsFeedView> {
+class _ShortsFeedViewState extends State<ShortsFeedView> with WidgetsBindingObserver {
   late final WebViewController _controller;
   bool _isLoading = true;
 
@@ -59,33 +59,26 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
 
   static const String _shortsUrl = 'https://www.youtube.com/shorts';
 
-  /// Minimal CSS:
-  /// 1. Completely hides YouTube website header/logo/icons.
-  /// 2. Hides YouTube website bottom pivot bar & external app promos.
-  /// 3. ALL native Shorts buttons (Like, Dislike, Comment, Share, Channel Avatar, Subscribe) remain 100% visible & interactive!
+  /// Cleanup CSS:
+  /// 1. Completely hides YouTube website logo at top-left corner.
+  /// 2. Hides "Open in YouTube App" promos, banners, and buttons.
+  /// 3. Hides YouTube website bottom pivot tab bar.
+  /// 4. KEEPS Google Account "Sign in" button intact and functional.
+  /// 5. ALL native Shorts buttons (Like, Dislike, Comment, Share, Avatar, Subscribe) remain 100% visible & interactive!
   static const String _minimalCleanupCss = '''
-    /* 1. Hide YouTube website top header bar, logo, and top-left branding */
-    ytm-mobile-topbar-renderer,
-    .mobile-topbar-header,
-    #header-bar,
-    .topbar-header,
-    header,
-    header.mobile-topbar-header,
+    /* 1. Hide YouTube website logo on top-left corner */
     #logo,
+    a#logo,
     .ytm-logo,
     ytm-home-logo,
     .topbar-logo,
-    ytd-topbar-logo-renderer,
-    .mobile-topbar-header-endpoint,
     yt-icon.topbar-logo,
-    yt-icon[type="brand"],
-    .yt-spec-icon-badge-shape--type-brand,
-    a[href="/"][id*="logo"],
+    a.mobile-topbar-header-endpoint,
     a[aria-label="YouTube"],
     a[aria-label="YouTube Home"],
-    .header-bar-logo,
-    yt-icon.mobile-topbar-header-endpoint,
-    button[aria-label*="YouTube" i] {
+    yt-icon[type="brand"],
+    .yt-spec-icon-badge-shape--type-brand,
+    .header-bar-logo {
       display: none !important;
       visibility: hidden !important;
       opacity: 0 !important;
@@ -96,7 +89,43 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
       pointer-events: none !important;
     }
 
-    /* 2. Hide YouTube website bottom tab bar (Home, Subscriptions, etc.) since MSIXA has its own */
+    /* 2. Hide "Open YouTube App" buttons and banners completely */
+    ytm-open-app-button,
+    .open-app-button,
+    [data-target-id="open-app-button"],
+    ytm-button-renderer[data-target-id="open-app-button"],
+    a[aria-label*="Open app" i],
+    button[aria-label*="Open app" i],
+    a[aria-label*="Open YouTube app" i],
+    button[aria-label*="Open YouTube app" i],
+    .upsell-dialog-renderer,
+    ytm-upsell-dialog-renderer,
+    ytm-mealbar-promo-renderer,
+    .banner-promo,
+    #app-banner,
+    .open-app-banner {
+      display: none !important;
+      visibility: hidden !important;
+      opacity: 0 !important;
+      height: 0px !important;
+      width: 0px !important;
+      overflow: hidden !important;
+      pointer-events: none !important;
+    }
+
+    /* 3. Keep Sign In button visible and accessible at top right */
+    ytm-signin-button,
+    a[href*="accounts.google.com"],
+    a[href*="ServiceLogin"],
+    a[aria-label*="Sign in" i],
+    .signin-button {
+      display: inline-block !important;
+      visibility: visible !important;
+      opacity: 1 !important;
+      pointer-events: auto !important;
+    }
+
+    /* 4. Hide YouTube website bottom tab bar (Home, Subscriptions) */
     ytm-pivot-bar-renderer,
     .pivot-bar,
     .ytm-pivot-bar {
@@ -107,22 +136,7 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
       overflow: hidden !important;
     }
 
-    /* 3. Hide annoying 'Open in YouTube App' banners and promos */
-    .upsell-dialog-renderer,
-    #app-banner,
-    .open-app-banner,
-    ytm-upsell-dialog-renderer,
-    ytm-mealbar-promo-renderer,
-    .banner-promo,
-    ytm-button-renderer[data-target-id="open-app-button"],
-    ytm-open-app-button,
-    .open-app-button {
-      display: none !important;
-      visibility: hidden !important;
-      height: 0px !important;
-    }
-
-    /* 4. Full screen black background & smooth fit */
+    /* 5. Full screen black background & smooth fit */
     body, html {
       background-color: #000000 !important;
       margin: 0 !important;
@@ -136,6 +150,7 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     AppShareService.keepScreenOn(true);
     ShortsFeedView.isPlayingNotifier.value = false;
     ShortsFeedView.refreshNotifier.addListener(_handleReclickRefresh);
@@ -150,9 +165,10 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
       ..addJavaScriptChannel(
         'MsixaPlaybackChannel',
         onMessageReceived: (JavaScriptMessage message) {
-          if (message.message == 'playing') {
+          final state = message.message;
+          if (state == 'playing') {
             if (mounted) ShortsFeedView.isPlayingNotifier.value = true;
-          } else if (message.message == 'paused') {
+          } else if (state == 'paused') {
             if (mounted) ShortsFeedView.isPlayingNotifier.value = false;
           }
         },
@@ -183,7 +199,7 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
             _injectCleanupScript();
           },
           onProgress: (int progress) {
-            if (progress > 25) {
+            if (progress > 20) {
               _injectCleanupScript();
             }
           },
@@ -204,6 +220,7 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     ShortsFeedView.refreshNotifier.removeListener(_handleReclickRefresh);
     ShortsFeedView.pauseRequestNotifier.removeListener(_handlePauseRequest);
     ShortsFeedView.isPlayingNotifier.value = false;
@@ -211,13 +228,23 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
     super.dispose();
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+      ShortsFeedView.pausePlayback();
+    }
+  }
+
   void _handlePauseRequest() {
     _controller.runJavaScript('''
       (function() {
-        var videos = document.querySelectorAll('video');
-        for (var i = 0; i < videos.length; i++) {
-          videos[i].pause();
-        }
+        try {
+          var videos = document.querySelectorAll('video');
+          for (var i = 0; i < videos.length; i++) {
+            videos[i].pause();
+            videos[i].muted = true;
+          }
+        } catch(_) {}
       })();
     ''').catchError((_) {});
   }
@@ -256,99 +283,155 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
   void _injectCleanupScript() {
     final script = '''
       (function() {
-        // 1. Inject CSS to hide website headers and logos
+        // 1. Inject CSS to hide website logo and Open App promos
         function injectCss() {
-          var style = document.getElementById('msixa-minimal-cleanup');
-          if (!style) {
-            style = document.createElement('style');
-            style.id = 'msixa-minimal-cleanup';
-            style.innerHTML = `$_minimalCleanupCss`;
-            (document.head || document.documentElement).appendChild(style);
-          }
+          try {
+            var style = document.getElementById('msixa-minimal-cleanup');
+            if (!style) {
+              style = document.createElement('style');
+              style.id = 'msixa-minimal-cleanup';
+              style.innerHTML = `$_minimalCleanupCss`;
+              (document.head || document.documentElement).appendChild(style);
+            }
+          } catch(e) {}
         }
         injectCss();
 
-        // 2. Unmute and force max audio volume
+        // 2. Override HTMLMediaElement prototype muted and volume setters so YouTube CANNOT mute video
+        try {
+          if (!window._msixaAudioPatched) {
+            window._msixaAudioPatched = true;
+            var nativeMutedDesc = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'muted');
+            Object.defineProperty(HTMLMediaElement.prototype, 'muted', {
+              get: function() { return false; },
+              set: function(val) {
+                if (nativeMutedDesc && nativeMutedDesc.set) {
+                  nativeMutedDesc.set.call(this, false);
+                }
+              },
+              configurable: true,
+              enumerable: true
+            });
+
+            var nativeVolDesc = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'volume');
+            Object.defineProperty(HTMLMediaElement.prototype, 'volume', {
+              get: function() { return 1.0; },
+              set: function(val) {
+                if (nativeVolDesc && nativeVolDesc.set) {
+                  nativeVolDesc.set.call(this, 1.0);
+                }
+              },
+              configurable: true,
+              enumerable: true
+            });
+          }
+        } catch(e) {}
+
+        // 3. Set volume unmuted in localStorage & sessionStorage
+        try {
+          var volData = JSON.stringify({ volume: 100, muted: false });
+          localStorage.setItem('yt-player-volume', JSON.stringify({ data: volData }));
+          sessionStorage.setItem('yt-player-volume', JSON.stringify({ data: volData }));
+        } catch(e) {}
+
+        // 4. Force unmute on any video elements and click any unmute overlay button
         function forceUnmute() {
           try {
-            var volData = JSON.stringify({ volume: 100, muted: false });
-            localStorage.setItem('yt-player-volume', JSON.stringify({ data: volData }));
-            sessionStorage.setItem('yt-player-volume', JSON.stringify({ data: volData }));
-          } catch(e) {}
-
-          var videos = document.querySelectorAll('video');
-          for (var i = 0; i < videos.length; i++) {
-            var v = videos[i];
-            if (v.muted) v.muted = false;
-            if (v.volume < 1.0) v.volume = 1.0;
-            if (v.hasAttribute('muted')) v.removeAttribute('muted');
-          }
-
-          var muteButtons = document.querySelectorAll(
-            'button[aria-label*="unmute" i], ' +
-            'button[aria-label*="Unmute" i], ' +
-            '.ytp-mute-button[aria-pressed="true"], ' +
-            'ytm-mute-button, ' +
-            '[aria-label*="Unmute" i]'
-          );
-          for (var j = 0; j < muteButtons.length; j++) {
-            var btn = muteButtons[j];
-            var aria = (btn.getAttribute('aria-label') || '').toLowerCase();
-            if (aria.indexOf('unmute') !== -1 || btn.getAttribute('aria-pressed') === 'true') {
-              btn.click();
+            var videos = document.querySelectorAll('video');
+            for (var i = 0; i < videos.length; i++) {
+              var v = videos[i];
+              if (v.muted) v.muted = false;
+              if (v.volume < 1.0) v.volume = 1.0;
+              if (v.hasAttribute('muted')) v.removeAttribute('muted');
             }
-          }
+
+            var muteButtons = document.querySelectorAll(
+              'button[aria-label*="unmute" i], ' +
+              'button[aria-label*="Unmute" i], ' +
+              '.ytp-mute-button[aria-pressed="true"], ' +
+              'ytm-mute-button, ' +
+              '[aria-label*="Unmute" i]'
+            );
+            for (var j = 0; j < muteButtons.length; j++) {
+              var btn = muteButtons[j];
+              var aria = (btn.getAttribute('aria-label') || '').toLowerCase();
+              if (aria.indexOf('unmute') !== -1 || btn.getAttribute('aria-pressed') === 'true') {
+                btn.click();
+              }
+            }
+          } catch(e) {}
         }
         forceUnmute();
 
-        // 3. Purge clutter and logos
+        // 5. Purge clutter: remove YouTube logo & Open App button from DOM, keep Sign In
         function purgeClutter() {
-          injectCss();
-          forceUnmute();
-          var clutterSelectors = [
-            'ytm-mobile-topbar-renderer',
-            '.mobile-topbar-header',
-            '#header-bar',
-            '.topbar-header',
-            'header',
-            '#logo',
-            '.ytm-logo',
-            'ytm-home-logo',
-            '.topbar-logo',
-            'ytd-topbar-logo-renderer',
-            '.mobile-topbar-header-endpoint',
-            'yt-icon.topbar-logo',
-            'yt-icon[type="brand"]',
-            '.yt-spec-icon-badge-shape--type-brand',
-            'a[aria-label="YouTube"]',
-            'a[aria-label="YouTube Home"]',
-            'ytm-pivot-bar-renderer',
-            '.pivot-bar',
-            '#app-banner',
-            '.open-app-banner',
-            'ytm-upsell-dialog-renderer',
-            'ytm-mealbar-promo-renderer'
-          ];
-          for (var i = 0; i < clutterSelectors.length; i++) {
-            var els = document.querySelectorAll(clutterSelectors[i]);
-            for (var j = 0; j < els.length; j++) {
-              els[j].style.setProperty('display', 'none', 'important');
-              els[j].style.setProperty('visibility', 'hidden', 'important');
-              els[j].style.setProperty('height', '0px', 'important');
-              els[j].style.setProperty('width', '0px', 'important');
-              els[j].style.setProperty('opacity', '0', 'important');
+          try {
+            injectCss();
+            forceUnmute();
+
+            // Remove YouTube logo at top-left
+            var logos = document.querySelectorAll(
+              '#logo, a#logo, ytm-home-logo, .topbar-logo, yt-icon.topbar-logo, ' +
+              'a.mobile-topbar-header-endpoint, a[aria-label="YouTube"], a[aria-label="YouTube Home"], ' +
+              'yt-icon[type="brand"], .yt-spec-icon-badge-shape--type-brand'
+            );
+            for (var i = 0; i < logos.length; i++) {
+              logos[i].style.setProperty('display', 'none', 'important');
+              logos[i].style.setProperty('visibility', 'hidden', 'important');
             }
-          }
+
+            // Remove Open App buttons & popups
+            var openApps = document.querySelectorAll(
+              'ytm-open-app-button, .open-app-button, [data-target-id="open-app-button"], ' +
+              'a[aria-label*="Open app" i], button[aria-label*="Open app" i], ' +
+              '.upsell-dialog-renderer, ytm-upsell-dialog-renderer, ytm-mealbar-promo-renderer, #app-banner'
+            );
+            for (var j = 0; j < openApps.length; j++) {
+              openApps[j].remove();
+            }
+
+            // Remove YouTube bottom pivot bar
+            var pivotBars = document.querySelectorAll('ytm-pivot-bar-renderer, .pivot-bar, .ytm-pivot-bar');
+            for (var k = 0; k < pivotBars.length; k++) {
+              pivotBars[k].style.setProperty('display', 'none', 'important');
+              pivotBars[k].style.setProperty('visibility', 'hidden', 'important');
+            }
+          } catch(e) {}
         }
         purgeClutter();
 
-        // 4. Hook video events for play/pause state communication
+        // 6. Playback state detection: check if video is actively playing vs paused
+        var lastPlaybackState = '';
+        function checkPlaybackState() {
+          try {
+            var videos = document.querySelectorAll('video');
+            var isPlaying = false;
+            for (var i = 0; i < videos.length; i++) {
+              var v = videos[i];
+              if (!v.paused && !v.ended && v.currentTime > 0) {
+                isPlaying = true;
+                break;
+              }
+            }
+            var currentState = isPlaying ? 'playing' : 'paused';
+            if (currentState !== lastPlaybackState) {
+              lastPlaybackState = currentState;
+              if (window.MsixaPlaybackChannel) {
+                window.MsixaPlaybackChannel.postMessage(currentState);
+              }
+            }
+          } catch(e) {}
+        }
+        setInterval(checkPlaybackState, 250);
+
+        // 7. Video event listeners for instantaneous play/pause state
         ['play', 'playing'].forEach(function(evt) {
           document.addEventListener(evt, function(e) {
-            if (e.target && e.target.tagName === 'VIDEO') {
+            if (e.target && e.target.tagName && e.target.tagName.toUpperCase() === 'VIDEO') {
               e.target.muted = false;
               e.target.volume = 1.0;
               forceUnmute();
+              lastPlaybackState = 'playing';
               if (window.MsixaPlaybackChannel) {
                 window.MsixaPlaybackChannel.postMessage('playing');
               }
@@ -358,7 +441,8 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
 
         ['pause', 'ended'].forEach(function(evt) {
           document.addEventListener(evt, function(e) {
-            if (e.target && e.target.tagName === 'VIDEO') {
+            if (e.target && e.target.tagName && e.target.tagName.toUpperCase() === 'VIDEO') {
+              lastPlaybackState = 'paused';
               if (window.MsixaPlaybackChannel) {
                 window.MsixaPlaybackChannel.postMessage('paused');
               }
@@ -374,15 +458,18 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
 
         // Prevent opening external YouTube app
         document.addEventListener('click', function(e) {
-          var target = e.target.closest('a, button');
-          if (target) {
-            var href = target.getAttribute('href') || '';
-            if (href.indexOf('intent://') === 0 || href.indexOf('market://') === 0 || href.indexOf('vnd.youtube') === 0) {
-              e.preventDefault();
-              e.stopPropagation();
-              return false;
+          try {
+            if (!e.target || typeof e.target.closest !== 'function') return;
+            var target = e.target.closest('a, button');
+            if (target) {
+              var href = target.getAttribute('href') || '';
+              if (href.indexOf('intent://') === 0 || href.indexOf('market://') === 0 || href.indexOf('vnd.youtube') === 0) {
+                e.preventDefault();
+                e.stopPropagation();
+                return false;
+              }
             }
-          }
+          } catch(_) {}
         }, true);
       })();
     ''';
@@ -397,16 +484,14 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
       canPop: false,
       onPopInvoked: (didPop) async {
         if (didPop) return;
-        if (await _controller.canGoBack()) {
-          _controller.goBack();
+        // Immediately pause and stop audio
+        ShortsFeedView.pausePlayback();
+        if (widget.onBackToHome != null) {
+          widget.onBackToHome!();
           return;
         }
         if (widget.onBackToDeviceVideos != null) {
           widget.onBackToDeviceVideos!();
-          return;
-        }
-        if (widget.onBackToHome != null) {
-          widget.onBackToHome!();
           return;
         }
         if (Navigator.canPop(context)) {
@@ -520,37 +605,42 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
                 Positioned(
                   top: 10,
                   left: 10,
-                  child: GestureDetector(
-                    onTap: () {
-                      if (widget.onBackToDeviceVideos != null) {
-                        widget.onBackToDeviceVideos!();
-                      } else if (widget.onBackToHome != null) {
-                        widget.onBackToHome!();
-                      } else if (Navigator.canPop(context)) {
-                        Navigator.pop(context);
-                      }
-                    },
-                    behavior: HitTestBehavior.opaque,
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.55),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white24, width: 1),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.4),
-                            blurRadius: 6,
-                            offset: const Offset(0, 2),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(24),
+                      onTap: () {
+                        // Stop Shorts video audio immediately before navigating away
+                        ShortsFeedView.pausePlayback();
+                        if (widget.onBackToHome != null) {
+                          widget.onBackToHome!();
+                        } else if (widget.onBackToDeviceVideos != null) {
+                          widget.onBackToDeviceVideos!();
+                        } else if (Navigator.canPop(context)) {
+                          Navigator.pop(context);
+                        }
+                      },
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.65),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white24, width: 1.2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.5),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: const Center(
+                          child: Icon(
+                            Icons.arrow_back_ios_new_rounded,
+                            color: Colors.white,
+                            size: 20,
                           ),
-                        ],
-                      ),
-                      child: const Center(
-                        child: Icon(
-                          Icons.arrow_back_ios_new_rounded,
-                          color: Colors.white,
-                          size: 18,
                         ),
                       ),
                     ),
