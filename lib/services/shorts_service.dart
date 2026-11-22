@@ -79,13 +79,23 @@ class ShortsService {
       return videoId;
     }
 
-    // Use YoutubeExplode for direct clean MP4 stream extraction with highest HD quality
+    // Use YoutubeExplode for direct clean MP4/HLS stream extraction with Adaptive Bitrate HD quality
     YoutubeExplode? yt;
     try {
       yt = YoutubeExplode();
       final manifest = await yt.videos.streamsClient.getManifest(videoId).timeout(
         const Duration(seconds: 8),
       );
+
+      // Priority 1: HLS Adaptive Bitrate stream (.m3u8)
+      // Provides crystal clear 1080p/720p 60fps and automatically adapts quality on slow networks without buffering!
+      if (manifest.hls.isNotEmpty) {
+        final hlsUrl = manifest.hls.first.url.toString();
+        _streamCache[videoId] = hlsUrl;
+        return hlsUrl;
+      }
+
+      // Priority 2: Highest Quality Muxed Progressive MP4 Stream
       final muxedStreams = manifest.muxed.toList();
       if (muxedStreams.isNotEmpty) {
         // Sort descending by video resolution and bitrate for highest HD quality (1080p/720p 60fps)
@@ -104,6 +114,15 @@ class ShortsService {
       yt?.close();
     }
     return null;
+  }
+
+  /// Pre-warms stream URLs in the background to ensure ZERO-LATENCY playback
+  void prewarmStreamUrls(List<String> videoIds) {
+    for (final id in videoIds) {
+      if (!_streamCache.containsKey(id)) {
+        resolveStreamUrl(id).catchError((_) => null);
+      }
+    }
   }
 
   /// Searches Shorts across all genres without user login
@@ -189,10 +208,22 @@ class ShortsService {
   /// Downloads Short Video to device storage with progress callback
   Future<String?> downloadShort(ShortVideoItem item, {Function(double progress)? onProgress}) async {
     try {
-      // 1. Resolve direct stream URL
-      String? streamUrl = item.streamUrl;
-      if (streamUrl == null || streamUrl.isEmpty) {
-        streamUrl = await resolveStreamUrl(item.id);
+      // 1. Resolve direct MP4 stream URL for downloading (standalone video file)
+      String? streamUrl;
+      if (item.streamUrl != null && item.streamUrl!.contains('.mp4')) {
+        streamUrl = item.streamUrl;
+      } else {
+        YoutubeExplode? yt;
+        try {
+          yt = YoutubeExplode();
+          final manifest = await yt.videos.streamsClient.getManifest(item.id);
+          final muxed = manifest.muxed.withHighestBitrate();
+          streamUrl = muxed.url.toString();
+        } catch (_) {
+          streamUrl = await resolveStreamUrl(item.id);
+        } finally {
+          yt?.close();
+        }
       }
       if (streamUrl == null || streamUrl.isEmpty) {
         return null;

@@ -26,6 +26,10 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
   bool _isSearching = false;
   int _currentIndex = 0;
 
+  // Multi-Controller Preloading Pool for 0-Second Instant Playback
+  final Map<int, VideoPlayerController> _controllers = {};
+  final Set<int> _loadingIndices = {};
+
   final List<Map<String, String>> _categories = [
     {'id': 'Trending', 'hi': '🔥 ट्रेंडिंग', 'en': '🔥 Trending'},
     {'id': 'Marwadi', 'hi': '🐪 मारवाड़ी व राजस्थानी', 'en': '🐪 Rajasthani'},
@@ -43,13 +47,26 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
 
   @override
   void dispose() {
+    _disposeAllControllers();
     _pageController.dispose();
     _searchController.dispose();
     super.dispose();
   }
 
+  void _disposeAllControllers() {
+    for (final ctrl in _controllers.values) {
+      try {
+        ctrl.pause();
+        ctrl.dispose();
+      } catch (_) {}
+    }
+    _controllers.clear();
+    _loadingIndices.clear();
+  }
+
   Future<void> _loadShortsForCategory(String category) async {
     setState(() => _isLoading = true);
+    _disposeAllControllers();
     final list = await _shortsService.getShortsByCategory(category);
     if (mounted) {
       setState(() {
@@ -57,12 +74,15 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
         _isLoading = false;
         _currentIndex = 0;
       });
+      // Pre-warm and preload the first 3 videos into memory immediately!
+      _preloadAroundIndex(0);
     }
   }
 
   Future<void> _performSearch(String query) async {
     if (query.trim().isEmpty) return;
     setState(() => _isLoading = true);
+    _disposeAllControllers();
     final results = await _shortsService.searchShorts(query.trim());
     if (mounted) {
       setState(() {
@@ -70,7 +90,99 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
         _isLoading = false;
         _currentIndex = 0;
       });
+      _preloadAroundIndex(0);
     }
+  }
+
+  void _preloadAroundIndex(int center) {
+    if (_shorts.isEmpty) return;
+    // Pre-warm URLs in background
+    final idsToPrewarm = <String>[];
+    for (int i = center; i <= center + 3; i++) {
+      if (i >= 0 && i < _shorts.length) {
+        idsToPrewarm.add(_shorts[i].id);
+      }
+    }
+    _shortsService.prewarmStreamUrls(idsToPrewarm);
+
+    // Initialize VideoPlayerControllers for current, next 1, and next 2
+    for (int i = center; i <= center + 2; i++) {
+      if (i >= 0 && i < _shorts.length) {
+        _initControllerForIndex(i);
+      }
+    }
+
+    // Clean up distant controllers to avoid memory leaks
+    final staleKeys = _controllers.keys.where((k) => k < center - 2 || k > center + 3).toList();
+    for (final k in staleKeys) {
+      try {
+        _controllers[k]?.pause();
+        _controllers[k]?.dispose();
+      } catch (_) {}
+      _controllers.remove(k);
+    }
+  }
+
+  Future<void> _initControllerForIndex(int index) async {
+    if (index < 0 || index >= _shorts.length) return;
+    if (_controllers.containsKey(index) || _loadingIndices.contains(index)) return;
+
+    _loadingIndices.add(index);
+    try {
+      final item = _shorts[index];
+      String? streamUrl = item.streamUrl;
+      if (streamUrl == null || streamUrl.isEmpty) {
+        streamUrl = await _shortsService.resolveStreamUrl(item.id);
+      }
+
+      if (streamUrl != null && streamUrl.isNotEmpty && mounted) {
+        final ctrl = VideoPlayerController.networkUrl(
+          Uri.parse(streamUrl),
+          videoPlayerOptions: VideoPlayerOptions(mixWithOthers: false),
+        );
+        await ctrl.initialize();
+        ctrl.setLooping(false);
+
+        if (mounted) {
+          setState(() {
+            _controllers[index] = ctrl;
+            _loadingIndices.remove(index);
+          });
+          // If this index is currently visible, play immediately!
+          if (index == _currentIndex) {
+            ctrl.play();
+          }
+        } else {
+          ctrl.dispose();
+        }
+      }
+    } catch (_) {
+      _loadingIndices.remove(index);
+    }
+  }
+
+  void _onPageChanged(int newIndex) {
+    final oldIndex = _currentIndex;
+    _currentIndex = newIndex;
+
+    // Pause old video
+    if (_controllers.containsKey(oldIndex)) {
+      _controllers[oldIndex]?.pause();
+    }
+
+    // Play new video immediately (already preloaded in 0ms!)
+    if (_controllers.containsKey(newIndex)) {
+      final ctrl = _controllers[newIndex]!;
+      ctrl.seekTo(Duration.zero);
+      ctrl.play();
+    } else {
+      // In case of rapid multi-swipe
+      _initControllerForIndex(newIndex);
+    }
+
+    // Preload next videos ahead
+    _preloadAroundIndex(newIndex);
+    setState(() {});
   }
 
   void _onVideoCompleted(int index) {
@@ -78,14 +190,14 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
     // Auto-scroll hands-free to next video upon completion
     if (index < _shorts.length - 1) {
       _pageController.nextPage(
-        duration: const Duration(milliseconds: 400),
+        duration: const Duration(milliseconds: 350),
         curve: Curves.easeInOutCubic,
       );
     } else {
       // Loop back to the first video smoothly
       _pageController.animateToPage(
         0,
-        duration: const Duration(milliseconds: 500),
+        duration: const Duration(milliseconds: 450),
         curve: Curves.easeInOutCubic,
       );
     }
@@ -132,15 +244,16 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
               controller: _pageController,
               scrollDirection: Axis.vertical,
               itemCount: _shorts.length,
-              onPageChanged: (index) {
-                setState(() => _currentIndex = index);
-              },
+              onPageChanged: _onPageChanged,
               itemBuilder: (context, index) {
                 final isCurrent = index == _currentIndex;
+                final controller = _controllers[index];
+
                 return _ShortVideoPlayerCard(
                   key: ValueKey(_shorts[index].id),
                   short: _shorts[index],
                   isActive: isCurrent,
+                  controller: controller,
                   onVideoCompleted: () => _onVideoCompleted(index),
                   onLikeToggle: () {
                     setState(() {
@@ -272,6 +385,7 @@ class _ShortsFeedViewState extends State<ShortsFeedView> {
 class _ShortVideoPlayerCard extends StatefulWidget {
   final ShortVideoItem short;
   final bool isActive;
+  final VideoPlayerController? controller;
   final VoidCallback onLikeToggle;
   final VoidCallback onVideoCompleted;
 
@@ -279,6 +393,7 @@ class _ShortVideoPlayerCard extends StatefulWidget {
     Key? key,
     required this.short,
     required this.isActive,
+    this.controller,
     required this.onLikeToggle,
     required this.onVideoCompleted,
   }) : super(key: key);
@@ -289,8 +404,6 @@ class _ShortVideoPlayerCard extends StatefulWidget {
 
 class _ShortVideoPlayerCardState extends State<_ShortVideoPlayerCard> {
   final ShortsService _shortsService = ShortsService();
-  VideoPlayerController? _controller;
-  bool _isInit = false;
   bool _isPlaying = true;
   bool _isDownloading = false;
   double _downloadProgress = 0.0;
@@ -300,41 +413,49 @@ class _ShortVideoPlayerCardState extends State<_ShortVideoPlayerCard> {
   @override
   void initState() {
     super.initState();
-    if (widget.isActive) {
-      _initVideo();
+    _attachListener();
+    if (widget.isActive && widget.controller != null && widget.controller!.value.isInitialized) {
+      widget.controller!.play();
+      _isPlaying = true;
     }
   }
 
   @override
   void didUpdateWidget(covariant _ShortVideoPlayerCard oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller?.removeListener(_onControllerUpdate);
+      _attachListener();
+    }
+
     if (widget.isActive != oldWidget.isActive) {
       if (widget.isActive) {
         _hasTriggeredCompletion = false;
-        if (_controller == null) {
-          _initVideo();
-        } else {
-          _controller?.seekTo(Duration.zero);
-          _controller?.play();
+        if (widget.controller != null && widget.controller!.value.isInitialized) {
+          widget.controller!.seekTo(Duration.zero);
+          widget.controller!.play();
           setState(() => _isPlaying = true);
         }
       } else {
-        _controller?.pause();
+        widget.controller?.pause();
         setState(() => _isPlaying = false);
       }
     }
   }
 
+  void _attachListener() {
+    widget.controller?.addListener(_onControllerUpdate);
+  }
+
   @override
   void dispose() {
-    _controller?.removeListener(_checkVideoCompletion);
-    _controller?.dispose();
+    widget.controller?.removeListener(_onControllerUpdate);
     super.dispose();
   }
 
-  void _checkVideoCompletion() {
-    if (!mounted || _controller == null || !widget.isActive) return;
-    final val = _controller!.value;
+  void _onControllerUpdate() {
+    if (!mounted || widget.controller == null || !widget.isActive) return;
+    final val = widget.controller!.value;
     if (val.isInitialized && val.duration > Duration.zero) {
       if (val.position >= val.duration) {
         if (!_hasTriggeredCompletion) {
@@ -345,44 +466,16 @@ class _ShortVideoPlayerCardState extends State<_ShortVideoPlayerCard> {
     }
   }
 
-  Future<void> _initVideo() async {
-    try {
-      String? streamUrl = widget.short.streamUrl;
-      if (streamUrl == null || streamUrl.isEmpty) {
-        streamUrl = await _shortsService.resolveStreamUrl(widget.short.id);
-      }
-
-      if (streamUrl != null && streamUrl.isNotEmpty && mounted) {
-        final ctrl = VideoPlayerController.networkUrl(
-          Uri.parse(streamUrl),
-          videoPlayerOptions: VideoPlayerOptions(mixWithOthers: false),
-        );
-        await ctrl.initialize();
-        ctrl.setLooping(false); // Loop handled by auto-scroll on completion!
-        ctrl.addListener(_checkVideoCompletion);
-
-        if (widget.isActive) {
-          ctrl.play();
-        }
-        if (mounted) {
-          setState(() {
-            _controller = ctrl;
-            _isInit = true;
-            _isPlaying = widget.isActive;
-          });
-        }
-      }
-    } catch (_) {}
-  }
-
   void _togglePlayPause() {
-    if (_controller == null || !_isInit) return;
+    final ctrl = widget.controller;
+    if (ctrl == null || !ctrl.value.isInitialized) return;
+
     setState(() {
-      if (_controller!.value.isPlaying) {
-        _controller!.pause();
+      if (ctrl.value.isPlaying) {
+        ctrl.pause();
         _isPlaying = false; // Buttons & overlay become visible on pause!
       } else {
-        _controller!.play();
+        ctrl.play();
         _isPlaying = true; // Buttons & overlay hide when video plays!
       }
     });
@@ -483,9 +576,11 @@ class _ShortVideoPlayerCardState extends State<_ShortVideoPlayerCard> {
 
   @override
   Widget build(BuildContext context) {
-    // Only show side buttons and overlay when the video is paused by the user!
+    final ctrl = widget.controller;
+    final isReady = ctrl != null && ctrl.value.isInitialized;
+    // Side buttons only appear when the video is paused by the user!
     // When playing: pure, clean full-screen video with zero distractions.
-    final showControls = !_isPlaying && _isInit;
+    final showControls = !_isPlaying && isReady;
 
     return GestureDetector(
       onTap: _togglePlayPause,
@@ -494,14 +589,14 @@ class _ShortVideoPlayerCardState extends State<_ShortVideoPlayerCard> {
         fit: StackFit.expand,
         children: [
           // 1. Pure Edge-to-Edge Fullscreen Video Player (FittedBox.cover)
-          if (_controller != null && _isInit)
+          if (isReady)
             SizedBox.expand(
               child: FittedBox(
                 fit: BoxFit.cover,
                 child: SizedBox(
-                  width: _controller!.value.size.width > 0 ? _controller!.value.size.width : 1080,
-                  height: _controller!.value.size.height > 0 ? _controller!.value.size.height : 1920,
-                  child: VideoPlayer(_controller!),
+                  width: ctrl.value.size.width > 0 ? ctrl.value.size.width : 1080,
+                  height: ctrl.value.size.height > 0 ? ctrl.value.size.height : 1920,
+                  child: VideoPlayer(ctrl),
                 ),
               ),
             )
@@ -538,13 +633,13 @@ class _ShortVideoPlayerCardState extends State<_ShortVideoPlayerCard> {
             ),
 
           // 3. Subtle bottom video progress indicator
-          if (_controller != null && _isInit)
+          if (isReady)
             Positioned(
               left: 0,
               right: 0,
               bottom: 0,
               child: VideoProgressIndicator(
-                _controller!,
+                ctrl,
                 allowScrubbing: true,
                 colors: const VideoProgressColors(
                   playedColor: Color(0xFF00E5FF),

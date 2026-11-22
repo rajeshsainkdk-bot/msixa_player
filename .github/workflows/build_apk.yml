@@ -1120,14 +1120,14 @@ jobs:
                   if "setEnableDecoderFallback(true)" not in content and "new ExoPlayer.Builder(context)" in content:
                       content = content.replace(
                           "new ExoPlayer.Builder(context)",
-                          "new ExoPlayer.Builder(context, new androidx.media3.exoplayer.DefaultRenderersFactory(context).setEnableDecoderFallback(true).setExtensionRendererMode(androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)).setSeekParameters(androidx.media3.exoplayer.SeekParameters.CLOSEST_SYNC)"
+                          "new ExoPlayer.Builder(context, new androidx.media3.exoplayer.DefaultRenderersFactory(context).setEnableDecoderFallback(true).setExtensionRendererMode(androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)).setLoadControl(new androidx.media3.exoplayer.DefaultLoadControl.Builder().setBufferDurationsMs(1000, 30000, 500, 1000).build()).setSeekParameters(androidx.media3.exoplayer.SeekParameters.CLOSEST_SYNC)"
                       )
                       modified = True
               elif "com.google.android.exoplayer2" in content:
                   if "setEnableDecoderFallback(true)" not in content and "new ExoPlayer.Builder(context)" in content:
                       content = content.replace(
                           "new ExoPlayer.Builder(context)",
-                          "new ExoPlayer.Builder(context, new com.google.android.exoplayer2.DefaultRenderersFactory(context).setEnableDecoderFallback(true)).setSeekParameters(com.google.android.exoplayer2.SeekParameters.CLOSEST_SYNC)"
+                          "new ExoPlayer.Builder(context, new com.google.android.exoplayer2.DefaultRenderersFactory(context).setEnableDecoderFallback(true)).setLoadControl(new com.google.android.exoplayer2.DefaultLoadControl.Builder().setBufferDurationsMs(1000, 30000, 500, 1000).build()).setSeekParameters(com.google.android.exoplayer2.SeekParameters.CLOSEST_SYNC)"
                       )
                       modified = True
               if modified:
