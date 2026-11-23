@@ -11,7 +11,8 @@ import '../theme/app_colors.dart';
 /// - Directly loads official online Shorts link (https://www.youtube.com/shorts)
 /// - Starts unmuted with full audio immediately on click & refresh
 /// - Sits cleanly below system status bar (no overlap with network/battery)
-/// - Full-screen when playing (hides bottom nav), shows nav when paused
+/// - Seamless scrolling: navigation bar stays completely hidden while swiping between shorts (NO blinking)
+/// - Navigation buttons ONLY viewable when user explicitly pauses the video
 /// - Hides YouTube top-left logo and "Open in App" popups, keeps Sign In visible
 /// - Top-left back button & Android back button seamlessly return to Discover and stop audio
 class ShortsFeedView extends StatefulWidget {
@@ -22,7 +23,7 @@ class ShortsFeedView extends StatefulWidget {
   static final ValueNotifier<int> refreshNotifier = ValueNotifier<int>(0);
 
   /// Global playback state: true = playing (hide bottom nav), false = paused (show bottom nav)
-  static final ValueNotifier<bool> isPlayingNotifier = ValueNotifier<bool>(false);
+  static final ValueNotifier<bool> isPlayingNotifier = ValueNotifier<bool>(true);
 
   /// Global pause request trigger: used when user leaves or pauses the Shorts tab
   static final ValueNotifier<int> pauseRequestNotifier = ValueNotifier<int>(0);
@@ -51,6 +52,10 @@ class ShortsFeedView extends StatefulWidget {
 class _ShortsFeedViewState extends State<ShortsFeedView> with WidgetsBindingObserver {
   late final WebViewController _controller;
   bool _isLoading = true;
+
+  // Anti-blink scroll & pause debounce state
+  Timer? _pauseDebounceTimer;
+  DateTime _lastUserScrollTime = DateTime.now();
 
   // Pull-down to refresh gesture state
   double _dragStartY = 0.0;
@@ -152,7 +157,7 @@ class _ShortsFeedViewState extends State<ShortsFeedView> with WidgetsBindingObse
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     AppShareService.keepScreenOn(true);
-    ShortsFeedView.isPlayingNotifier.value = false;
+    ShortsFeedView.isPlayingNotifier.value = true;
     ShortsFeedView.refreshNotifier.addListener(_handleReclickRefresh);
     ShortsFeedView.pauseRequestNotifier.addListener(_handlePauseRequest);
 
@@ -167,9 +172,18 @@ class _ShortsFeedViewState extends State<ShortsFeedView> with WidgetsBindingObse
         onMessageReceived: (JavaScriptMessage message) {
           final state = message.message;
           if (state == 'playing') {
+            _pauseDebounceTimer?.cancel();
             if (mounted) ShortsFeedView.isPlayingNotifier.value = true;
           } else if (state == 'paused') {
-            if (mounted) ShortsFeedView.isPlayingNotifier.value = false;
+            // Anti-blink: during video scrolling/swiping (within last 1.6s), do NOT show navigation bar!
+            final msSinceScroll = DateTime.now().difference(_lastUserScrollTime).inMilliseconds;
+            if (msSinceScroll < 1600) {
+              return;
+            }
+            _pauseDebounceTimer?.cancel();
+            _pauseDebounceTimer = Timer(const Duration(milliseconds: 600), () {
+              if (mounted) ShortsFeedView.isPlayingNotifier.value = false;
+            });
           }
         },
       )
@@ -195,7 +209,7 @@ class _ShortsFeedViewState extends State<ShortsFeedView> with WidgetsBindingObse
           },
           onPageStarted: (String url) {
             if (mounted) setState(() => _isLoading = true);
-            ShortsFeedView.isPlayingNotifier.value = false;
+            ShortsFeedView.isPlayingNotifier.value = true;
             _injectCleanupScript();
           },
           onProgress: (int progress) {
@@ -221,6 +235,7 @@ class _ShortsFeedViewState extends State<ShortsFeedView> with WidgetsBindingObse
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _pauseDebounceTimer?.cancel();
     ShortsFeedView.refreshNotifier.removeListener(_handleReclickRefresh);
     ShortsFeedView.pauseRequestNotifier.removeListener(_handlePauseRequest);
     ShortsFeedView.isPlayingNotifier.value = false;
@@ -236,6 +251,7 @@ class _ShortsFeedViewState extends State<ShortsFeedView> with WidgetsBindingObse
   }
 
   void _handlePauseRequest() {
+    _pauseDebounceTimer?.cancel();
     _controller.runJavaScript('''
       (function() {
         try {
@@ -251,7 +267,7 @@ class _ShortsFeedViewState extends State<ShortsFeedView> with WidgetsBindingObse
 
   /// Initial load or fresh load with timestamp
   void _loadFreshShorts() {
-    ShortsFeedView.isPlayingNotifier.value = false;
+    ShortsFeedView.isPlayingNotifier.value = true;
     final freshUrl = '$_shortsUrl?t=${DateTime.now().millisecondsSinceEpoch}';
     _controller.loadRequest(Uri.parse(freshUrl));
   }
@@ -400,8 +416,67 @@ class _ShortsFeedViewState extends State<ShortsFeedView> with WidgetsBindingObse
         }
         purgeClutter();
 
-        // 6. Playback state detection: check if video is actively playing vs paused
+        // 6. Anti-blink Swipe / Scroll detection: keep navigation bar hidden during video scrolling
+        var isSwiping = false;
+        var swipeTimer = null;
+        function setSwiping() {
+          isSwiping = true;
+          clearTimeout(swipeTimer);
+          swipeTimer = setTimeout(function() {
+            isSwiping = false;
+          }, 1800);
+        }
+        window.addEventListener('touchstart', setSwiping, { passive: true, capture: true });
+        window.addEventListener('touchmove', setSwiping, { passive: true, capture: true });
+        window.addEventListener('touchend', setSwiping, { passive: true, capture: true });
+        window.addEventListener('scroll', setSwiping, { passive: true, capture: true });
+
+        // 7. Debounced Playback State Controller (Zero Blink on Scroll)
         var lastPlaybackState = '';
+        var pauseTimer = null;
+
+        function notifyState(state) {
+          if (state === 'playing') {
+            if (pauseTimer) {
+              clearTimeout(pauseTimer);
+              pauseTimer = null;
+            }
+            if (lastPlaybackState !== 'playing') {
+              lastPlaybackState = 'playing';
+              if (window.MsixaPlaybackChannel) {
+                window.MsixaPlaybackChannel.postMessage('playing');
+              }
+            }
+          } else if (state === 'paused') {
+            // When user is scrolling between shorts, IGNORE pause so bottom nav DOES NOT BLINK!
+            if (isSwiping) {
+              return;
+            }
+            if (!pauseTimer && lastPlaybackState !== 'paused') {
+              pauseTimer = setTimeout(function() {
+                pauseTimer = null;
+                // Double check if video is STILL genuinely paused by user and not swiping
+                if (!isSwiping) {
+                  var videos = document.querySelectorAll('video');
+                  var isPlaying = false;
+                  for (var i = 0; i < videos.length; i++) {
+                    if (!videos[i].paused && !videos[i].ended && videos[i].currentTime > 0) {
+                      isPlaying = true;
+                      break;
+                    }
+                  }
+                  if (!isPlaying) {
+                    lastPlaybackState = 'paused';
+                    if (window.MsixaPlaybackChannel) {
+                      window.MsixaPlaybackChannel.postMessage('paused');
+                    }
+                  }
+                }
+              }, 700);
+            }
+          }
+        }
+
         function checkPlaybackState() {
           try {
             var videos = document.querySelectorAll('video');
@@ -413,28 +488,19 @@ class _ShortsFeedViewState extends State<ShortsFeedView> with WidgetsBindingObse
                 break;
               }
             }
-            var currentState = isPlaying ? 'playing' : 'paused';
-            if (currentState !== lastPlaybackState) {
-              lastPlaybackState = currentState;
-              if (window.MsixaPlaybackChannel) {
-                window.MsixaPlaybackChannel.postMessage(currentState);
-              }
-            }
+            notifyState(isPlaying ? 'playing' : 'paused');
           } catch(e) {}
         }
         setInterval(checkPlaybackState, 250);
 
-        // 7. Video event listeners for instantaneous play/pause state
+        // 8. Video event listeners for immediate play/pause state
         ['play', 'playing'].forEach(function(evt) {
           document.addEventListener(evt, function(e) {
             if (e.target && e.target.tagName && e.target.tagName.toUpperCase() === 'VIDEO') {
               e.target.muted = false;
               e.target.volume = 1.0;
               forceUnmute();
-              lastPlaybackState = 'playing';
-              if (window.MsixaPlaybackChannel) {
-                window.MsixaPlaybackChannel.postMessage('playing');
-              }
+              notifyState('playing');
             }
           }, true);
         });
@@ -442,10 +508,7 @@ class _ShortsFeedViewState extends State<ShortsFeedView> with WidgetsBindingObse
         ['pause', 'ended'].forEach(function(evt) {
           document.addEventListener(evt, function(e) {
             if (e.target && e.target.tagName && e.target.tagName.toUpperCase() === 'VIDEO') {
-              lastPlaybackState = 'paused';
-              if (window.MsixaPlaybackChannel) {
-                window.MsixaPlaybackChannel.postMessage('paused');
-              }
+              notifyState('paused');
             }
           }, true);
         });
@@ -507,10 +570,14 @@ class _ShortsFeedViewState extends State<ShortsFeedView> with WidgetsBindingObse
           child: Listener(
             behavior: HitTestBehavior.translucent,
             onPointerDown: (event) {
+              _lastUserScrollTime = DateTime.now();
+              _pauseDebounceTimer?.cancel();
               _dragStartY = event.position.dy;
               _currentPullDelta = 0.0;
             },
             onPointerMove: (event) {
+              _lastUserScrollTime = DateTime.now();
+              _pauseDebounceTimer?.cancel();
               final deltaY = event.position.dy - _dragStartY;
               // Detect pull down to refresh from upper 50% of screen
               if (_dragStartY < MediaQuery.of(context).size.height * 0.50 && deltaY > 0) {
@@ -522,6 +589,7 @@ class _ShortsFeedViewState extends State<ShortsFeedView> with WidgetsBindingObse
               }
             },
             onPointerUp: (event) {
+              _lastUserScrollTime = DateTime.now();
               if (_currentPullDelta > 50.0 && !_isPullRefreshing) {
                 _handlePullRefresh();
               } else {
@@ -531,6 +599,7 @@ class _ShortsFeedViewState extends State<ShortsFeedView> with WidgetsBindingObse
               }
             },
             onPointerCancel: (_) {
+              _lastUserScrollTime = DateTime.now();
               if (mounted && _currentPullDelta > 0.0) {
                 setState(() => _currentPullDelta = 0.0);
               }
